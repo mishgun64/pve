@@ -1,0 +1,50 @@
+[system]
+hostname = "proxmox-node"
+timezone = "Europe/Helsinki"
+keyboard_layout = "us"
+locale = "en_US.UTF-8"
+root_password = "1234"
+
+[network]
+# интерфейсы
+[[network.interfaces]]
+name = "eth0"
+method = "dhcp"
+# static пример:
+# method = "static"
+# address = "192.168.1.100/24"
+# gateway = "192.168.1.1"
+# dns = ["8.8.8.8", "8.8.4.4"]
+
+[storage]
+disk = "/dev/sda"
+filesystem = "ext4"
+mount_point = "/"
+lvm_group = "pve"
+overwrite = true
+
+[subscription]
+# no-subscription репозиторий
+use_subscription = false
+
+[packages]
+# список пакетов, которые нужно установить дополнительно
+extra = ["vim", "htop", "curl", "git"]
+
+[proxmox]
+# версия Proxmox VE
+version = "8.3"
+
+[ssh]
+enable = true
+authorized_keys = [
+    ""
+]
+
+[post_install]
+# команды для выполнения после установки
+commands = [
+    "apt update && apt upgrade -y",
+    "systemctl enable ssh",
+    "echo 'Installation complete!'"
+]

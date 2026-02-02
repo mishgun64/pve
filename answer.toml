@@ -12,3 +12,4 @@ source = "from-dhcp"
 
 [disk-setup]
 filesystem = "ext4"
+disk-list = "/dev/sda"

@@ -1,9 +1,9 @@
 [global]
 keyboard = "en-us"
-country = "us"
-fqdn = "pveauto.testinstall"
-mailto = "mail@no.invalid"
-timezone = "America/Chicago"
+country = "ru"
+fqdn = "pve.karazhan.local"
+mailto = "heimcbk201@gmail.com"
+timezone = "Russia/Moscow"
 root-password = "12345678"
 
 [network]

@@ -4,3 +4,12 @@ services:
     network_mode: host
     volumes:
       - ./http:/usr/share/nginx/html:ro
+  tftp:
+    image: 3x3cut0r/tftpd-hpa
+    environment:
+        TZ: Europe/Moscow
+        VERBOSE: 1
+    volumes:
+      - ./tftp:/tftpboot
+    ports:
+      - 69:69/udp

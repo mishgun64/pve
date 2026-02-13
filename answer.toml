@@ -3,7 +3,7 @@ keyboard = "en-us"
 country = "ru"
 fqdn = "pve.karazhan.local"
 mailto = "heimcbk201@gmail.com"
-timezone = "Russia/Moscow"
+timezone = "Europe/Moscow"
 root-password = "12345678"
 
 [network]

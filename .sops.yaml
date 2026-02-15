@@ -1,0 +1,5 @@
+creation_rules:
+  - encrypted_regex: '^(root-password)$'
+    age:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINbw4Tc1nPQuOyzaoPDViG0WNp9QKJB+C6Rme439RMbC root@mg-VirtualBox
+

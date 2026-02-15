@@ -8,7 +8,7 @@ STATE_FILE="pve-last-version"
 WORKDIR="$(pwd)"
 MOUNT_DIR="$WORKDIR/mnt"
 EXTRACTED_DIR="$WORKDIR/extracted"
-RESULT_DIR="/srv/pve-iso"
+RESULT_DIR="$WORKDIR/result"
 ANSWER_FILE="$WORKDIR/answer.toml"
 
 mkdir -p "$MOUNT_DIR" "$RESULT_DIR"
@@ -42,7 +42,7 @@ if [[ -n "$saved_version" ]] && ! version_gt "$latest_version" "$saved_version";
 fi
 
 # --- скачать answer.toml ---
-curl -fSL -o "$ANSWER_FILE" "$ANSWER_URL"
+curl -fsSL "$ANSWER_URL" | sops -d /dev/stdin > "$ANSWER_FILE"
 
 # --- скачать ISO как source.iso ---
 curl -fSL -o "$WORKDIR/source.iso" "${URL}/proxmox-ve_${latest_version}.iso"
@@ -97,3 +97,4 @@ mv "$WORKDIR/custom-initrd.img" "$RESULT_DIR/custom-initrd.img"
 echo "Готово:"
 echo "- result/linux26"
 echo "- result/custom-initrd.img"
+

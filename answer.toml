@@ -1,14 +1,14 @@
-[global]
-keyboard = "en-us"
-country = "ru"
-fqdn = "pve.karazhan.local"
-mailto = "heimcbk201@gmail.com"
-timezone = "Europe/Moscow"
-root-password = "12345678"
-
-[network]
-source = "from-dhcp"
-
-[disk-setup]
-filesystem = "ext4"
-disk-list = ["/dev/sda"]
+{
+	"data": "ENC[AES256_GCM,data:hgtF8+EE06HGxD1WEOXpIQD2LrYs2VNZI3QKVIZ0CcuyA3ih6g5DvcZpN5bureMfJX+J48FqTFnG1/iUXQUx53COP1zHW2r3OZ9PSxFkZsy8HQeERgmK+xS6kz/IcDjcOpqLgKDk3k5YIE8BstM0QR8u9cCidfeM2N8KO+AygJXRzrrlCjQwB56W4gawrLMOJ6g6ZC0IffXQ5uKKg3Nf2eClhjoucjxA/4okwgcBDR/Wq7k+vxaXkDLECvhugJ538ayVZFTjxuSulkDQZTfHO4B1ADdyLMzHogpSYNVZKot+4KRXUcNdimC/PkpMaT61uDkTKQHcFHmmXe/4mLou0on8ySXiTM6DIpRArX0MXYr+ERcnD5cj1qkp1Z6LMXNJM4Sno+u22iKf7NdOzsyGVtVZrA7nC/OWdwNI2NVzXlHNrXtKqPDeSnHy0MmLIgoD0/1mpOe1v5O2g4jgUJl9lUMAR+gI74TAvTYFOqQZEH7sIVCMZ7e83bbOtyIey6WAbKYQhn3VjZTwdCpvJgzljbAs6IiQ7pEJcZVE1JUtQXFDswQ8+Sq4SGNkn4HzUBx6NLd1IAdGFBZmzDW7dakpVD8xOcGXdTaUxg8TElcHPEu87jJJsD4VU69u5dgI13ww+KAhoM5YoLwTRGxfhPLCbuBy,iv:5PbEeQki1tw4PR5q52wfr3AL+6ZYZbdRMmCBQSvBc5A=,tag:QycDy6VjYVOH7ogs3+Dx8A==,type:str]",
+	"sops": {
+		"age": [
+			{
+				"recipient": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINbw4Tc1nPQuOyzaoPDViG0WNp9QKJB+C6Rme439RMbC root@mg-VirtualBox",
+				"enc": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHNzaC1lZDI1NTE5IFRpb213USA0aGti\nZjg2a1pxM0t6ZVhaajVpRHlDb25WcGxJVmQ2SUIvTk14QjVOUUhVCmI1S1BaL1gz\ndTNnWTVNUFg1bmdZS0FyT0xQNUNaZVB0dVk4QzdjYmYwancKLS0tIEFHVkM5OGJp\ndWw0aTZnNTdsMC9ibXgzQ0hyWEt6dE43ZDJObWpoOFNSTm8KAmn5SkmL2YdANyiP\n9e8p2yoXFjhnxRCl4bQ1xeNttoNOqLmPSJSpn+1b3/5xLEKMReQ3GbWz2YaTIMEv\nSG2rJw==\n-----END AGE ENCRYPTED FILE-----\n"
+			}
+		],
+		"lastmodified": "2026-02-15T18:20:39Z",
+		"mac": "ENC[AES256_GCM,data:oj83A+HSbrAEHASlfnd8t8AQhh3WvTTG+MkCz7/wZKFUIXKkekf8s47TR5cuRxOTcGPWpIbLrP3IShh93b0mngiRaNZx8sQ52Cu5ejO+d5klvs+XeGPHr57FIOp2Ji169fww9+X+IeymRbNsQqA+BR8daxp5MRNSOb5IrcvXXhE=,iv:ZelMJE5DrcqSILWA1KYrS1BU/W1kulBfYfv5mSMqwpM=,tag:BtjaVU8VZh7DV7EgLeUUFQ==,type:str]",
+		"version": "3.11.0"
+	}
+}

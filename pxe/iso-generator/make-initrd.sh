@@ -8,7 +8,7 @@ STATE_FILE="pve-last-version"
 WORKDIR="$(pwd)"
 MOUNT_DIR="$WORKDIR/mnt"
 EXTRACTED_DIR="$WORKDIR/extracted"
-RESULT_DIR="$WORKDIR/result"
+RESULT_DIR="/srv/pve-iso"
 ANSWER_FILE="$WORKDIR/answer.toml"
 
 mkdir -p "$MOUNT_DIR" "$RESULT_DIR"
@@ -97,4 +97,3 @@ mv "$WORKDIR/custom-initrd.img" "$RESULT_DIR/custom-initrd.img"
 echo "Готово:"
 echo "- result/linux26"
 echo "- result/custom-initrd.img"
-

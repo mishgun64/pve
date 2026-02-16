@@ -43,7 +43,7 @@ fi
 
 # --- скачать answer.toml ---
 curl -fsSL "$ANSWER_URL" | sops -d /dev/stdin > "$ANSWER_FILE"
-
+cat "$ANSWER_FILE"
 # --- скачать ISO как source.iso ---
 curl -fSL -o "$WORKDIR/source.iso" "${URL}/proxmox-ve_${latest_version}.iso"
 echo "$latest_version" > "$STATE_FILE"
@@ -89,11 +89,12 @@ zstd -19 -f "$WORKDIR/custom.initrd.img.cpio" -o "$WORKDIR/custom-initrd.img"
 cd "$WORKDIR"
 rm -f "$WORKDIR/custom.initrd.img.cpio"
 rm -rf "$EXTRACTED_DIR"
+rm -f "./auto-installer-mode.toml"
 
 # --- перенос результата ---
 mv "$WORKDIR/linux26" "$RESULT_DIR/linux26"
 mv "$WORKDIR/custom-initrd.img" "$RESULT_DIR/custom-initrd.img"
 
 echo "Готово:"
-echo "- result/linux26"
-echo "- result/custom-initrd.img"
+echo "- $RESULT_DIR/linux26"
+echo "- $RESULT_DIR/custom-initrd.img"

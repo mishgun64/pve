@@ -1,14 +1,25 @@
-{
-	"data": "ENC[AES256_GCM,data:D4z8FJY8tXCqGxLbO0kCxFyv4CqzZotX5V7VFQ9efe4NuZ+LhHLPGl6b9e0wsbleY/qV8cip6RpgzqGjFy19jFT8v/QlL5bmHWJjlqwY2cSQ9zPWZY7XpUm2CG5WmbIAMtyyr5PxZQs0Zv7fTuRG/ThbohWT3JqlP7ZtFdf5Wx+yx1wA3sZF1MbUNrFKZN8MeiICPjX5N9Qny/Hi7XkbKSOFO+XcvnjpKDd1gog8DjML+R78nFMTeYTw6ya1Lh/K3H9DdVf3ezPlFdVG/C+kMBwv+4fwSBmiEyPPFLhyqSh6Vf+dZzzUoQrwZn7ZGw6voYe0yVYKoGVQKH6BiEZfydv5GFgRovyyTXxjTR5dMO9sp092tHIsWArE4UDpuIQdQa8/Ks2zgrRLkDmVk2ri5RzGAHupIrG6W/SpvlD7yTQvblEVconbJBzR7bk+YydHLf5q32yA8LiksyZx2FnLaavwPaVrN0d/yUszDNaBtP93UwVW3YtWHIrXFqAhTQwlPXgcyXgoaKxlwVD3lN5IOmGTP2BpoS0jF4JGzhcKA3OfrAwgKL7BD+IXDoKPIcUwEcnv10Id6XJ7XtdE/tUhZc0UI8MDhoM/OsPjQdZ4VrGHozUE+bNKG02twFOPz3kHTAHm2F9XNyWcl/EC4QBPl1/7p68nsug94rnbIkZ/E+8G9RYCKOkwVs1LJk4yUlxry5pGLwbsFKWz57fSURheW/Twdph4vQzC1BjrfgqEWQBoC3w4tHITzpgQKrZloK1TVEehT0csbTHkN+dQHoNbb316+cy26d6YZ8BX7lYtOz1QzOXBl+Fi23Yx1u8+HnrNKPVKIpLCUORoN8vtnZL0Ic8dc+VbI+zo+g8/JqVoqqhc/gWt6J6PM00a7p1sfrpj5yXOyjbEDTrKBWyLfIiuriQC6Ft04Cb9GwC1WVChuamKuw1w8I2yFx4CuZdlOui7ikjBEubpwmN3Saj3RP+kHMHJsemKAnOfZ8lCQny9MVEA5AMEpfCaFAJ/ag==,iv:er3mfK2wn3p+1T+iZKRVe7yvGtvOAcXjBkHhTEEo/AI=,tag:WE97gjs23VviXILxSL3Anw==,type:str]",
-	"sops": {
-		"age": [
-			{
-				"recipient": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINbw4Tc1nPQuOyzaoPDViG0WNp9QKJB+C6Rme439RMbC root@mg-VirtualBox",
-				"enc": "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IHNzaC1lZDI1NTE5IFRpb213USB5dDJw\nb3lBK0w2NDYvRmVqVStoTG1xK0JYVGt3N21iR3FPdTlrdk85MEJzCmhPYTBaMEFK\nZytWbHh4dm5LNjRMWFkrY1hUUFd4dkJ5c1g5bW12Y1NoVFEKLS0tIE0wTXZxWVND\neUhuVW9ybG9vVzlBeUM2eHh5TTRkcUlpZXo0NC9OKyt1RW8K+gy4mVSsf2vc1TbP\nGz41FMJmQQXhkLstkb0qGnhJ+gDeIEAGs8iIWyp8h/m9zYaJpnV5xbYqnn8VH2sY\nowX74A==\n-----END AGE ENCRYPTED FILE-----\n"
-			}
-		],
-		"lastmodified": "2026-03-03T15:01:30Z",
-		"mac": "ENC[AES256_GCM,data:9nrxE8osPimKXrWmrBaYzrt04dkZpVqDlT+n0453W2Cb/a5R42RRhqV5aY7pT7TfUdlY3pT+G6IBCxVthgDUJ0PTZzJhHC48pKXXIa2Xhz663MndVSjbkgeARtJdTudsjCNA/vjxk3CjR0xL7NMBprvU+EpHnB1FlyU8f2TTERg=,iv:O9yIJe9C+NbEwpwoAaenv4j4etc25+qKfywY/aOHptw=,tag:1qWX2a16Bfr0kWY+437baw==,type:str]",
-		"version": "3.11.0"
-	}
-}
+[global]
+keyboard = "en-us"
+country = "ru"
+fqdn = "pve.karazhan.local"
+mailto = "heimcbk201@gmail.com"
+timezone = "Europe/Moscow"
+root-password = "1234"
+root-ssh-keys = []
+
+[network]
+#source = "from-dhcp"
+source = "from-answer"
+cidr = "192.168.1.100/24"
+dns = "192.168.1.1"
+gateway = "192.168.1.1"
+filter.ID_NET_NAME_MAC = "*"
+
+[disk-setup]
+filesystem = "ext4"
+disk-list = ["/dev/nvme0n1"]
+
+#[first-boot]
+#source = "from-url"
+#ordering = "network-online"
+#url = "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=proxmox-init"

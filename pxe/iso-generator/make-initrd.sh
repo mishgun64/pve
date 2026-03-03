@@ -42,7 +42,7 @@ if [[ -n "$saved_version" ]] && ! version_gt "$latest_version" "$saved_version";
 fi
 
 # --- скачать answer.toml ---
-curl -fsSL "$ANSWER_URL" | sops -d /dev/stdin > "$ANSWER_FILE"
+curl -fsSL "$ANSWER_URL" 
 cat "$ANSWER_FILE"
 # --- скачать ISO как source.iso ---
 curl -fSL -o "$WORKDIR/source.iso" "${URL}/proxmox-ve_${latest_version}.iso"

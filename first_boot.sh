@@ -1,8 +1,12 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-JENKINS_URL="http://192.168.1.200:8080"
-TOKEN="pve-first-boot"
+JENKINS_SERVER="192.168.1.200:8080"
+TOKEN="pve-webhook"
 
-curl -fsS -X POST \
-  "${JENKINS_URL}/generic-webhook-trigger/invoke?token=${TOKEN}"
+curl -X POST http://$JENKINS_SERVER/generic-webhook-trigger/invoke?token=$TOKEN \
+-H "Content-Type: application/json" \
+-d '{
+  "event": "pve-first-boot",
+  "node": "pve1",
+  "host": "pve1.local"
+}'

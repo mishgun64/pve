@@ -19,7 +19,7 @@ filter.ID_NET_NAME_MAC = "*"
 filesystem = "ext4"
 disk-list = ["/dev/nvme0n1"]
 
-#[first-boot]
-#source = "from-url"
-#ordering = "network-online"
-#url = "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=proxmox-init"
+[first-boot]
+source = "from-url"
+ordering = "network-online"
+url = "https://raw.githubusercontent.com/mishgun64/pve/refs/heads/main/first_boot.sh"

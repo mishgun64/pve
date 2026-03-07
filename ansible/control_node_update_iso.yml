@@ -74,13 +74,13 @@
             flat: yes
           delegate_to: "{{ pve_iso_server }}"
 
-        - name: Set http permissions
-          ansible.builtin.file:
-            path: /root/pxe/http/
-            owner: root
-            group: root
-            mode: '0755'
-            recurse: yes
+#        - name: Set http permissions
+#          ansible.builtin.file:
+#            path: /var/lib/jenkins/http/
+#            owner: root
+#            group: root
+#            mode: '0755'
+#            recurse: yes
 
       when: files_need_update | bool
       rescue:

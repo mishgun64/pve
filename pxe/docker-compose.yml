@@ -10,6 +10,6 @@ services:
         TZ: Europe/Moscow
         VERBOSE: 1
     volumes:
-      - /srv/tftp:/tftpboot
+      - ./tftp:/tftpboot
     ports:
       - 69:69/udp

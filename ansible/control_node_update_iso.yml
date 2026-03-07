@@ -1,0 +1,88 @@
+---
+
+- name: Ensure ISO files are up-to-date
+  hosts: localhost
+  gather_facts: no
+  vars:
+    initrd_path: /srv/pve-iso/custom-initrd.img
+    linux26_path: /srv/pve-iso/linux26
+    local_initrd: /root/pxe/http/custom-initrd.img
+    local_linux26: /root/pxe/http/linux26
+    pve_iso_server: 192.168.1.72
+
+  tasks:
+
+    - name: Compute remote initrd checksum
+      ansible.builtin.stat:
+        path: "{{ initrd_path }}"
+        checksum_algorithm: md5
+      delegate_to: "{{ pve_iso_server }}"
+      register: remote_initrd_stat
+      ignore_errors: yes
+
+    - name: Compute remote linux26 checksum
+      ansible.builtin.stat:
+        path: "{{ linux26_path }}"
+        checksum_algorithm: md5
+      delegate_to: "{{ pve_iso_server }}"
+      register: remote_linux26_stat
+      ignore_errors: yes
+
+    - name: Compute local initrd checksum
+      ansible.builtin.stat:
+        path: "{{ local_initrd }}"
+        checksum_algorithm: md5
+      register: local_initrd_stat
+      ignore_errors: yes
+
+    - name: Compute local linux26 checksum
+      ansible.builtin.stat:
+        path: "{{ local_linux26 }}"
+        checksum_algorithm: md5
+      register: local_linux26_stat
+      ignore_errors: yes
+
+    - name: Determine if files need to be retrieved
+      set_fact:
+        files_need_update: >-
+          {{ 
+            (local_initrd_stat.stat.exists is not defined or not local_initrd_stat.stat.exists) 
+            or (local_linux26_stat.stat.exists is not defined or not local_linux26_stat.stat.exists)
+            or (remote_initrd_stat.stat.exists is not defined or not remote_initrd_stat.stat.exists)
+            or (remote_linux26_stat.stat.exists is not defined or not remote_linux26_stat.stat.exists)
+            or (local_initrd_stat.stat.exists and remote_initrd_stat.stat.exists and local_initrd_stat.stat.checksum != remote_initrd_stat.stat.checksum)
+            or (local_linux26_stat.stat.exists and remote_linux26_stat.stat.exists and local_linux26_stat.stat.checksum != remote_linux26_stat.stat.checksum)
+          }}
+
+    - name: Retrieve ISO files from PVE server
+      block:
+
+        - name: Fetch initrd from PVE ISO server
+          ansible.builtin.fetch:
+            src: "{{ initrd_path }}"
+            dest: "{{ local_initrd }}"
+            flat: yes
+          delegate_to: "{{ pve_iso_server }}"
+
+        - name: Fetch linux26 from PVE ISO server
+          ansible.builtin.fetch:
+            src: "{{ linux26_path }}"
+            dest: "{{ local_linux26 }}"
+            flat: yes
+          delegate_to: "{{ pve_iso_server }}"
+
+        - name: Set http permissions
+          ansible.builtin.file:
+            path: /root/pxe/http/
+            owner: root
+            group: root
+            mode: '0755'
+            recurse: yes
+
+      when: files_need_update | bool
+      rescue:
+
+        - name: Stop playbook if server unreachable
+          ansible.builtin.fail:
+            msg: "Unable to retrieve files from the PVE ISO server."
+

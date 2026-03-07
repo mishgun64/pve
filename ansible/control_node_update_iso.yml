@@ -7,8 +7,8 @@
   vars:
     initrd_path: /srv/pve-iso/custom-initrd.img
     linux26_path: /srv/pve-iso/linux26
-    local_initrd: /root/pxe/http/custom-initrd.img
-    local_linux26: /root/pxe/http/linux26
+    local_initrd: /srv/http/custom-initrd.img
+    local_linux26: /srv/http/linux26
     pve_iso_server: 192.168.1.72
 
   tasks:

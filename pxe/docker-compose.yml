@@ -3,7 +3,7 @@ services:
     image: nginx:stable-alpine
     network_mode: host
     volumes:
-      - /srv/http:/usr/share/nginx/html:ro
+      - /var/lib/jenkins/http:/usr/share/nginx/html:ro
   tftp:
     image: 3x3cut0r/tftpd-hpa
     environment:

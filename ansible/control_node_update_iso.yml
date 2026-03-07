@@ -2,6 +2,7 @@
 
 - name: Ensure ISO files are up-to-date
   hosts: localhost
+  remote_user: root
   gather_facts: no
   vars:
     initrd_path: /srv/pve-iso/custom-initrd.img

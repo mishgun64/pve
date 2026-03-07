@@ -64,6 +64,8 @@
             dest: "{{ local_initrd }}"
             flat: yes
           delegate_to: "{{ pve_iso_server }}"
+          vars:
+            ansible_user: root
 
         - name: Fetch linux26 from PVE ISO server
           ansible.builtin.fetch:
@@ -86,4 +88,3 @@
         - name: Stop playbook if server unreachable
           ansible.builtin.fail:
             msg: "Unable to retrieve files from the PVE ISO server."
-

@@ -106,11 +106,17 @@
     vg: media_vg
     pvs: "{{ lvm_devices }}"
 
+- name: Check if LV exists
+  stat:
+    path: /dev/media_vg/media_lv
+  register: media_lv_check
+
 - name: Create logical volume (6TB)
   community.general.lvol:
     vg: media_vg
     lv: media_lv
     size: 100%FREE
+  when: not media_lv_check.stat.exists
 
 - name: Create filesystem on media LV
   filesystem:

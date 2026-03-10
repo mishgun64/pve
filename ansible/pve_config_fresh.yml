@@ -9,4 +9,4 @@
   roles:
     - pve/config_soft
     - pve/config_hard
-    - pve/firsboot_clean
+    - pve/firstboot_clean

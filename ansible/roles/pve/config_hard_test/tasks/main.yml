@@ -134,3 +134,4 @@
     src: /dev/media_vg/media_lv
     fstype: ext4
     state: mounted
+

@@ -10,3 +10,4 @@
     - pve/config_soft
     - pve/config_hard
     - pve/firstboot_clean
+    - pve/webhook

@@ -65,3 +65,13 @@
     content: '{{ api_token.stdout }}'
   when: api_token.stdout != ""
   delegate_to: localhost
+
+- name: Trigger Jenkins webhook
+  uri:
+    url: "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      event: services

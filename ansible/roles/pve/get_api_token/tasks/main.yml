@@ -53,7 +53,7 @@
 
 - name: Ensure terraform secrets directory exists
   ansible.builtin.file:
-    path: ./terraform/secrets
+    path: ../terraform/secrets
     state: directory
     mode: 0700
   delegate_to: localhost
@@ -61,7 +61,7 @@
 - name: Create api file on localhost
   ansible.builtin.copy:
     mode: 0700
-    dest: ./terraform/secrets/api_key
+    dest: ../terraform/secrets/api_key
     content: '{{ api_token.stdout }}'
   when: api_token.stdout != ""
   delegate_to: localhost

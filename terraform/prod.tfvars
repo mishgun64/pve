@@ -1,0 +1,10 @@
+proxmox_api_url = "https://192.168.1.100:8006/api2/json"
+proxmox_api_token_id = "terraform@pam"
+proxmox_api_token_secret = file("${path.module}/secrets/api_key")
+lxc_ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control"
+lxc_ostemplate = "local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst"
+target_node_name = "pve"
+memory = 512
+cores = 1
+storage_size = "5G"
+ip_address = ["192.168.1.103/24", "192.168.1.104/24", "192.168.1.105/24", "192.168.1.106/24"]

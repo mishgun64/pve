@@ -7,8 +7,4 @@
   vars:
     ansible_password: "12345678"
   roles:
-    - pve/config_soft
-    - pve/config_hard_test
-    - pve/firstboot_clean
     - pve/get_api_token
-    - pve/webhook

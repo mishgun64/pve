@@ -1,0 +1,12 @@
+---
+
+- name: PVE config
+  hosts: pve
+  remote_user: root
+  gather_facts: false
+  vars:
+    ansible_password: "12345678"
+  roles:
+    - pve/config_soft
+    - pve/config_hard_test
+    - pve/firsboot_clean

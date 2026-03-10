@@ -1,0 +1,95 @@
+---
+
+#--------------------------Repository settings---------------------------------
+
+- name: Disable pve-enterprise repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/pve-enterprise.sources
+    content: |
+      Types: deb
+      URIs: https://enterprise.proxmox.com/debian/pve
+      Suites: trixie
+      Components: pve-enterprise
+      Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+      Enabled: false
+
+- name: Disable repository ceph
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/ceph.sources
+    content: |
+      Types: deb
+      URIs: https://enterprise.proxmox.com/debian/ceph-squid
+      Suites: trixie
+      Components: enterprise
+      Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+      Enabled: false
+
+- name: Add pve-no-subscription repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/proxmox.sources
+    content: |
+      Types: deb
+      URIs: http://download.proxmox.com/debian/pve
+      Suites: trixie
+      Components: pve-no-subscription
+      Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
+
+#-----------------------Set timezone----------------------------------
+
+- name: Set Europe/Moscow timezone
+  ansible.builtin.shell: timedatectl set-timezone Europe/Moscow
+
+#--------------------------Updates------------------------------------------------
+
+- name: Update and upgrade
+  ansible.builtin.apt:
+    name: '*'
+    state: latest
+    update_cache: yes
+
+- name: Scheduled update
+  ansible.builtin.cron:
+    name: 'Update and upgrade'
+    minute: 0
+    hour: 6
+    job: apt update && apt upgrade -y
+
+#--------------------------SSH settings----------------------------------
+
+- name: Copy control ssh key
+  ansible.builtin.copy:
+    src: authorized_keys2
+    dest: /root/.ssh/
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Copy sshd config
+  ansible.builtin.copy:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Restart sshd service
+  ansible.builtin.systemd_service:
+    state: restarted
+    name: sshd
+
+#-----------------------Change root password----------------------------------
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$Ogv7SOQr$ovSFzkn3VEkPC58NEDL91wBA3rmNTSYjGKVwmFwtVryF78hP.I5vKobSmCUr.7YKw31KRE/Swv03BUys.hNW3.'
+    # python3 -c 'import crypt; print(crypt.crypt("pass", "$6$Ogv7SOQr"))'
+
+#-----------------------Scheduled update----------------------------------
+
+- name: Scheduled update
+  ansible.builtin.cron:
+    name: 'Update and upgrade'
+    minute: 0
+    hour: 5
+    job: apt update && apt upgrade -y

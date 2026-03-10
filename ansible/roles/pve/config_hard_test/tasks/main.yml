@@ -1,0 +1,130 @@
+---
+
+- name: Install required packages
+  apt:
+    name:
+      - mdadm
+      - lvm2
+      - parted
+    state: present
+    update_cache: yes
+
+#################################
+# Partition sda
+#################################
+
+- name: Create GPT on sda
+  community.general.parted:
+    device: /dev/sda
+    label: gpt
+
+- name: Create sda1 (1TB)
+  community.general.parted:
+    device: /dev/sda
+    number: 1
+    state: present
+    part_start: 1MiB
+    part_end: 1001MiB
+
+- name: Create sda2 (1TB)
+  community.general.parted:
+    device: /dev/sda
+    number: 2
+    state: present
+    part_start: 1001MiB
+    part_end: 100%
+
+#################################
+# Partition sdb
+#################################
+
+- name: Create GPT on sdb
+  community.general.parted:
+    device: /dev/sdb
+    label: gpt
+
+- name: Create sdb1 (1TB)
+  community.general.parted:
+    device: /dev/sdb
+    number: 1
+    state: present
+    part_start: 1MiB
+    part_end: 1001MiB
+
+- name: Create sdb2 (1TB)
+  community.general.parted:
+    device: /dev/sdb
+    number: 2
+    state: present
+    part_start: 1001MiB
+    part_end: 100%
+
+#################################
+# RAID1 (md0) 1TB
+#################################
+
+- name: Check if md0 exists
+  stat:
+    path: /dev/md0
+  register: md0_check
+
+- name: Create RAID1 array
+  command: >
+    mdadm --create /dev/md0
+    --level=1
+    --raid-devices=2
+    --bitmap=internal
+    --metadata=1.2
+    --force
+    --run
+    /dev/sda1 /dev/sdb1
+  when: not md0_check.stat.exists
+
+- name: Wait for RAID to become active
+  command: cat /proc/mdstat
+  register: mdstat
+  until: "'md0' in mdstat.stdout"
+  retries: 10
+  delay: 3
+
+- name: Save mdadm config
+  command: mdadm --detail --scan
+  register: mdadm_scan
+  changed_when: false
+
+- name: Persist mdadm config
+  copy:
+    content: "{{ mdadm_scan.stdout }}"
+    dest: /etc/mdadm/mdadm.conf
+
+#################################
+# LVM 6TB (Media)
+#################################
+
+- name: Create physical volumes
+  community.general.lvg:
+    vg: media_vg
+    pvs: "{{ lvm_devices }}"
+
+- name: Create logical volume (6TB)
+  community.general.lvol:
+    vg: media_vg
+    lv: media_lv
+    size: 100%FREE
+
+- name: Create filesystem on media LV
+  filesystem:
+    fstype: ext4
+    dev: /dev/media_vg/media_lv
+
+- name: Create mount point for Media
+  file:
+    path: /mnt/media
+    state: directory
+
+- name: Mount media volume
+  mount:
+    path: /mnt/media
+    src: /dev/media_vg/media_lv
+    fstype: ext4
+    state: mounted

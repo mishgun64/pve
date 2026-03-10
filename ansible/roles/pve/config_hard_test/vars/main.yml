@@ -1,0 +1,8 @@
+raid_devices:
+  - /dev/sda1
+  - /dev/sdb1
+
+lvm_devices:
+  - /dev/sda2
+  - /dev/sdb2
+  - /dev/sdc

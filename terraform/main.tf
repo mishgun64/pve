@@ -10,6 +10,9 @@ resource "proxmox_vm_qemu" "vm_media" {
   memory      = 2048              # MB
   scsihw      = "virtio-scsi-pci"
 
+  cpu {
+    cores = 6
+  }
   # Диск
   disk {
     size        = "5G"

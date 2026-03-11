@@ -5,8 +5,6 @@ resource "proxmox_vm_qemu" "vm_media" {
   pxe         = true
   target_node = "pve"            # имя Proxmox node
   vmid        = 100              # уникальный VMID
-  cores       = 1
-  sockets     = 1
   memory      = 2048              # MB
   scsihw      = "virtio-scsi-pci"
 

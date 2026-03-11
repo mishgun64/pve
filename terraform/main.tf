@@ -15,8 +15,8 @@ resource "proxmox_vm_qemu" "vm_media" {
   disk {
     size        = "5G"
     type        = "disk"
-    disk_file   = "local:vm-<<<vmid>>>-disk-<<<disk number>>>"
-    storage     = "local"
+    disk_file   = "local-lvm:vm-<<<vmid>>>-disk-<<<disk number>>>"
+    storage     = "local-lvm"
     slot        = "scsi0"
   }
 

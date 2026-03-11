@@ -21,6 +21,7 @@
     Datastore.AllocateTemplate
     Datastore.Audit
     Pool.Allocate
+    Pool.Audit
     Sys.Audit
     Sys.Console
     Sys.Modify
@@ -74,4 +75,4 @@
       Content-Type: "application/json"
     body_format: json
     body:
-      event: services
+      event: terraform

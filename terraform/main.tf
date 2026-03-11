@@ -5,11 +5,11 @@ resource "proxmox_vm_qemu" "vm_media" {
   pxe         = true
   target_node = "pve"            # имя Proxmox node
   vmid        = 100              # уникальный VMID
-  memory      = 2048              # MB
+  memory      = 1024              # MB
   scsihw      = "virtio-scsi-pci"
 
   cpu {
-    cores = 6
+    cores = 1
   }
   # Диск
   disk {

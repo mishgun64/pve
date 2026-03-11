@@ -16,14 +16,14 @@ resource "proxmox_vm_qemu" "vm_media" {
     type        = "disk"
     disk_file   = "local:vm-<<<vmid>>>-disk-<<<disk number>>>"
     storage     = "local"
+    slot        = "scsi0"
   }
 
   # Сетевой интерфейс
   network {
+    id        = 0
     model     = "virtio"
     bridge    = "vmbr0"
   }
 
-  # ISO для установки ОС
-  iso         = "local:iso/ubuntu-22.04-live-server-amd64.iso"
 }

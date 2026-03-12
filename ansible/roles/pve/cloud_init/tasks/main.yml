@@ -1,0 +1,54 @@
+- name: Install required packages
+  apt:
+    name:
+      - qemu-utils
+      - wget
+    state: present
+    update_cache: yes
+
+- name: Download Debian cloud image
+  get_url:
+    url: "{{ debian_cloud_image_url }}"
+    dest: "{{ debian_cloud_image_path }}"
+    mode: '0644'
+
+- name: Remove existing VM if exists
+  shell: qm destroy {{ template_id }} --purge || true
+  args:
+    executable: /bin/bash
+
+- name: Create VM
+  command: >
+    qm create {{ template_id }}
+    --name {{ template_name }}
+    --memory {{ vm_memory }}
+    --cores {{ vm_cores }}
+    --net0 virtio,bridge={{ proxmox_bridge }}
+
+- name: Import disk to storage
+  command: >
+    qm importdisk {{ template_id }}
+    {{ debian_cloud_image_path }}
+    {{ proxmox_storage }}
+
+- name: Attach imported disk
+  command: >
+    qm set {{ template_id }}
+    --scsihw virtio-scsi-pci
+    --scsi0 {{ proxmox_storage }}:vm-{{ template_id }}-disk-0
+
+- name: Add cloud-init disk
+  command: >
+    qm set {{ template_id }}
+    --ide2 {{ proxmox_storage }}:cloudinit
+
+- name: Configure boot and agent
+  command: >
+    qm set {{ template_id }}
+    --boot order=scsi0
+    --serial0 socket
+    --vga serial0
+    --agent enabled=1
+
+- name: Convert VM to template
+  command: qm template {{ template_id }}

@@ -39,6 +39,9 @@
 - name: Set Europe/Moscow timezone
   ansible.builtin.shell: timedatectl set-timezone Europe/Moscow
 
+- name: Sync time
+  ansible.builtin.shell: timedatectl set-ntp true
+
 #--------------------------Updates------------------------------------------------
 
 - name: Update and upgrade

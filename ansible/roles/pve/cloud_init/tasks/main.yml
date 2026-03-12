@@ -1,10 +1,10 @@
-- name: Install required packages
-  apt:
-    name:
-      - qemu-utils
-      - wget
-    state: present
-    update_cache: yes
+#- name: Install required packages
+#  apt:
+#    name:
+#      - qemu-utils
+#      - wget
+#    state: present
+#    update_cache: yes
 
 - name: Download Debian cloud image
   get_url:

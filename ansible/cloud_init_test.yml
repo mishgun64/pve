@@ -2,6 +2,7 @@
 
 - hosts: pve
   remote_user: root
+  become: yes
   gather_facts: false
   roles:
     - pve/cloud_init

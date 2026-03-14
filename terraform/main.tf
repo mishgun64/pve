@@ -18,6 +18,7 @@ resource "proxmox_vm_qemu" "vm_media" {
     type    = "disk"
     storage = "local-lvm"
     size    = "5G"
+    iothread = 1
   }
 
   # Сетевой интерфейс

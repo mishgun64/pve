@@ -25,7 +25,8 @@ resource "proxmox_vm_qemu" "vm_media" {
   }
 
   os_type = "cloud-init"
-  ipconfig0 = "ip=192.168.1.101/24,gw=192.168.1.1"
+  ipconfig0 = "ip=192.168.1.50/24,gw=192.168.1.1"
   ciuser = "debian"
-  sshkeys = file("~/.ssh/id_ed25519.pub")
+  sshkeys = file("~/.ssh/id_rsa.pub")
+
 }

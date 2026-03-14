@@ -23,6 +23,10 @@
     --name {{ template_name }}
     --memory {{ vm_memory }}
     --cores {{ vm_cores }}
+    --sockets 1
+    --cpu x86-64-v2-AES
+    --numa 0
+    --ostype l26
     --net0 virtio,bridge={{ proxmox_bridge }}
 
 - name: Import disk to storage

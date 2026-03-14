@@ -1,23 +1,20 @@
 resource "proxmox_vm_qemu" "vm_media" {
   name        = "media"
-  agent       = 0
-  boot        = "order=scsi0;net0"
-  pxe         = true
-  target_node = "pve"            # имя Proxmox node
-  vmid        = 100              # уникальный VMID
-  memory      = 1024              # MB
-  scsihw      = "virtio-scsi-pci"
+  target_node = "pve"
+  clone = "debian12-cloudinit-template"
+  vmid = 101
+  memory = 2048
+  agent = 1
 
   cpu {
     cores = 1
   }
   # Диск
   disk {
-    size        = "5G"
-    type        = "disk"
-    disk_file   = "local-lvm:vm-<<<vmid>>>-disk-<<<disk number>>>"
-    storage     = "local-lvm"
-    slot        = "scsi0"
+    slot    = "scsi0"
+    type    = "disk"
+    storage = "local-lvm"
+    size    = "5G"
   }
 
   # Сетевой интерфейс
@@ -26,5 +23,10 @@ resource "proxmox_vm_qemu" "vm_media" {
     model     = "virtio"
     bridge    = "vmbr0"
   }
+
+  os_type = "cloud-init"
+  ipconfig0 = "ip=192.168.1.50/24,gw=192.168.1.1"
+  ciuser = "debian"
+  sshkeys = file("~/.ssh/id_rsa.pub")
 
 }

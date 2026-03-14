@@ -38,6 +38,8 @@
     VM.Config.Options
     VM.Migrate
     VM.PowerMgmt
+    VM.GuestAgent.Audit
+    VM.GuestAgent.Unrestricted
     SDN.Use"
   when: tf_role.stdout == ""
 

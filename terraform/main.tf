@@ -3,7 +3,6 @@ resource "proxmox_vm_qemu" "cloudinit-example" {
   name        = "test-terraform0"
   target_node = "pve"
   agent       = 1
-  cores       = 1
   memory      = 1024
   boot        = "order=scsi0" # has to be the same as the OS disk of the template
   clone       = "debian-cloudinit-template" # The name of the template
@@ -21,6 +20,11 @@ resource "proxmox_vm_qemu" "cloudinit-example" {
   cipassword = "1234"
   sshkeys    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control"
 
+  cpu {
+    cores   = 1
+    sockets = 1
+    type    = "x86-64-v2-AES"
+  }
   # Most cloud-init images require a serial device for their display
   serial {
     id = 0

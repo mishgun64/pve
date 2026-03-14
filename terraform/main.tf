@@ -40,5 +40,5 @@ resource "proxmox_vm_qemu" "vm_media" {
   ipconfig0 = "ip=192.168.1.101/24,gw=192.168.1.1"
   ciuser = "debian"
   sshkeys = file("~/.ssh/id_ed25519.pub")
-
+  cipassword = "1234"
 }

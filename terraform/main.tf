@@ -1,7 +1,7 @@
 resource "proxmox_vm_qemu" "vm_media" {
   name        = "media"
   target_node = "pve"
-  clone = "debian12-cloudinit-template"
+  clone = "debian-cloudinit-template"
   vmid = 101
   memory = 2048
   agent = 1

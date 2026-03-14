@@ -58,3 +58,19 @@
 
 - name: Convert VM to template
   command: qm template {{ template_id }}
+
+- name: Ensure snippets directory exists
+  ansible.builtin.file:
+    path: /var/lib/vz/snippets
+    state: directory
+    mode: "0755"
+
+- name: Create qemu-guest-agent cloud-init snippet
+  ansible.builtin.copy:
+    dest: /var/lib/vz/snippets/qemu-guest-agent.yml
+    mode: "0644"
+    content: |
+      runcmd:
+        - apt update
+        - apt install -y qemu-guest-agent
+        - systemctl start qemu-guest-agent

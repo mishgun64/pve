@@ -1,45 +1,55 @@
-resource "proxmox_vm_qemu" "vm_media" {
-  name        = "media"
+resource "proxmox_vm_qemu" "cloudinit-example" {
+  vmid        = 100
+  name        = "test-terraform0"
   target_node = "pve"
-  clone = "debian-cloudinit-template"
-  full_clone = true
-  vmid = 101
-  memory = 2048
-  agent = 1
-  scsihw = "virtio-scsi-single"
-  boot = "order=scsi0"
+  agent       = 1
+  cores       = 1
+  memory      = 1024
+  boot        = "order=scsi0" # has to be the same as the OS disk of the template
+  clone       = "debian-cloudinit-template" # The name of the template
+  scsihw      = "virtio-scsi-single"
+  vm_state    = "running"
+  automatic_reboot = true
 
-  cpu {
-    cores = 1
-    type  = "x86-64-v2-AES"
-  }
-  # Диск
-  disk {
-    slot    = "scsi0"
-    type    = "disk"
-    storage = "local-lvm"
-    size    = "5G"
-  }
-
-  # Сетевой интерфейс
-  network {
-    id        = 0
-    model     = "virtio"
-    bridge    = "vmbr0"
-  }
-
-  serial {
-    id   = 0
-    type = "socket"
-  }
-
-  vga {
-    type = "serial0"
-  }
-
-  os_type = "cloud-init"
-  ipconfig0 = "ip=192.168.1.101/24,gw=192.168.1.1"
-  ciuser = "debian"
-  sshkeys = file("~/.ssh/id_ed25519.pub")
+  # Cloud-Init configuration
+  cicustom   = "vendor=local:snippets/qemu-guest-agent.yml" # /var/lib/vz/snippets/qemu-guest-agent.yml
+  ciupgrade  = true
+  nameserver = "192.168.1.1"
+  ipconfig0  = "ip=192.168.1.101/24,gw=192.168.1.1"
+  skip_ipv6  = true
+  ciuser     = "root"
   cipassword = "1234"
+  sshkeys    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control"
+
+  # Most cloud-init images require a serial device for their display
+  serial {
+    id = 0
+  }
+
+  disks {
+    scsi {
+      scsi0 {
+        # We have to specify the disk from our template, else Terraform will think it's not supposed to be there
+        disk {
+          storage = "local-lvm"
+          # The size of the disk should be at least as big as the disk in the template. If it's smaller, the disk will be recreated
+          size    = "2G"
+        }
+      }
+    }
+    ide {
+      # Some images require a cloud-init disk on the IDE controller, others on the SCSI or SATA controller
+      ide1 {
+        cloudinit {
+          storage = "local-lvm"
+        }
+      }
+    }
+  }
+
+  network {
+    id = 0
+    bridge = "vmbr0"
+    model  = "virtio"
+  }
 }

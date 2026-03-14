@@ -5,6 +5,8 @@ resource "proxmox_vm_qemu" "vm_media" {
   vmid = 101
   memory = 2048
   agent = 1
+  scsihw = "virtio-scsi-single"
+  boot = "order=scsi0"
 
   cpu {
     cores = 1
@@ -16,6 +18,7 @@ resource "proxmox_vm_qemu" "vm_media" {
     type    = "disk"
     storage = "local-lvm"
     size    = "5G"
+    iothread = 1
   }
 
   # Сетевой интерфейс
@@ -23,6 +26,15 @@ resource "proxmox_vm_qemu" "vm_media" {
     id        = 0
     model     = "virtio"
     bridge    = "vmbr0"
+  }
+
+  serial {
+    id   = 0
+    type = "socket"
+  }
+
+  vga {
+    type = "serial0"
   }
 
   os_type = "cloud-init"

@@ -12,6 +12,8 @@
     dest: "{{ debian_cloud_image_path }}"
     mode: '0644'
 
+
+
 - name: Remove existing VM if exists
   shell: qm destroy {{ template_id }} --purge || true
   args:

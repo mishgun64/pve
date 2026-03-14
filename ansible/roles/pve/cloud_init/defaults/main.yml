@@ -1,8 +1,11 @@
 template_id: 9000
 template_name: debian-cloudinit-template
 
-debian_cloud_image_url: "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
-debian_cloud_image_path: "/tmp/debian-13-genericcloud-amd64.qcow2"
+#debian_cloud_image_url: "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+#debian_cloud_image_path: "/tmp/debian-13-genericcloud-amd64.qcow2"
+
+debian_cloud_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+debian_cloud_image_path: "/tmp/noble-server-cloudimg-amd64.qcow2"
 
 proxmox_storage: local-lvm
 proxmox_bridge: vmbr0

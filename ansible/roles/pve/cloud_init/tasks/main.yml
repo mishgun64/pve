@@ -38,7 +38,7 @@
 - name: Attach imported disk
   command: >
     qm set {{ template_id }}
-    --scsihw virtio-scsi-pci
+    --scsihw virtio-scsi-single
     --scsi0 {{ proxmox_storage }}:vm-{{ template_id }}-disk-0
 
 - name: Add cloud-init disk
@@ -51,7 +51,7 @@
     qm set {{ template_id }}
     --boot order=scsi0
     --serial0 socket
-    --vga serial0
+    --vga std
     --agent enabled=1
 
 - name: Convert VM to template

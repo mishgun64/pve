@@ -1,0 +1,10 @@
+---
+
+- name: Media VM config
+  hosts: media_vm
+  remote_user: root
+  gather_facts: false
+  roles:
+    - common/basic
+    - common/docker
+    - media_vm/config_soft

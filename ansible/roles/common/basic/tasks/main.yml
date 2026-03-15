@@ -1,0 +1,105 @@
+---
+
+#- name: Add group mg
+#  ansible.builtin.group:
+#    name: mg
+#    gid: 1001
+#    state: present
+#
+#- name: Add user mg
+#  ansible.builtin.user:
+#    name: mg
+#    shell: /bin/bash
+#    create_home: yes
+#    group: mg
+#    uid: 1001
+#
+#- name: Create .ssh folder for mg user
+#  ansible.builtin.file:
+#    path: /home/mg/.ssh
+#    state: directory
+#    owner: mg
+#    group: mg
+#    mode: '0600'
+#
+#- name: Add ssh key for mg user
+#  ansible.builtin.lineinfile:
+#    path: /home/mg/.ssh/authorized_keys
+#    line: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCn8ANObVDJ7vNQVOqf5eHSxKJeRXqcPv2EVrgUKLsMBNDkgE6gOgyAPc6GcB3Rtu14n8RGmyM4K4RWvC8j1YVmbJ+yIADdPo/A/zE5AEAXiTymBlBTPpUSopcwWLOXy5mXPV0rmnc3Gi+vS9Iw7Nt3Rr3PfM6e0XTUVUyTSp9LCFnif4dAIcReDKXrifWX3pJSOsnb9MWNgtjXuGJG/Eab0aeHbVk9CIGGG9rifETucysSTCq0sMHAM9UQyXILwEHFOhZVPA0YC36F8PirX+cfNee1my2jE+mWWlsKl6VP+yOqapXre/HQhFWVoBwdqDwdcqL995/KcE1ZjB4Uv9DLBz7twbF9/X/3QoBSmZMg2uYi7L0R6Rrys8E2hngCd0NvqTQYwFEdd+RHyr5AOfIpOZOj7roCohZhaCSB8XJrktKEOUbyjjruE25uGUAFDV3hST4OnvITW3s2DI1t+DWlrK4PQHCPGcENEP1rPtPdvIPT3kjqjIxXiENbCvSskGk= heimc@DESKTOP-LSDOR4T
+#    create: yes
+#    owner: mg
+#    group: mg
+#    mode: '0600'
+
+#-----------------------Set timezone----------------------------------
+
+- name: Set Europe/Moscow timezone
+  ansible.builtin.shell: timedatectl set-timezone Europe/Moscow
+
+#-----------------------Change sshd config----------------------------------
+
+- name: Change sshd config
+  ansible.builtin.copy:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+
+- name: Disable ssh.socket
+  ansible.builtin.systemd_service:
+    name: ssh.socket
+    enabled: false
+
+- name: Enable ssh
+  ansible.builtin.systemd_service:
+    name: ssh
+    enabled: true
+
+#-----------------------Update and upgrade----------------------------------
+
+- name: Update repo and upgrade packages
+  ansible.builtin.apt:
+    name: '*'
+    state: latest
+    update_cache: yes
+
+#-----------------------Install fail2ban----------------------------------
+
+#- name: Install fail2ban
+#  ansible.builtin.apt:
+#    name: fail2ban
+#    state: latest
+#
+#- name: Add fail2ban config file
+#  ansible.builtin.copy:
+#    src: jail.local
+#    dest: /etc/fail2ban/jail.local
+#
+#- name: Restart fail2ban service
+#  ansible.builtin.systemd_service:
+#    state: restarted
+#    name: fail2ban
+
+#-----------------------Install neovim----------------------------------
+
+- name: Install neovim
+  ansible.builtin.apt:
+    name: neovim
+    state: latest
+
+- name: Copy .bashrc
+  ansible.builtin.copy:
+    src: .bashrc
+    dest: /root/.bashrc
+
+#-----------------------Scheduled update----------------------------------
+
+- name: Scheduled update
+  ansible.builtin.cron:
+    name: 'Update and upgrade'
+    minute: 0
+    hour: 6
+    job: apt update && apt upgrade -y
+
+#-----------------------Reboot----------------------------------
+#
+#- name: Reboot
+#  ansible.builtin.reboot:

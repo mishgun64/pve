@@ -1,6 +1,6 @@
 resource "proxmox_vm_qemu" "cloudinit-example" {
   vmid        = 100
-  name        = "test-terraform0"
+  name        = "media"
   target_node = "pve"
   agent       = 1
   memory      = 1024

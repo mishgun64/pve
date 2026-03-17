@@ -5,4 +5,4 @@
   become: yes
   gather_facts: false
   roles:
-    - pve/add_storage
+    - media_vm/add_storage

@@ -1,9 +1,0 @@
----
-
-- name: Add LVM storage to Proxmox (if not exists)
-  ansible.builtin.shell: |
-    pvesm status | grep -q '^media_vg' || pvesm add lvm media_vg --vgname media_vg
-
-- name: Attach LVM volume to VM 105
-  ansible.builtin.command: >
-    qm set 105 -virtio1 media_vg:media_lv

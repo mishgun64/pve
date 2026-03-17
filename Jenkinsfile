@@ -91,6 +91,7 @@ pipeline {
                 '''
             }
         }
+
         stage('media_vm') {
             when {
                 expression { env.EVENT == 'media_vm' }
@@ -100,6 +101,19 @@ pipeline {
 
                 sh '''
                     ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/media_config.yml
+                '''
+            }
+        }
+
+        stage('test_media_vm_storage') {
+            when {
+                expression { env.EVENT == 'media_storage' }
+            }
+            steps {
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/media_vm_add_storage_test.yml
                 '''
             }
         }

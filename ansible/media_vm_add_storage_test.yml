@@ -1,0 +1,8 @@
+---
+
+- hosts: pve
+  remote_user: root
+  become: yes
+  gather_facts: false
+  roles:
+    - pve/add_storage

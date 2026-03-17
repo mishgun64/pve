@@ -6,6 +6,12 @@
     shell: /bin/bash
     create_home: yes
 
+- name: Add docker user to docker group
+  ansible.builtin.user:
+    name: docker
+    groups: docker
+    append: true
+
 - name: Create directories for docker services
   ansible.builtin.file:
     path: "{{ item }}"

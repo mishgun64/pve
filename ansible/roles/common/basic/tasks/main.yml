@@ -90,6 +90,13 @@
     src: .bashrc
     dest: /root/.bashrc
 
+#-----------------------Install cron----------------------------------
+
+- name: Install cron
+  ansible.builtin.apt:
+    name: cron
+    state: latest
+
 #-----------------------Scheduled update----------------------------------
 
 - name: Scheduled update

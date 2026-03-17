@@ -12,3 +12,18 @@ services:
       - WEBUI_PORTS=9696/tcp
     volumes:
       - ./prowlarr_config:/config
+
+  sonarr:
+    container_name: sonarr
+    image: ghcr.io/hotio/sonarr
+    ports:
+      - "8989:8989"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=Europe/Moscow
+      - WEBUI_PORTS=8989/tcp
+    volumes:
+      - ./sonarr_config:/config
+      - ./sonarr_data:/data

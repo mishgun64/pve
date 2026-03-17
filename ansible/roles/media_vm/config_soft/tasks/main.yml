@@ -1,0 +1,34 @@
+---
+
+- name: Create docker user
+  ansible.builtin.user:
+    name: docker
+    shell: /bin/bash
+    create_home: yes
+
+- name: Create directories for docker services
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: docker
+    group: docker
+    mode: "0755"
+  loop:
+    - /home/docker/prowlarr_config
+    - /home/docker/sonarr_config
+    - /home/docker/sonarr_data
+
+- name: Copy docker-compose file
+  ansible.builtin.copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: docker
+    group: docker
+    mode: "0644"
+
+- name: Start docker compose stack
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker

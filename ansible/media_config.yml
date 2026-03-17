@@ -3,7 +3,7 @@
 - name: Media VM config
   hosts: media_vm
   remote_user: root
-  gather_facts: false
+  gather_facts: true
   roles:
     - common/basic
     - common/docker

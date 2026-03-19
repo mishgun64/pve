@@ -27,7 +27,7 @@ services:
     volumes:
       - ./sonarr_anime_config:/config
       - /media:/data
-      -
+
   sonarr-series:
     <<: *common-keys
     container_name: sonarr-series

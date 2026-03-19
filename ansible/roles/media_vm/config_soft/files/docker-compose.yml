@@ -98,7 +98,7 @@ services:
       - /media/library:/media:ro #read-only
     ports:
       - "8096:8096"
-      -
+
   emby:
     <<: *common-keys
     container_name: embyserver

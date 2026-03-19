@@ -1,8 +1,0 @@
----
-
-- hosts: pve
-  remote_user: root
-  become: yes
-  gather_facts: false
-  roles:
-    - media_vm/add_storage

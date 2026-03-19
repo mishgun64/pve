@@ -1,5 +1,0 @@
----
-
-- name: Attach LVM volume to VM 105
-  ansible.builtin.command: >
-    qm set 100 -virtio1 /dev/media_vg/media_lv

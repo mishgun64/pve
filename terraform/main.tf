@@ -9,6 +9,7 @@ resource "proxmox_vm_qemu" "cloudinit-example" {
   scsihw      = "virtio-scsi-single"
   vm_state    = "running"
   automatic_reboot = true
+  onboot = true
 
   # Cloud-Init configuration
   cicustom   = "vendor=local:snippets/qemu-guest-agent.yml" # /var/lib/vz/snippets/qemu-guest-agent.yml

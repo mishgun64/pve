@@ -18,14 +18,24 @@ services:
     volumes:
       - ./prowlarr_config:/config
 
-  sonarr:
+  sonarr-anime:
     <<: *common-keys
-    container_name: sonarr
+    container_name: sonarr-anime
     image: ghcr.io/hotio/sonarr:latest
     ports:
       - "8989:8989"
     volumes:
-      - ./sonarr_config:/config
+      - ./sonarr_anime_config:/config
+      - /media:/data
+      -
+  sonarr-series:
+    <<: *common-keys
+    container_name: sonarr-series
+    image: ghcr.io/hotio/sonarr:latest
+    ports:
+      - "8990:8990"
+    volumes:
+      - ./sonarr_series_config:/config
       - /media:/data
 
   radarr:
@@ -37,6 +47,23 @@ services:
     volumes:
       - ./radarr_config:/config
       - /media:/data
+
+  bazarr:
+    <<: *common-keys
+    container_name: bazarr
+    image: ghcr.io/hotio/bazarr:latest
+    ports:
+      - "6767:6767"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=Etc/UTC
+      - WEBUI_PORTS=6767/tcp
+    volumes:
+      - ./bazarr_config:/config
+      - /media:/data
+
 
   qbittorrent:
     <<: *common-keys
@@ -52,3 +79,46 @@ services:
     volumes:
       - ./qbittorrent_config:/config
       - /media:/data
+
+  seerr:
+    <<: *common-keys
+    container_name: seerr
+    image: ghcr.io/hotio/seerr:latest
+    ports:
+      - "5055:5055"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - UMASK=002
+      - TZ=Etc/UTC
+      - WEBUI_PORTS=5055/tcp
+    volumes:
+      - ./seerr_config:/config
+
+  jellyfin:
+    <<: *common-keys
+    container_name: jellyfin
+    image: ghcr.io/hotio/jellyfin:latest
+    volumes:
+      - ./jellyfin_config:/config
+      - /media/library:/media:ro #read-only
+    ports:
+      - 8096:8096
+      -
+  emby:
+    image: emby/embyserver
+    container_name: embyserver
+    environment:
+      - UID=1000 # The UID to run emby as (default: 2)
+      - GID=1000 # The GID to run emby as (default 2)
+      - GIDLIST=100 # A comma-separated list of additional GIDs to run emby as (default: 2)
+    volumes:
+      - ./emby_config:/config # Configuration directory
+      - /media/library:/media:ro # Media directory
+    ports:
+      - 8096:8096 # HTTP port
+    restart: on-failure
+
+networks:
+  default:
+    name: arr_network

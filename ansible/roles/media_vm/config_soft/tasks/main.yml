@@ -74,9 +74,14 @@
     mode: "0755"
   loop:
     - /home/docker/prowlarr_config
-    - /home/docker/sonarr_config
+    - /home/docker/sonarr_anime_config
+    - /home/docker/sonarr_series_config
     - /home/docker/radarr_config
+    - /home/docker/bazarr_config
     - /home/docker/qbittorrent_config
+    - /home/docker/seerr_config
+    - /home/docker/jellyfin_config
+    - /home/docker/emby_config
 
 - name: Copy docker-compose file
   ansible.builtin.copy:

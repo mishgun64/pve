@@ -103,7 +103,7 @@
   become: true
   become_user: docker
 
-- name: Update docker compose stack
+- name: Pull docker compose stack
   ansible.builtin.shell: docker compose pull
   args:
     chdir: /home/docker

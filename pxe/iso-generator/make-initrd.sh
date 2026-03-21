@@ -2,7 +2,7 @@
 set -euo pipefail
 
 URL="https://enterprise.proxmox.com/iso/"
-ANSWER_URL="https://raw.githubusercontent.com/mishgun64/pve/refs/heads/main/answer.toml"
+ANSWER_URL="https://raw.githubusercontent.com/mishgun64/pve/refs/heads/main/pxe/answer.toml"
 STATE_FILE="pve-last-version"
 
 WORKDIR="$(pwd)"

@@ -8,7 +8,6 @@ root-password = "12345678"
 root-ssh-keys = []
 
 [network]
-#source = "from-dhcp"
 source = "from-answer"
 cidr = "192.168.1.100/24"
 dns = "192.168.1.1"
@@ -22,4 +21,4 @@ disk-list = ["/dev/nvme0n1"]
 [first-boot]
 source = "from-url"
 ordering = "network-online"
-url = "https://raw.githubusercontent.com/mishgun64/pve/refs/heads/main/first_boot.sh"
+url = "https://raw.githubusercontent.com/mishgun64/pve/refs/heads/main/pxe/first_boot.sh"

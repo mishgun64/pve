@@ -109,6 +109,17 @@ services:
     ports:
       - "8096:8096" # HTTP port
 
+  samba:
+    image: dperson/samba
+    container_name: samba
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /media:/media
+    command: >
+      -u "user;strongpassword"
+      -s "media;/media;yes;no;no;user"
+
 networks:
   default:
     name: arr_network

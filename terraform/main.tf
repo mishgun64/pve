@@ -1,15 +1,15 @@
-resource "proxmox_vm_qemu" "cloudinit-example" {
-  vmid        = 100
+resource "proxmox_vm_qemu" "media_vm" {
+  vmid        = 101
   name        = "media"
   target_node = "pve"
   agent       = 1
-  memory      = 1024
-  boot        = "order=scsi0" # has to be the same as the OS disk of the template
-  clone       = "debian-cloudinit-template" # The name of the template
+  memory      = 6144
+  boot        = "order=scsi0"
+  clone       = "debian-cloudinit-template"
   scsihw      = "virtio-scsi-single"
   vm_state    = "running"
   automatic_reboot = true
-  onboot = true
+  start_at_node_boot = true
 
   # Cloud-Init configuration
   cicustom   = "vendor=local:snippets/qemu-guest-agent.yml" # /var/lib/vz/snippets/qemu-guest-agent.yml
@@ -22,7 +22,7 @@ resource "proxmox_vm_qemu" "cloudinit-example" {
   sshkeys    = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control"
 
   cpu {
-    cores   = 1
+    cores   = 4
     sockets = 1
     type    = "x86-64-v2-AES"
   }
@@ -38,7 +38,7 @@ resource "proxmox_vm_qemu" "cloudinit-example" {
         disk {
           storage = "local-lvm"
           # The size of the disk should be at least as big as the disk in the template. If it's smaller, the disk will be recreated
-          size    = "4G"
+          size    = "30G"
         }
       }
     }

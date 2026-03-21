@@ -17,7 +17,7 @@ filter.ID_NET_NAME_MAC = "*"
 [disk-setup]
 filesystem = "ext4"
 lvm.swapsize = 0
-lvm.maxvz = 200
+lvm.maxroot = 50
 disk-list = ["/dev/nvme0n1"]
 
 [first-boot]

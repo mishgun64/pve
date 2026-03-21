@@ -23,15 +23,15 @@
     device: /dev/sda
     number: 1
     state: present
-    part_start: 1MiB
-    part_end: 1001MiB
+    part_start: 0%
+    part_end: 50%
 
 - name: Create sda2 (1TB)
   community.general.parted:
     device: /dev/sda
     number: 2
     state: present
-    part_start: 1001MiB
+    part_start: 50%
     part_end: 100%
 
 #################################
@@ -48,15 +48,15 @@
     device: /dev/sdb
     number: 1
     state: present
-    part_start: 1MiB
-    part_end: 1001MiB
+    part_start: 0%
+    part_end: 50%
 
 - name: Create sdb2 (1TB)
   community.general.parted:
     device: /dev/sdb
     number: 2
     state: present
-    part_start: 1001MiB
+    part_start: 50%
     part_end: 100%
 
 #################################

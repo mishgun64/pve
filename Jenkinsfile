@@ -33,7 +33,7 @@ pipeline {
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pve_config_fresh_test.yml
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pve_config_init_test.yml
                 '''
             }
         }

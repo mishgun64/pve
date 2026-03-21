@@ -66,3 +66,13 @@
         - apt update
         - apt install -y qemu-guest-agent
         - systemctl start qemu-guest-agent
+
+- name: Trigger Jenkins webhook
+  uri:
+    url: "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      event: terraform

@@ -114,11 +114,15 @@ services:
     container_name: samba
     restart: unless-stopped
     network_mode: host
+    ports:
+      - "445:445"
+    environment:
+      TZ: Europe/Moscow
     volumes:
       - /media:/media
     command: >
-      -u "user;strongpassword"
-      -s "media;/media;yes;no;no;user"
+      -u "user;1234"
+      -s "media;/media;yes;no;all;none"
 
 networks:
   default:

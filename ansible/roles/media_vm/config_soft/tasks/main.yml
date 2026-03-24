@@ -73,6 +73,22 @@
 
 #-----------------------Copy init config----------------------------------
 
+- name: Decrypt encrypted archives
+  shell: >
+    sops -d {{ item.src }} > {{ item.dest }}
+  args:
+    creates: "{{ item.dest }}"
+#  environment:
+#    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
+  loop:
+    - { src: "{{ init_dir_jenkins }}/emby_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/emby_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz" }
+  delegate_to: control_node
+
 - name: Create directories for docker services
   ansible.builtin.file:
     path: "{{ item }}"
@@ -91,38 +107,18 @@
     - /home/docker/jellyfin_config
     - /home/docker/emby_config
 
-- name: Ensure init directory exists
-  file:
-    path: /home/docker/init_config
-    state: directory
-
-- name: Copy encrypted configs and sops file
+- name: Copy archives
   copy:
     src: "{{ item }}"
     dest: /home/docker/init_config/
   loop:
-    - init_config/emby_init_config.tar.gz.enc
-    - init_config/prowlarr_init_config.tar.gz.enc
-    - init_config/radarr_init_config.tar.gz.enc
-    - init_config/seerr_init_config.tar.gz.enc
-    - init_config/sonarr_anime_init_config.tar.gz.enc
-    - init_config/sonarr_series_init_config.tar.gz.enc
-    - init_config/.sops.yaml
+    - init_config/emby_init_config.tar.gz
+    - init_config/prowlarr_init_config.tar.gz
+    - init_config/radarr_init_config.tar.gz
+    - init_config/seerr_init_config.tar.gz
+    - init_config/sonarr_anime_init_config.tar.gz
+    - init_config/sonarr_series_init_config.tar.gz
 
-- name: Decrypt encrypted archives
-  shell: >
-    sops -d {{ item.src }} > {{ item.dest }}
-  args:
-    creates: "{{ item.dest }}"
-  environment:
-    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
-  loop:
-    - { src: "/home/docker/init_config/emby_init_config.tar.gz.enc", dest: "/home/docker/init_config/emby_init_config.tar.gz" }
-    - { src: "/home/docker/init_config/prowlarr_init_config.tar.gz.enc", dest: "/home/docker/init_config/prowlarr_init_config.tar.gz" }
-    - { src: "/home/docker/init_config/radarr_init_config.tar.gz.enc", dest: "/home/docker/init_config/radarr_init_config.tar.gz" }
-    - { src: "/home/docker/init_config/seerr_init_config.tar.gz.enc", dest: "/home/docker/init_config/seerr_init_config.tar.gz" }
-    - { src: "/home/docker/init_config/sonarr_anime_init_config.tar.gz.enc", dest: "/home/docker/init_config/sonarr_anime_init_config.tar.gz" }
-    - { src: "/home/docker/init_config/sonarr_series_init_config.tar.gz.enc", dest: "/home/docker/init_config/sonarr_series_init_config.tar.gz" }
 
 - name: Extract archives
   unarchive:

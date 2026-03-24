@@ -71,7 +71,7 @@
     - /media/library/anime
     - /media/library/series
 
-#-----------------------Install and run services ----------------------------------
+#-----------------------Copy init config----------------------------------
 
 - name: Create directories for docker services
   ansible.builtin.file:
@@ -91,34 +91,50 @@
     - /home/docker/jellyfin_config
     - /home/docker/emby_config
 
-# 1. Список архивов и целевых директорий
-- name: Define archives mapping
-  set_fact:
-    archives:
-      emby: /home/docker/emby_config
-      prowlarr: /home/docker/prowlarr_config
-      radarr: /home/docker/radarr_config
-      seerr: /home/docker/seerr_config
-      sonarr_anime: /home/docker/sonarr_anime_config
-      sonarr_series: /home/docker/sonarr_series_config
+- name: Ensure init directory exists
+  file:
+    path: /home/docker/init_config
+    state: directory
 
-# 2. Расшифровка и распаковка
-- name: Decrypt and extract archives
-  shell: |
-    set -e
-    ENC_FILE="{{ init_dir }}/{{ item.key }}_init_config.tar.gz.enc"
-    TAR_FILE="{{ init_dir }}/{{ item.key }}_init_config.tar.gz"
-    TARGET_DIR="{{ item.value }}"
+- name: Copy encrypted configs and sops file
+  copy:
+    src: "{{ item }}"
+    dest: /home/docker/init_config/
+  loop:
+    - init_config/emby_init_config.tar.gz.enc
+    - init_config/prowlarr_init_config.tar.gz.enc
+    - init_config/radarr_init_config.tar.gz.enc
+    - init_config/seerr_init_config.tar.gz.enc
+    - init_config/sonarr_anime_init_config.tar.gz.enc
+    - init_config/sonarr_series_init_config.tar.gz.enc
+    - init_config/.sops.yaml
 
-    mkdir -p "$TARGET_DIR"
+- name: Decrypt encrypted archives
+  command: >
+    sops -d {{ item.src }} > {{ item.dest }}
+  args:
+    creates: "{{ item.dest }}"
+  loop:
+    - { src: "/home/docker/init_config/emby_init_config.tar.gz.enc", dest: "/home/docker/init_config/emby_init_config.tar.gz" }
+    - { src: "/home/docker/init_config/prowlarr_init_config.tar.gz.enc", dest: "/home/docker/init_config/prowlarr_init_config.tar.gz" }
+    - { src: "/home/docker/init_config/radarr_init_config.tar.gz.enc", dest: "/home/docker/init_config/radarr_init_config.tar.gz" }
+    - { src: "/home/docker/init_config/seerr_init_config.tar.gz.enc", dest: "/home/docker/init_config/seerr_init_config.tar.gz" }
+    - { src: "/home/docker/init_config/sonarr_anime_init_config.tar.gz.enc", dest: "/home/docker/init_config/sonarr_anime_init_config.tar.gz" }
+    - { src: "/home/docker/init_config/sonarr_series_init_config.tar.gz.enc", dest: "/home/docker/init_config/sonarr_series_init_config.tar.gz" }
 
-    sops -d "$ENC_FILE" > "$TAR_FILE"
-    tar -xzf "$TAR_FILE" -C "$TARGET_DIR"
+- name: Extract archives
+  unarchive:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    remote_src: yes
+  loop:
+    - { src: "/home/docker/init_config/emby_init_config.tar.gz", dest: "/home/docker/emby_config" }
+    - { src: "/home/docker/init_config/prowlarr_init_config.tar.gz", dest: "/home/docker/prowlarr_config" }
+    - { src: "/home/docker/init_config/radarr_init_config.tar.gz", dest: "/home/docker/radarr_config" }
+    - { src: "/home/docker/init_config/seerr_init_config.tar.gz", dest: "/home/docker/seerr_config" }
+    - { src: "/home/docker/init_config/sonarr_anime_init_config.tar.gz", dest: "/home/docker/sonarr_anime_config" }
+    - { src: "/home/docker/init_config/sonarr_series_init_config.tar.gz", dest: "/home/docker/sonarr_series_config" }
 
-    rm -f "$TAR_FILE"
-  loop: "{{ archives | dict2items }}"
-
-# 3. Копирование qbittorrent конфигов
 - name: Ensure qbittorrent config dir exists
   file:
     path: /home/docker/qbittorrent_config/config
@@ -129,10 +145,19 @@
   copy:
     src: "{{ item }}"
     dest: /home/docker/qbittorrent_config/config/
+    owner: docker
+    group: docker
     mode: '0644'
   loop:
     - "{{ init_dir }}/qbittorrent/categories.json"
     - "{{ init_dir }}/qbittorrent/qBittorrent.conf"
+
+- name: Remove init_config directory
+  file:
+    path: /home/docker/init_config
+    state: absent
+
+#-----------------------Run containers----------------------------------
 
 - name: Copy docker-compose file
   ansible.builtin.copy:

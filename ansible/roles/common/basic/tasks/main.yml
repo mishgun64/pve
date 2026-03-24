@@ -80,7 +80,7 @@
 
 #-----------------------Install packages----------------------------------
 
-- name: Install neovim
+- name: Install apt packages
   ansible.builtin.apt:
     name:
       - neovim

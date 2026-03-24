@@ -110,10 +110,12 @@
     - init_config/.sops.yaml
 
 - name: Decrypt encrypted archives
-  command: >
+  shell: >
     sops -d {{ item.src }} > {{ item.dest }}
   args:
     creates: "{{ item.dest }}"
+  environment:
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
   loop:
     - { src: "/home/docker/init_config/emby_init_config.tar.gz.enc", dest: "/home/docker/init_config/emby_init_config.tar.gz" }
     - { src: "/home/docker/init_config/prowlarr_init_config.tar.gz.enc", dest: "/home/docker/init_config/prowlarr_init_config.tar.gz" }

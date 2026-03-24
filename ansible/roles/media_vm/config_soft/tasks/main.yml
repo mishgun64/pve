@@ -120,6 +120,19 @@
     - init_config/sonarr_anime_init_config.tar.gz
     - init_config/sonarr_series_init_config.tar.gz
 
+- name: Remove decrypted archives from control node
+  delegate_to: localhost
+  run_once: true
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ init_dir_jenkins }}/emby_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/radarr_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/seerr_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz"
 
 - name: Extract archives
   unarchive:
@@ -148,8 +161,8 @@
     group: docker
     mode: '0644'
   loop:
-    - "{{ init_dir }}/qbittorrent/categories.json"
-    - "{{ init_dir }}/qbittorrent/qBittorrent.conf"
+    - init_config/qbittorrent/categories.json
+    - init_config/qbittorrent/qBittorrent.conf
 
 - name: Remove init_config directory
   file:

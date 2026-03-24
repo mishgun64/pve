@@ -12,7 +12,7 @@
     uid: 1000
     group: docker
     create_home: yes
-    shell: /bin/bash
+    shell: /usr/sbin/nologin
     system: no
 
 - name: Update apt cache

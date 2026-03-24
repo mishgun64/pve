@@ -121,6 +121,9 @@
   unarchive:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
+    owner: docker
+    group: docker
+    mode: "0755"
     remote_src: yes
   loop:
     - { src: "/home/docker/init_config/emby_init_config.tar.gz", dest: "/home/docker/emby_config" }
@@ -134,6 +137,8 @@
   file:
     path: /home/docker/qbittorrent_config/config
     state: directory
+    owner: docker
+    group: docker
     mode: '0755'
 
 - name: Copy qbittorrent configs

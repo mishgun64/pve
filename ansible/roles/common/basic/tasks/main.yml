@@ -78,24 +78,29 @@
 #    state: restarted
 #    name: fail2ban
 
-#-----------------------Install neovim----------------------------------
+#-----------------------Install packages----------------------------------
 
 - name: Install neovim
   ansible.builtin.apt:
-    name: neovim
+    name:
+      - neovim
+      - cron
     state: latest
+
+- name: Install sops binary
+  get_url:
+    url: https://github.com/getsops/sops/releases/download/v3.12.2/sops-v3.12.2.linux.amd64
+    dest: /usr/local/bin/sops
+    mode: '0755'
+    owner: root
+    group: root
+
+#-----------------------Copy .bashrc----------------------------------
 
 - name: Copy .bashrc
   ansible.builtin.copy:
     src: .bashrc
     dest: /root/.bashrc
-
-#-----------------------Install cron----------------------------------
-
-- name: Install cron
-  ansible.builtin.apt:
-    name: cron
-    state: latest
 
 #-----------------------Scheduled update----------------------------------
 

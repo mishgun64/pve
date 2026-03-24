@@ -119,19 +119,19 @@
 
 - name: Extract archives
   unarchive:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
+    src: "{{ item }}"
+    dest: /home/docker/
     owner: docker
     group: docker
     mode: "0755"
     remote_src: yes
   loop:
-    - { src: "/home/docker/init_config/emby_init_config.tar.gz", dest: "/home/docker/emby_config" }
-    - { src: "/home/docker/init_config/prowlarr_init_config.tar.gz", dest: "/home/docker/prowlarr_config" }
-    - { src: "/home/docker/init_config/radarr_init_config.tar.gz", dest: "/home/docker/radarr_config" }
-    - { src: "/home/docker/init_config/seerr_init_config.tar.gz", dest: "/home/docker/seerr_config" }
-    - { src: "/home/docker/init_config/sonarr_anime_init_config.tar.gz", dest: "/home/docker/sonarr_anime_config" }
-    - { src: "/home/docker/init_config/sonarr_series_init_config.tar.gz", dest: "/home/docker/sonarr_series_config" }
+    - /home/docker/init_config/emby_init_config.tar.gz
+    - /home/docker/init_config/prowlarr_init_config.tar.gz
+    - /home/docker/init_config/radarr_init_config.tar.gz
+    - /home/docker/init_config/seerr_init_config.tar.gz
+    - /home/docker/init_config/sonarr_anime_init_config.tar.gz
+    - /home/docker/init_config/sonarr_series_init_config.tar.gz
 
 - name: Ensure qbittorrent config dir exists
   file:
@@ -159,31 +159,31 @@
 
 #-----------------------Run containers----------------------------------
 
-#- name: Copy docker-compose file
-#  ansible.builtin.copy:
-#    src: docker-compose.yml
-#    dest: /home/docker/docker-compose.yml
-#    owner: docker
-#    group: docker
-#    mode: "0644"
-#
-#- name: Stop docker compose stack
-#  ansible.builtin.shell: docker compose down
-#  args:
-#    chdir: /home/docker
-#  become: true
-#  become_user: docker
-#
-#- name: Pull docker compose stack
-#  ansible.builtin.shell: docker compose pull
-#  args:
-#    chdir: /home/docker
-#  become: true
-#  become_user: docker
-#
-#- name: Start docker compose stack
-#  ansible.builtin.shell: docker compose up -d
-#  args:
-#    chdir: /home/docker
-#  become: true
-#  become_user: docker
+- name: Copy docker-compose file
+  ansible.builtin.copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: docker
+    group: docker
+    mode: "0644"
+
+- name: Stop docker compose stack
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
+
+- name: Pull docker compose stack
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
+
+- name: Start docker compose stack
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker

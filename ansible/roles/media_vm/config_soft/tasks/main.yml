@@ -35,23 +35,6 @@
     state: mounted
     opts: defaults
 
-#-----------------------Create docker user----------------------------------
-
-- name: Create docker group
-  ansible.builtin.group:
-    name: docker
-    gid: 1000
-    state: present
-
-- name: Create docker user without shell
-  ansible.builtin.user:
-    name: docker
-    uid: 1000
-    group: docker
-    create_home: yes
-    shell: /usr/sbin/nologin
-    system: no
-
 #-----------------------Create folder structure----------------------------------
 
 - name: Create media directory structure

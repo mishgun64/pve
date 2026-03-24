@@ -80,8 +80,8 @@
     sops -d {{ item.src }} > {{ item.dest }}
   args:
     creates: "{{ item.dest }}"
-#  environment:
-#    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
+  environment:
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
   loop:
     - { src: "{{ init_dir_jenkins }}/emby_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/emby_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz" }

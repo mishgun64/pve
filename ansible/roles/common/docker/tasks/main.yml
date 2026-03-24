@@ -1,5 +1,20 @@
 ---
 
+- name: Create docker group
+  ansible.builtin.group:
+    name: docker
+    gid: 1000
+    state: present
+
+- name: Create docker user
+  ansible.builtin.user:
+    name: docker
+    uid: 1000
+    group: docker
+    create_home: yes
+    shell: /bin/bash
+    system: no
+
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: true
@@ -53,17 +68,3 @@
       - docker-compose-plugin
     state: present
 
-- name: Create docker group
-  ansible.builtin.group:
-    name: docker
-    gid: 1000
-    state: present
-
-- name: Create docker user without shell
-  ansible.builtin.user:
-    name: docker
-    uid: 1000
-    group: docker
-    create_home: yes
-    shell: /bin/bash
-    system: no

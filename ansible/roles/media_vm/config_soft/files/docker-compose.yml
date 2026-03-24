@@ -33,7 +33,7 @@ services:
     container_name: sonarr-series
     image: ghcr.io/hotio/sonarr:latest
     ports:
-      - "8990:8990"
+      - "8990:8989"
     volumes:
       - ./sonarr_series_config:/config
       - /media:/data
@@ -54,12 +54,6 @@ services:
     image: ghcr.io/hotio/bazarr:latest
     ports:
       - "6767:6767"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - UMASK=002
-      - TZ=Etc/UTC
-      - WEBUI_PORTS=6767/tcp
     volumes:
       - ./bazarr_config:/config
       - /media:/data
@@ -86,6 +80,9 @@ services:
     image: ghcr.io/hotio/seerr:latest
     ports:
       - "5055:5055"
+    dns:
+      - 9.9.9.9
+      - 149.112.112.112
     volumes:
       - ./seerr_config:/config
 
@@ -107,22 +104,22 @@ services:
       - ./emby_config:/config # Configuration directory
       - /media/library:/media:ro # Media directory
     ports:
-      - "8096:8096" # HTTP port
+      - "8097:8096" # HTTP port
 
   samba:
     image: dperson/samba
     container_name: samba
     restart: unless-stopped
     network_mode: host
-    ports:
-      - "445:445"
     environment:
       TZ: Europe/Moscow
     volumes:
       - /media:/media
+      - /home/docker:/config
     command: >
       -u "user;1234"
-      -s "media;/media;yes;no;all;none"
+      -s "media;/media;yes;no;yes;all;none" 
+      -s "config;/config;yes;no;yes"
 
 networks:
   default:

@@ -37,17 +37,20 @@
 
 #-----------------------Create docker user----------------------------------
 
-- name: Create docker user
-  ansible.builtin.user:
+- name: Create docker group
+  ansible.builtin.group:
     name: docker
-    shell: /bin/bash
-    create_home: yes
+    gid: 1000
+    state: present
 
-- name: Add docker user to docker group
+- name: Create docker user without shell
   ansible.builtin.user:
     name: docker
-    groups: docker
-    append: true
+    uid: 1000
+    group: docker
+    create_home: yes
+    shell: /usr/sbin/nologin
+    system: no
 
 #-----------------------Create folder structure----------------------------------
 
@@ -87,6 +90,49 @@
     - /home/docker/seerr_config
     - /home/docker/jellyfin_config
     - /home/docker/emby_config
+
+# 1. Список архивов и целевых директорий
+- name: Define archives mapping
+  set_fact:
+    archives:
+      emby: /home/docker/emby_config
+      prowlarr: /home/docker/prowlarr_config
+      radarr: /home/docker/radarr_config
+      seerr: /home/docker/seerr_config
+      sonarr_anime: /home/docker/sonarr_anime_config
+      sonarr_series: /home/docker/sonarr_series_config
+
+# 2. Расшифровка и распаковка
+- name: Decrypt and extract archives
+  shell: |
+    set -e
+    ENC_FILE="{{ init_dir }}/{{ item.key }}_init_config.tar.gz.enc"
+    TAR_FILE="{{ init_dir }}/{{ item.key }}_init_config.tar.gz"
+    TARGET_DIR="{{ item.value }}"
+
+    mkdir -p "$TARGET_DIR"
+
+    sops -d "$ENC_FILE" > "$TAR_FILE"
+    tar -xzf "$TAR_FILE" -C "$TARGET_DIR"
+
+    rm -f "$TAR_FILE"
+  loop: "{{ archives | dict2items }}"
+
+# 3. Копирование qbittorrent конфигов
+- name: Ensure qbittorrent config dir exists
+  file:
+    path: /home/docker/qbittorrent_config/config
+    state: directory
+    mode: '0755'
+
+- name: Copy qbittorrent configs
+  copy:
+    src: "{{ item }}"
+    dest: /home/docker/qbittorrent_config/config/
+    mode: '0644'
+  loop:
+    - "{{ init_dir }}/qbittorrent/categories.json"
+    - "{{ init_dir }}/qbittorrent/qBittorrent.conf"
 
 - name: Copy docker-compose file
   ansible.builtin.copy:

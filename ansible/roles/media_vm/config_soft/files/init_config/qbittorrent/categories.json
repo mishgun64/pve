@@ -1,0 +1,11 @@
+{
+    "Anime": {
+        "save_path": "/data/torrents/anime"
+    },
+    "Movie": {
+        "save_path": "/data/torrents/movies"
+    },
+    "Series": {
+        "save_path": "/data/torrents/series"
+    }
+}

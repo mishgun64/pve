@@ -3,7 +3,7 @@ resource "proxmox_vm_qemu" "media_vm" {
   name        = "media"
   target_node = "pve"
   agent       = 1
-  memory      = 6144
+  memory      = 8192
   boot        = "order=scsi0"
   clone       = "debian-cloudinit-template"
   scsihw      = "virtio-scsi-single"

@@ -74,6 +74,8 @@
 #-----------------------Copy init config----------------------------------
 
 - name: Decrypt encrypted archives
+  delegate_to: localhost
+  run_once: true
   shell: >
     sops -d {{ item.src }} > {{ item.dest }}
   args:
@@ -87,7 +89,6 @@
     - { src: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz" }
-  delegate_to: control_node
 
 - name: Create directories for docker services
   ansible.builtin.file:

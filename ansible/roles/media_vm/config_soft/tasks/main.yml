@@ -159,31 +159,31 @@
 
 #-----------------------Run containers----------------------------------
 
-- name: Copy docker-compose file
-  ansible.builtin.copy:
-    src: docker-compose.yml
-    dest: /home/docker/docker-compose.yml
-    owner: docker
-    group: docker
-    mode: "0644"
-
-- name: Stop docker compose stack
-  ansible.builtin.shell: docker compose down
-  args:
-    chdir: /home/docker
-  become: true
-  become_user: docker
-
-- name: Pull docker compose stack
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_user: docker
-
-- name: Start docker compose stack
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_user: docker
+#- name: Copy docker-compose file
+#  ansible.builtin.copy:
+#    src: docker-compose.yml
+#    dest: /home/docker/docker-compose.yml
+#    owner: docker
+#    group: docker
+#    mode: "0644"
+#
+#- name: Stop docker compose stack
+#  ansible.builtin.shell: docker compose down
+#  args:
+#    chdir: /home/docker
+#  become: true
+#  become_user: docker
+#
+#- name: Pull docker compose stack
+#  ansible.builtin.shell: docker compose pull
+#  args:
+#    chdir: /home/docker
+#  become: true
+#  become_user: docker
+#
+#- name: Start docker compose stack
+#  ansible.builtin.shell: docker compose up -d
+#  args:
+#    chdir: /home/docker
+#  become: true
+#  become_user: docker

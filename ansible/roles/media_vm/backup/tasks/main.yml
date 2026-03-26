@@ -6,7 +6,7 @@
   delegate_to: localhost
   run_once: true
   command: >
-    sops -d {{ role_path }}/files/secrets.enc.yaml
+    sops -d {{ role_path }}/files/secrets.enc.yml
   register: secrets_raw
 
 - name: Parse secrets

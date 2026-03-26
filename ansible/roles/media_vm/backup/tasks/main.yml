@@ -131,16 +131,16 @@
 
 #-----------------------Move backups to control node----------------------------------
 
-- name: Create local backup directory
-  delegate_to: localhost
-  run_once: true
-  become: true
-  ansible.builtin.file:
-    path: /srv/backups/
-    state: directory
-    owner: jenkins
-    group: jenkins
-    mode: "0700"
+#- name: Create local backup directory
+#  delegate_to: localhost
+#  run_once: true
+#  become: true
+#  ansible.builtin.file:
+#    path: /srv/backups/
+#    state: directory
+#    owner: jenkins
+#    group: jenkins
+#    mode: "0700"
 
 - name: Find backup files
   become: true

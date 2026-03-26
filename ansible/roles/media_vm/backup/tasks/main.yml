@@ -112,25 +112,27 @@
   find:
     paths: /home/docker/sonarr_anime_config/Backups
     patterns: "sonarr_backup_*.zip"
-  register: sonarr_backups
+    recurse: yes
+  register: sonarr_anime_backups
 
 - name: Rename Sonarr-anime backup
   command: >
     mv {{ item.path }}
        {{ item.path | regex_replace('sonarr_backup', 'sonarr-anime_backup') }}
-  loop: "{{ sonarr_backups.files }}"
+  loop: "{{ sonarr_anime_backups.files }}"
 
 - name: Find Sonarr-series backups
   find:
     paths: /home/docker/sonarr_series_config/Backups
     patterns: "sonarr_backup_*.zip"
-  register: sonarr_backups
+    recurse: yes
+  register: sonarr_series_backups
 
 - name: Rename Sonarr-series backup
   command: >
     mv {{ item.path }}
        {{ item.path | regex_replace('sonarr_backup', 'sonarr-series_backup') }}
-  loop: "{{ sonarr_backups.files }}"
+  loop: "{{ sonarr_series_backups.files }}"
 
 - name: Find backup zip files
   become: true

@@ -104,5 +104,18 @@ pipeline {
                 '''
             }
         }
+
+        stage('media_vm_backup') {
+            when {
+                expression { env.EVENT == 'media_vm_backup' }
+            }
+            steps {
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/media_backup.yml
+                '''
+            }
+        }
     }
 }

@@ -1,0 +1,169 @@
+---
+
+#-----------------------Get API keys from secrets.yml----------------------------------
+
+- name: Decrypt secrets file
+  delegate_to: localhost
+  run_once: true
+  command: >
+    sops -d {{ role_path }}/files/secrets.enc.yaml
+  register: secrets_raw
+
+- name: Parse secrets
+  set_fact:
+    secrets: "{{ secrets_raw.stdout | from_yaml }}"
+
+#-----------------------Trigger webhook backups----------------------------------
+
+- name: Trigger Prowlarr backup
+  uri:
+    url: http://localhost:9696/api/v3/command
+    method: POST
+    headers:
+      X-Api-Key: "{{ secrets.prowlarr_api_key }}"
+    body_format: json
+    body:
+      name: Backup
+
+- name: Trigger Radarr backup
+  uri:
+    url: http://localhost:7878/api/v3/command
+    method: POST
+    headers:
+      X-Api-Key: "{{ secrets.radarr_api_key }}"
+    body_format: json
+    body:
+      name: Backup
+
+- name: Trigger Sonarr_anime backup
+  uri:
+    url: http://localhost:8989/api/v3/command
+    method: POST
+    headers:
+      X-Api-Key: "{{ secrets.sonarr_anime_api_key }}"
+    body_format: json
+    body:
+      name: Backup
+
+- name: Trigger Sonarr_series backup
+  uri:
+    url: http://localhost:8990/api/v3/command
+    method: POST
+    headers:
+      X-Api-Key: "{{ secrets.sonarr_series_api_key }}"
+    body_format: json
+    body:
+      name: Backup
+
+#-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
+
+- name: Create backups directory
+  become: true
+  ansible.builtin.file:
+    path: /home/docker/backups
+    state: directory
+    owner: docker
+    group: docker
+    mode: "0755"
+
+- name: Set timestamp
+  set_fact:
+    backup_ts: "{{ ansible_date_time.year }}.{{ ansible_date_time.month }}.{{ ansible_date_time.day }}_{{ ansible_date_time.hour }}.{{ ansible_date_time.minute }}.{{ ansible_date_time.second }}"
+
+- name: Backup Emby
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/emby_config/config
+      - /home/docker/emby_config/data
+      - /home/docker/emby_config/plugins
+    dest: "/home/docker/backups/emby_backup_{{ backup_ts }}.zip"
+    format: zip
+
+- name: Backup Jellyfin
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/jellyfin_config/data
+      - /home/docker/jellyfin_config/encoding.xml
+      - /home/docker/jellyfin_config/system.xml
+      - /home/docker/jellyfin_config/database.xml
+    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
+    format: zip
+
+- name: Backup Seerr
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/seerr_config/db
+      - /home/docker/seerr_config/encoding.xml
+      - /home/docker/seerr_config/anime-list.xml
+      - /home/docker/seerr_config/settings.json
+    dest: "/home/docker/backups/seerr_backup_{{ backup_ts }}.zip"
+    format: zip
+
+#-----------------------Get backups from Prowlarr, Sonarr, Radarr, Bazarr----------------------------------
+
+- name: Find backup zip files
+  become: true
+  ansible.builtin.find:
+    paths:
+      - /home/docker/prowlarr_config/Backups/
+      - /home/docker/radarr_config/Backups/
+      - /home/docker/sonarr_anime_config/Backups/
+      - /home/docker/sonarr_series_config/Backups/
+      - /home/docker/bazarr_config/backup/
+    patterns: "*.zip"
+    recurse: yes
+  register: found_zips
+
+- name: Move zip files to central backup directory
+  become: true
+  ansible.builtin.command: >
+    mv "{{ item.path }}" /home/docker/backups/
+  loop: "{{ found_zips.files }}"
+  args:
+    removes: "{{ item.path }}"
+
+#-----------------------Move backups to control node----------------------------------
+
+- name: Create local backup directory
+  delegate_to: localhost
+  run_once: true
+  become: true
+  ansible.builtin.file:
+    path: /backups
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0700"
+
+- name: Find backup files
+  become: true
+  ansible.builtin.find:
+    paths: /home/docker/backups
+    patterns: "*.zip"
+  register: backup_files
+
+- name: Fetch backups
+  ansible.builtin.fetch:
+    src: "{{ item.path }}"
+    dest: /backups/
+    flat: yes
+  loop: "{{ backup_files.files }}"
+
+- name: Remove remote backups directory
+  become: true
+  ansible.builtin.file:
+    path: /home/docker/backups
+    state: absent
+
+#-----------------------Remove old backups on control node----------------------------------
+
+- name: Cleanup old backups via shell
+  delegate_to: localhost
+  run_once: true
+  shell: |
+    for svc in $(ls /backups | sed -E 's/_.*//' | sort -u); do
+      ls -1t /backups/${svc}_*.zip | tail -n +6 | xargs -r rm -f
+    done

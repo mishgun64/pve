@@ -32,7 +32,7 @@
 
 - name: Trigger Radarr backup
   uri:
-    url: http://localhost:7878/api/v1/command
+    url: http://localhost:7878/api/v3/command
     method: POST
     headers:
       X-Api-Key: "{{ secrets.radarr_api_key }}"
@@ -43,7 +43,7 @@
 
 - name: Trigger Sonarr_anime backup
   uri:
-    url: http://localhost:8989/api/v1/command
+    url: http://localhost:8989/api/v3/command
     method: POST
     headers:
       X-Api-Key: "{{ secrets.sonarr_anime_api_key }}"
@@ -54,7 +54,7 @@
 
 - name: Trigger Sonarr_series backup
   uri:
-    url: http://localhost:8990/api/v1/command
+    url: http://localhost:8990/api/v3/command
     method: POST
     headers:
       X-Api-Key: "{{ secrets.sonarr_series_api_key }}"

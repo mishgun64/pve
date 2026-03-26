@@ -136,7 +136,7 @@
   run_once: true
   become: true
   ansible.builtin.file:
-    path: /backups
+    path: /srv/backups/
     state: directory
     owner: jenkins
     group: jenkins
@@ -152,8 +152,11 @@
 - name: Fetch backups
   ansible.builtin.fetch:
     src: "{{ item.path }}"
-    dest: /backups/
+    dest: /srv/backups/
     flat: yes
+    owner: jenkins
+    group: jenkins
+    mode: "0700"
   loop: "{{ backup_files.files }}"
 
 - name: Remove remote backups directory

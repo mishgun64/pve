@@ -28,6 +28,7 @@
     body_format: json
     body:
       name: Backup
+    status_code: [200, 201]
 
 - name: Trigger Radarr backup
   uri:
@@ -38,6 +39,7 @@
     body_format: json
     body:
       name: Backup
+    status_code: [200, 201]
 
 - name: Trigger Sonarr_anime backup
   uri:
@@ -48,6 +50,7 @@
     body_format: json
     body:
       name: Backup
+    status_code: [200, 201]
 
 - name: Trigger Sonarr_series backup
   uri:
@@ -58,6 +61,7 @@
     body_format: json
     body:
       name: Backup
+    status_code: [200, 201]
 
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
 

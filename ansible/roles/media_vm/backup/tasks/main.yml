@@ -15,10 +15,6 @@
 
 #-----------------------Trigger webhook backups----------------------------------
 
-- name: Show Prowlarr API key
-  ansible.builtin.debug:
-    var: secrets.prowlarr_api_key
-
 - name: Trigger Prowlarr backup
   uri:
     url: http://localhost:9696/api/v1/command

@@ -3,6 +3,6 @@
 - name: Media VM backup
   hosts: media_vm
   remote_user: root
-  gather_facts: false
+  gather_facts: true
   roles:
     - media_vm/backup

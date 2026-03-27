@@ -22,7 +22,7 @@
   when: latest_backups is not defined or latest_backups[svc] is not defined
 
 - name: Copy latest backups to target
-  synchronize:
+  copy:
     src: "{{ item.value.path }}"
     dest: "/home/docker/backups/{{ item.value.path | basename }}"
   loop: "{{ latest_backups | dict2items }}"

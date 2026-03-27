@@ -37,8 +37,8 @@
     service_dirs:
       prowlarr: /home/docker/prowlarr_config/
       radarr: /home/docker/radarr_config/
-      sonarr_anime: /home/docker/sonarr_anime_config/
-      sonarr_series: /home/docker/sonarr_series_config/
+      sonarr-anime: /home/docker/sonarr_anime_config/
+      sonarr-series: /home/docker/sonarr_series_config/
       bazarr: /home/docker/bazarr_config/
       emby: /home/docker/emby_config/
       jellyfin: /home/docker/jellyfin_config/

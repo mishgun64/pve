@@ -86,6 +86,7 @@
       - neovim
       - cron
       - zip
+      - unzip
     state: latest
 
 - name: Install sops binary

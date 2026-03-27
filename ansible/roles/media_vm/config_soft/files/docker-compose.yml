@@ -72,6 +72,7 @@ services:
       - TORRENTING_PORT=6881
     volumes:
       - ./qbittorrent_config:/config
+      - ./vuetorrent:/vuetorrent
       - /media:/data
 
   seerr:

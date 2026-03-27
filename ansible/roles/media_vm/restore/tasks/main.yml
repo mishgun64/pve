@@ -48,6 +48,8 @@
   unarchive:
     src: "/home/docker/backups/{{ item.value.path | basename }}"
     dest: "{{ service_dirs[item.key] }}"
+    owner: docker
+    group: docker
     remote_src: yes
   loop: "{{ latest_backups | dict2items }}"
   when: item.key in service_dirs

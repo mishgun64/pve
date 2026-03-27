@@ -157,6 +157,26 @@
     path: /home/docker/init_config
     state: absent
 
+#-----------------------Install Vuetorrent----------------------------------
+
+#- name: Create VueTorrent directory
+#  file:
+#    path: /home/docker/vuetorrent
+#    state: directory
+#    owner: docker
+#    group: docker
+#    mode: '0755'
+
+- name: Clone VueTorrent repository
+  git:
+    repo: https://github.com/VueTorrent/VueTorrent.git
+    dest: /home/docker
+    version: latest-release
+    single_branch: yes
+    update: yes
+  become: true
+  become_user: docker
+
 #-----------------------Run containers----------------------------------
 
 - name: Copy docker-compose file
@@ -187,3 +207,36 @@
     chdir: /home/docker
   become: true
   become_user: docker
+
+#-----------------------Auto updates----------------------------------
+
+- name: Docker update via cron
+  cron:
+    name: "Docker update and cleanup"
+    minute: "0"
+    hour: "6"
+    job: >
+      cd /home/docker &&
+      docker compose pull &&
+      docker compose up -d &&
+      docker system prune -af --volumes
+
+- name: System update via cron
+  cron:
+    name: "APT update and cleanup"
+    minute: "20"
+    hour: "6"
+    job: >
+      apt update &&
+      apt upgrade -y &&
+      apt autoremove -y &&
+      apt autoclean -y
+
+- name: Update VueTorrent via cron
+  cron:
+    name: "vuetorrent update"
+    minute: "30"
+    hour: "6"
+    job: >
+      cd /home/docker/VueTorrent &&
+      git pull

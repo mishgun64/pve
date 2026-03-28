@@ -221,17 +221,6 @@
       docker compose up -d &&
       docker system prune -af --volumes
 
-- name: System update via cron
-  cron:
-    name: "APT update and cleanup"
-    minute: "20"
-    hour: "6"
-    job: >
-      apt update &&
-      apt upgrade -y &&
-      apt autoremove -y &&
-      apt autoclean -y
-
 - name: Update VueTorrent via cron
   cron:
     name: "VueTorrent update"

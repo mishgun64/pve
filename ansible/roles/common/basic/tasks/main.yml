@@ -83,12 +83,16 @@
 
 #-----------------------Scheduled update----------------------------------
 
-- name: Scheduled update
-  ansible.builtin.cron:
-    name: 'Update and upgrade'
-    minute: 0
-    hour: 6
-    job: apt update && apt upgrade -y
+- name: System update via cron
+  cron:
+    name: "APT update and cleanup"
+    minute: "20"
+    hour: "6"
+    job: >
+      apt update &&
+      apt upgrade -y &&
+      apt autoremove -y &&
+      apt autoclean -y
 
 #-----------------------Reboot----------------------------------
 #

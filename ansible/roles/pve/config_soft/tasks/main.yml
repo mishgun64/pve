@@ -1,14 +1,5 @@
 ---
 
-#- name: Remove old host key
-#  known_hosts:
-#    path: /var/lib/jenkins/.ssh/known_hosts
-#    name: 192.168.1.100
-#    state: absent
-#  delegate_to: localhost
-#  become: true
-#  become_user: jenkins
-
 #--------------------------Repository settings---------------------------------
 
 - name: Disable pve-enterprise repository

@@ -1,0 +1,17 @@
+---
+
+- name: Determine target host
+  set_fact:
+    target_host: "{{ ansible_host | default(inventory_hostname) }}"
+
+- name: Remove old host key
+  known_hosts:
+    name: "{{ target_host }}"
+    state: absent
+  delegate_to: localhost
+
+- name: Add new host key
+  known_hosts:
+    name: "{{ target_host }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan -H ' + target_host) }}"
+  delegate_to: localhost

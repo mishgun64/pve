@@ -13,6 +13,10 @@
   delegate_to: localhost
   register: backup_files
 
+- name: Init latest_backups
+  set_fact:
+    latest_backups: {}
+
 - name: Build latest backups dict
   set_fact:
     latest_backups: "{{ latest_backups | default({}) | combine({svc: item}) }}"

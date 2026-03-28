@@ -12,4 +12,3 @@
     - pve/config_hard
     - pve/firstboot_clean
     - pve/get_api_token
-    - pve/webhook

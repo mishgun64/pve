@@ -44,18 +44,37 @@
 
 #--------------------------Updates------------------------------------------------
 
+- name: Clean apt cache
+  apt:
+    clean: yes
+
+- name: Remove apt lists
+  file:
+    path: /var/lib/apt/lists
+    state: absent
+
+- name: Recreate apt lists directory
+  file:
+    path: /var/lib/apt/lists
+    state: directory
+    mode: '0755'
+
 - name: Update and upgrade
   ansible.builtin.apt:
     name: '*'
     state: latest
     update_cache: yes
 
-- name: Scheduled update
-  ansible.builtin.cron:
-    name: 'Update and upgrade'
-    minute: 0
-    hour: 6
-    job: apt update && apt upgrade -y
+- name: System update via cron
+  cron:
+    name: "APT update and cleanup"
+    minute: "20"
+    hour: "6"
+    job: >
+      apt update &&
+      apt upgrade -y &&
+      apt autoremove -y &&
+      apt autoclean -y
 
 #--------------------------SSH settings----------------------------------
 

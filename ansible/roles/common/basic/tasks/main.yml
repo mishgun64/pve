@@ -12,15 +12,23 @@
     src: sshd_config
     dest: /etc/ssh/sshd_config
 
-- name: Disable ssh.socket
-  ansible.builtin.systemd_service:
+- name: Disable and stop ssh.socket
+  systemd:
     name: ssh.socket
     enabled: false
+    state: stopped
 
-- name: Enable ssh
-  ansible.builtin.systemd_service:
+- name: Restart ssh
+  systemd:
     name: ssh
+    state: restarted
     enabled: true
+
+- name: Wait for SSH to come back
+  wait_for:
+    port: 22
+    delay: 2
+    timeout: 30
 
 #-----------------------Update and upgrade----------------------------------
 

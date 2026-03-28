@@ -129,5 +129,19 @@ pipeline {
                 '''
             }
         }
+
+        stage('known_hosts') {
+            when {
+                expression { env.EVENT == 'known_hosts' }
+            }
+            steps {
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/update_known_hosts_test.yml
+                    ssh root@192.168.1.101
+                '''
+            }
+        }
     }
 }

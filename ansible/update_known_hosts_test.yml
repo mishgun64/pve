@@ -5,4 +5,4 @@
   become: yes
   gather_facts: false
   roles:
-    - basic/update_known_hosts
+    - common/update_known_hosts

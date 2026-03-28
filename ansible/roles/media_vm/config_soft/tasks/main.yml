@@ -170,7 +170,7 @@
 - name: Clone VueTorrent repository
   git:
     repo: https://github.com/VueTorrent/VueTorrent.git
-    dest: /home/docker
+    dest: /home/docker/VueTorrent
     version: latest-release
     single_branch: yes
     update: yes
@@ -234,7 +234,7 @@
 
 - name: Update VueTorrent via cron
   cron:
-    name: "vuetorrent update"
+    name: "VueTorrent update"
     minute: "30"
     hour: "6"
     job: >

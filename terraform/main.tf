@@ -68,6 +68,7 @@ resource "terraform_data" "jenkins_trigger" {
 
   provisioner "local-exec" {
     command = <<EOT
+      sleep 20
       curl -X POST "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
       -H "Content-Type: application/json" \
       -d '{"event": "media_vm"}'

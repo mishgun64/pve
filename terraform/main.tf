@@ -58,3 +58,15 @@ resource "proxmox_vm_qemu" "media_vm" {
     model  = "virtio"
   }
 }
+
+resource "terraform_data" "jenkins_trigger" {
+  depends_on = [proxmox_vm_qemu.media_vm]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      curl -X POST "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
+      -H "Content-Type: application/json" \
+      -d '{"event": "media_vm"}'
+    EOT
+  }
+}

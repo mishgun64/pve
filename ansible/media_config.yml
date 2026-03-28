@@ -8,3 +8,4 @@
     - common/basic
     - common/docker
     - media_vm/config_soft
+    - media_vm/restore

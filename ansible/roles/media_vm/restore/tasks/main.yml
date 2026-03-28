@@ -27,10 +27,12 @@
     dest: "/home/docker/backups/{{ item.value.path | basename }}"
   loop: "{{ latest_backups | dict2items }}"
 
-- name: Stop docker compose
-  command: docker compose down
+- name: Stop docker compose stack
+  ansible.builtin.shell: docker compose down
   args:
     chdir: /home/docker
+  become: true
+  become_user: docker
 
 - name: Define service directories
   set_fact:
@@ -54,10 +56,19 @@
   loop: "{{ latest_backups | dict2items }}"
   when: item.key in service_dirs
 
-- name: Start docker compose
-  command: docker compose up -d
+- name: Pull docker compose stack
+  ansible.builtin.shell: docker compose pull
   args:
     chdir: /home/docker
+  become: true
+  become_user: docker
+
+- name: Start docker compose stack
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
 
 - name: Remove backup dir
   file:

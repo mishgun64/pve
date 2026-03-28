@@ -174,8 +174,6 @@
     version: latest-release
     single_branch: yes
     update: yes
-    owner: docker
-    group: docker
   become: true
   become_user: docker
 

@@ -62,6 +62,10 @@ resource "proxmox_vm_qemu" "media_vm" {
 resource "terraform_data" "jenkins_trigger" {
   depends_on = [proxmox_vm_qemu.media_vm]
 
+  triggers_replace = {
+    vm_id = proxmox_vm_qemu.media_vm.id
+  }
+
   provisioner "local-exec" {
     command = <<EOT
       curl -X POST "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \

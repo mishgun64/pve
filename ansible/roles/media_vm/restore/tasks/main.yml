@@ -81,6 +81,13 @@
     state: absent
   loop: "{{ found_files.files }}"
 
+- name: Fix ownership of docker home
+  ansible.builtin.file:
+    path: /home/docker
+    owner: docker
+    group: docker
+    recurse: true
+
 - name: Pull docker compose stack
   ansible.builtin.shell: docker compose pull
   args:

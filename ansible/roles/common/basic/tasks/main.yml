@@ -64,6 +64,7 @@
       - cron
       - zip
       - unzip
+      - htop
     state: latest
 
 - name: Install sops binary

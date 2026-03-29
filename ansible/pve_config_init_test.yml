@@ -6,6 +6,7 @@
   gather_facts: false
   vars:
     ansible_password: "12345678"
+    ansible_pipelining: false
   roles:
 #    - common/update_known_hosts
     - pve/config_soft

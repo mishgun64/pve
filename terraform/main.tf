@@ -24,7 +24,7 @@ resource "proxmox_vm_qemu" "media_vm" {
   cpu {
     cores   = 4
     sockets = 1
-    type    = "x86-64-v2-AES"
+    type    = "kvm64"
   }
   # Most cloud-init images require a serial device for their display
   serial {

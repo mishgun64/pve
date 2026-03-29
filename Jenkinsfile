@@ -30,6 +30,9 @@ pipeline {
                 expression { env.EVENT == 'pve-first-boot' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - PVE-first-boot"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''

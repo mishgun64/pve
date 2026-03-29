@@ -87,8 +87,7 @@
     chdir: /home/docker
   become: true
   become_user: docker
-  async: 600   # максимум 10 минут
-  poll: 30     # проверять каждые 30 секунд
+  timeout: 600
 
 - name: Start docker compose stack
   ansible.builtin.shell: docker compose up -d

@@ -29,7 +29,7 @@
     dest: /etc/apt/sources.list.d/proxmox.sources
     content: |
       Types: deb
-      URIs: https://download.proxmox.com/debian/pve
+      URIs: http//download.proxmox.com/debian/pve
       Suites: trixie
       Components: pve-no-subscription
       Signed-By: /usr/share/keyrings/proxmox-archive-keyring.gpg
@@ -37,8 +37,9 @@
 
 #-----------------------Set timezone----------------------------------
 
-- name: Set Europe/Moscow timezone
-  ansible.builtin.shell: timedatectl set-timezone Europe/Moscow
+- name: Set timezone
+  community.general.timezone:
+    name: Europe/Moscow
 
 - name: Sync time
   ansible.builtin.shell: timedatectl set-ntp true

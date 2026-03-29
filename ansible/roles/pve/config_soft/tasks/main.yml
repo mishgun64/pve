@@ -41,15 +41,15 @@
   community.general.timezone:
     name: Europe/Moscow
 
-- name: Enable NTP sync
-  ansible.builtin.systemd:
-    name: systemd-timesyncd
-    enabled: true
-    state: started
-
-- name: Enable NTP via timedatectl
-  ansible.builtin.command: timedatectl set-ntp true
-  changed_when: false
+#- name: Enable NTP sync
+#  ansible.builtin.systemd:
+#    name: systemd-timesyncd
+#    enabled: true
+#    state: started
+#
+#- name: Enable NTP via timedatectl
+#  ansible.builtin.command: timedatectl set-ntp true
+#  changed_when: false
 
 #--------------------------Updates------------------------------------------------
 

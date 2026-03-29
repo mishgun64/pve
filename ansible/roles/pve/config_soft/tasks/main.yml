@@ -46,20 +46,20 @@
 
 #--------------------------Updates------------------------------------------------
 
-- name: Clean apt cache
-  apt:
-    clean: yes
-
-- name: Remove apt lists
-  file:
-    path: /var/lib/apt/lists
-    state: absent
-
-- name: Recreate apt lists directory
-  file:
-    path: /var/lib/apt/lists
-    state: directory
-    mode: '0755'
+#- name: Clean apt cache
+#  apt:
+#    clean: yes
+#
+#- name: Remove apt lists
+#  file:
+#    path: /var/lib/apt/lists
+#    state: absent
+#
+#- name: Recreate apt lists directory
+#  file:
+#    path: /var/lib/apt/lists
+#    state: directory
+#    mode: '0755'
 
 - name: Update and upgrade
   ansible.builtin.apt:
@@ -109,11 +109,11 @@
     password: '$6$Ogv7SOQr$ovSFzkn3VEkPC58NEDL91wBA3rmNTSYjGKVwmFwtVryF78hP.I5vKobSmCUr.7YKw31KRE/Swv03BUys.hNW3.'
     # python3 -c 'import crypt; print(crypt.crypt("pass", "$6$Ogv7SOQr"))'
 
-#-----------------------Scheduled update----------------------------------
-
-- name: Scheduled update
-  ansible.builtin.cron:
-    name: 'Update and upgrade'
-    minute: 0
-    hour: 5
-    job: apt update && apt upgrade -y
+##-----------------------Scheduled update----------------------------------
+#
+#- name: Scheduled update
+#  ansible.builtin.cron:
+#    name: 'Update and upgrade'
+#    minute: 0
+#    hour: 5
+#    job: apt update && apt upgrade -y

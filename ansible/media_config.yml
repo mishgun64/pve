@@ -5,7 +5,7 @@
   remote_user: root
   gather_facts: true
   roles:
-    - common/update_known_hosts
+#    - common/update_known_hosts
     - common/basic
     - common/docker
     - media_vm/config_soft

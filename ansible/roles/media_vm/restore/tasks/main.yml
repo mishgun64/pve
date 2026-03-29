@@ -88,20 +88,6 @@
     group: docker
     recurse: true
 
-- name: Pull docker compose stack
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_user: docker
-  timeout: 600
-
-- name: Start docker compose stack
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_user: docker
 
 - name: Remove backup dir
   file:

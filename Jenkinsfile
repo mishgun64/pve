@@ -46,6 +46,9 @@ pipeline {
                 expression { env.EVENT == 'pve-iso-get' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - PVE-iso-get"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -59,6 +62,9 @@ pipeline {
                 expression { env.EVENT == 'terraform' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Terraform"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -74,6 +80,9 @@ pipeline {
                 expression { env.EVENT == 'services' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - API-token"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -87,6 +96,9 @@ pipeline {
                 expression { env.EVENT == 'cloud-init' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Cloud-init"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -100,6 +112,9 @@ pipeline {
                 expression { env.EVENT == 'media_vm' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Media_vm-config"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -113,6 +128,9 @@ pipeline {
                 expression { env.EVENT == 'media_vm_backup' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Media_vm-backup"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -125,6 +143,9 @@ pipeline {
                 expression { env.EVENT == 'media_vm_restore' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Media_vm-restore"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
@@ -138,6 +159,9 @@ pipeline {
                 expression { env.EVENT == 'known_hosts' }
             }
             steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Update-known_hosts"
+                }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''

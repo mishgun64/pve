@@ -1,6 +1,6 @@
 #!/bin/bash
 
-JENKINS_SERVER="192.168.1.200:8080"
+JENKINS_SERVER="192.168.2.200:8080"
 TOKEN="pve-webhook"
 
 curl -X POST http://$JENKINS_SERVER/generic-webhook-trigger/invoke?token=$TOKEN \

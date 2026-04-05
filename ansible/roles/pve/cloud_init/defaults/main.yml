@@ -9,5 +9,5 @@ debian_cloud_image_path: "/tmp/debian-13-genericcloud-amd64.qcow2"
 proxmox_storage: local-lvm
 proxmox_bridge: vmbr0
 
-vm_memory: 2048
+vm_memory: 1024
 vm_cores: 1

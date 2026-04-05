@@ -19,7 +19,7 @@
     --memory {{ vm_memory }}
     --cores {{ vm_cores }}
     --sockets 1
-    --cpu x86-64-v2-AES
+    --cpu host
     --numa 0
     --ostype l26
     --net0 virtio,bridge={{ proxmox_bridge }}
@@ -70,7 +70,7 @@
 
 - name: Trigger Jenkins webhook
   uri:
-    url: "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+    url: "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
     method: POST
     headers:
       Content-Type: "application/json"

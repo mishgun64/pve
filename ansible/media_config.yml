@@ -5,9 +5,7 @@
   remote_user: root
   gather_facts: true
   roles:
-#    - common/update_known_hosts
     - common/basic
     - common/docker
     - media_vm/config_soft
     - media_vm/restore
-#    - media_vm/start_docker

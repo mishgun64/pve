@@ -100,7 +100,7 @@ echo "- $RESULT_DIR/linux26"
 echo "- $RESULT_DIR/custom-initrd.img"
 
 # --- Jenkins webhook ---
-curl -X POST http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook \
+curl -X POST http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook \
 -H "Content-Type: application/json" \
 -d '{
   "event": "pve-iso-get"

@@ -229,3 +229,11 @@
     job: >
       cd /home/docker/VueTorrent &&
       git pull
+
+#-----------------------Change root password----------------------------------
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$fokOJwJ6nph/rD3.$x7MfhDHlm2lnWdDcne0cbWWx3.IBg6Kx5G2YVrFEQO/VCkPzOcpHz8nzIbxWJcIZQmTT1LIxUN6VmSq.hb1sI0'
+    # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"

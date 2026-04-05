@@ -1,4 +1,4 @@
-proxmox_api_url = "https://192.168.2.1:8006/api2/json"
+proxmox_api_url = "https://192.168.2.2:8006/api2/json"
 proxmox_api_token_id = "terraform@pam!tf"
 proxmox_api_token_secret = file("${path.module}/secrets/api_key")
 lxc_ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control"

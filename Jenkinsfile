@@ -166,7 +166,6 @@ pipeline {
 
                 sh '''
                     ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/update_known_hosts_test.yml
-                    ssh root@192.168.1.101
                 '''
             }
         }

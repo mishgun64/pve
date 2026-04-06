@@ -19,6 +19,11 @@
     password: '$6$xPh7X7pC.8NVYPQ/$flOFtvtURZugVbhpr0h0EndAb62noIGXc0NoJeRTyqbjRFRRxveNcxaLDDwp88e8.7Pc9CLektDk5fzgXy3S01'
     # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
 
+- name: Set shell for docker user
+  user:
+    name: docker
+    shell: /bin/bash
+
 - name: Create wireguard_config directory
   file:
     path: /home/docker/wireguard_config

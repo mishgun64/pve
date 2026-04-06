@@ -66,6 +66,7 @@ resource "proxmox_lxc" "wireguard" {
   ostemplate      = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
   password        = "12345"
   unprivileged    = true
+  cores           = 1
   memory          = 1024
   start           = true
   onboot          = true

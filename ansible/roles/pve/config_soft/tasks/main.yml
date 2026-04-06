@@ -119,9 +119,9 @@
 #-----------------------Download latest debian 13 lxc image----------------------------------
 
 - name: Update pve lxc repo
-  command: >
+  shell: >
     pveam update
 
 - name: Download latest lxc image
-  command: >
+  shell: >
     pveam download local $(pveam available | awk '/debian-13-standard/ {print $2}' | sort -V | tail -1)

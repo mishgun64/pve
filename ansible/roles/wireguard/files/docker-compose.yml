@@ -6,6 +6,7 @@ services:
     container_name: wireguard
     cap_add:
       - NET_ADMIN
+      - SYS_MODULE #optional
     environment:
       - PUID=1000
       - PGID=1000
@@ -13,15 +14,17 @@ services:
       - SERVERURL=91.122.207.222
       - SERVERPORT=51820 #optional
       - PEERS=2 #optional
-      - PEERDNS=auto #optional
+      - PEERDNS=172.16.80.1 #optional
       - INTERNAL_SUBNET=172.16.80.0 #optional
       - ALLOWEDIPS=0.0.0.0/0 #optional
       - PERSISTENTKEEPALIVE_PEERS=20 #optional
       - LOG_CONFS=true #optional
     volumes:
       - ./wireguard_config:/config
+      - /lib/modules:/lib/modules
     ports:
       - 51820:51820/udp
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
     restart: unless-stopped

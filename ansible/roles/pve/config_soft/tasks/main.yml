@@ -85,6 +85,26 @@
       apt autoremove -y &&
       apt autoclean -y
 
+#-----------------------Install packages----------------------------------
+
+- name: Install apt packages
+  ansible.builtin.apt:
+    name:
+      - neovim
+      - cron
+      - zip
+      - unzip
+      - htop
+    state: latest
+
+- name: Install sops binary
+  get_url:
+    url: https://github.com/getsops/sops/releases/download/v3.12.2/sops-v3.12.2.linux.amd64
+    dest: /usr/local/bin/sops
+    mode: '0755'
+    owner: root
+    group: root
+
 #--------------------------SSH settings----------------------------------
 
 - name: Copy control ssh key

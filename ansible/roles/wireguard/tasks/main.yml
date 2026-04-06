@@ -1,5 +1,7 @@
 ---
 
+#--------------------------SSH settings----------------------------------
+
 - name: Copy control ssh key
   ansible.builtin.copy:
     src: authorized_keys2
@@ -13,6 +15,8 @@
     state: restarted
     name: sshd
 
+#--------------------------User settings----------------------------------
+
 - name: Change root password
   ansible.builtin.user:
     name: root
@@ -23,6 +27,8 @@
   user:
     name: docker
     shell: /bin/bash
+
+#--------------------------Copy wg config files----------------------------------
 
 - name: Create wireguard_config directory
   file:
@@ -40,6 +46,45 @@
     group: 1000
     mode: '0644'
 
+#--------------------------Unpack backup----------------------------------
+
+- name: Copy encrypted backup
+  ansible.builtin.copy:
+    src: wg_config.tar.gz.enc
+    dest: /home/docker/wg_config.tar.gz.enc
+    owner: 1000
+    group: 1000
+    mode: '0700'
+
+- name: Copy .sops.yml
+  ansible.builtin.copy:
+    src: .sops.yml
+    dest: /home/docker/.sops.yml
+    owner: 1000
+    group: 1000
+    mode: '0755'
+
+- name: Decrypt backup
+  ansible.builtin.shell: >
+    sops -d --input-type binary --output-type binary
+    /home/docker/wg_config.tar.gz.enc > /home/docker/wg_config.tar.gz
+
+- name: Extract backup
+  ansible.builtin.unarchive:
+    src: /home/docker/wg_config.tar.gz
+    dest: /home/docker
+    remote_src: yes
+
+- name: Remove temp files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /home/docker/wg_config.tar.gz
+    - /home/docker/wg_config.tar.gz.enc
+
+#--------------------------Auto update----------------------------------
+
 - name: Docker update via cron
   cron:
     name: "Docker update and cleanup"
@@ -50,6 +95,8 @@
       docker compose pull &&
       docker compose up -d &&
       docker system prune -af --volumes
+
+#--------------------------Run container----------------------------------
 
 - name: Pull docker compose
   ansible.builtin.shell: docker compose pull

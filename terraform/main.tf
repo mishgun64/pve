@@ -64,7 +64,7 @@ resource "proxmox_lxc" "wireguard" {
   vmid            = 126
   hostname        = "wireguard"
   ostemplate      = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.gz"
-  password        = "1234"
+  password        = "12345"
   unprivileged    = true
   memory          = 1024
   ssh_public_keys = <<-EOT

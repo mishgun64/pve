@@ -63,7 +63,7 @@ resource "proxmox_lxc" "wireguard" {
   target_node     = "pve"
   vmid            = 126
   hostname        = "wireguard"
-  ostemplate      = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.gz"
+  ostemplate      = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
   password        = "12345"
   unprivileged    = true
   memory          = 1024

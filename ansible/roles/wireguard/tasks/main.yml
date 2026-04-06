@@ -58,7 +58,7 @@
 
 - name: Copy .sops.yaml
   ansible.builtin.copy:
-    src: .sops.yml
+    src: .sops.yaml
     dest: /home/docker/.sops.yaml
     owner: 1000
     group: 1000

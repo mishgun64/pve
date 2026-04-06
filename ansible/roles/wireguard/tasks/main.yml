@@ -1,0 +1,62 @@
+---
+
+- name: Copy control ssh key
+  ansible.builtin.copy:
+    src: authorized_keys2
+    dest: /root/.ssh/
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Restart sshd service
+  ansible.builtin.systemd_service:
+    state: restarted
+    name: sshd
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$xPh7X7pC.8NVYPQ/$flOFtvtURZugVbhpr0h0EndAb62noIGXc0NoJeRTyqbjRFRRxveNcxaLDDwp88e8.7Pc9CLektDk5fzgXy3S01'
+    # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
+
+- name: Create wireguard_config directory
+  file:
+    path: /home/docker/wireguard_config
+    state: directory
+    owner: 1000
+    group: 1000
+    mode: '0755'
+
+- name: Copy docker-compose.yml to /home/docker/
+  copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: 1000
+    group: 1000
+    mode: '0644'
+
+- name: Docker update via cron
+  cron:
+    name: "Docker update and cleanup"
+    minute: "0"
+    hour: "6"
+    job: >
+      cd /home/docker &&
+      docker compose pull &&
+      docker compose up -d &&
+      docker system prune -af --volumes
+
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker

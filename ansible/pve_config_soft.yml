@@ -1,0 +1,8 @@
+---
+
+- name: PVE config
+  hosts: pve
+  remote_user: root
+  gather_facts: false
+  roles:
+    - pve/config_soft

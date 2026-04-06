@@ -41,6 +41,22 @@ pipeline {
             }
         }
 
+        stage('Run pve-soft-config playbook') {
+            when {
+                expression { env.EVENT == 'pve-soft' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - PVE-soft-config"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pve_config_soft.yml
+                '''
+            }
+        }
+
         stage('pve-iso-get') {
             when {
                 expression { env.EVENT == 'pve-iso-get' }

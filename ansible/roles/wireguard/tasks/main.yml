@@ -48,40 +48,69 @@
 
 #--------------------------Unpack backup----------------------------------
 
-- name: Copy encrypted backup
-  ansible.builtin.copy:
-    src: wg_config.tar.gz.enc
-    dest: /home/docker/wg_config.tar.gz.enc
-    owner: 1000
-    group: 1000
-    mode: '0700'
-
-- name: Copy .sops.yaml
-  ansible.builtin.copy:
-    src: .sops.yaml
-    dest: /home/docker/.sops.yaml
-    owner: 1000
-    group: 1000
-    mode: '0755'
-
-- name: Decrypt backup
+- name: Decrypt backup on ansible host
   ansible.builtin.shell: >
     sops -d --input-type binary --output-type binary
-    /home/docker/wg_config.tar.gz.enc > /home/docker/wg_config.tar.gz
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/wg_config.tar.gz.enc >
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/wg_config.tar.gz
+  delegate_to: localhost
 
-- name: Extract backup
+- name: Copy backup to target
+  ansible.builtin.copy:
+    src: wg_config.tar.gz
+    dest: /home/docker/wg_config.tar.gz
+
+- name: Remove decrypted backup on ansible host
+  ansible.builtin.file:
+    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/wg_config.tar.gz
+    state: absent
+  delegate_to: localhost
+
+- name: Extract backup on target
   ansible.builtin.unarchive:
     src: /home/docker/wg_config.tar.gz
     dest: /home/docker
     remote_src: yes
 
-- name: Remove temp files
+- name: Remove backup on target
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: /home/docker/wg_config.tar.gz
     state: absent
-  loop:
-    - /home/docker/wg_config.tar.gz
-    - /home/docker/wg_config.tar.gz.enc
+
+#- name: Copy encrypted backup
+#  ansible.builtin.copy:
+#    src: wg_config.tar.gz.enc
+#    dest: /home/docker/wg_config.tar.gz.enc
+#    owner: 1000
+#    group: 1000
+#    mode: '0700'
+#
+#- name: Copy .sops.yaml
+#  ansible.builtin.copy:
+#    src: .sops.yaml
+#    dest: /home/docker/.sops.yaml
+#    owner: 1000
+#    group: 1000
+#    mode: '0755'
+#
+#- name: Decrypt backup
+#  ansible.builtin.shell: >
+#    sops -d --input-type binary --output-type binary
+#    /home/docker/wg_config.tar.gz.enc > /home/docker/wg_config.tar.gz
+#
+#- name: Extract backup
+#  ansible.builtin.unarchive:
+#    src: /home/docker/wg_config.tar.gz
+#    dest: /home/docker
+#    remote_src: yes
+#
+#- name: Remove temp files
+#  ansible.builtin.file:
+#    path: "{{ item }}"
+#    state: absent
+#  loop:
+#    - /home/docker/wg_config.tar.gz
+#    - /home/docker/wg_config.tar.gz.enc
 
 #--------------------------Auto update----------------------------------
 

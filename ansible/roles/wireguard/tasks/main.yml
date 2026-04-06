@@ -56,10 +56,10 @@
     group: 1000
     mode: '0700'
 
-- name: Copy .sops.yml
+- name: Copy .sops.yaml
   ansible.builtin.copy:
     src: .sops.yml
-    dest: /home/docker/.sops.yml
+    dest: /home/docker/.sops.yaml
     owner: 1000
     group: 1000
     mode: '0755'

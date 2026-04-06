@@ -169,5 +169,21 @@ pipeline {
                 '''
             }
         }
+
+        stage('wireguard') {
+            when {
+                expression { env.EVENT == 'wireguard' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Wireguard"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/wireguard_server_config.yml
+                '''
+            }
+        }
     }
 }

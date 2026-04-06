@@ -8,6 +8,9 @@ local_hosts:
       ansible_host: 192.168.1.72
     media_vm:
       ansible_host: 192.168.2.4
+    wg_lxc:
+      ansible_host: 192.168.2.6
+
 
   vars:
     ansible_ssh_private_key_file: /var/lib/jenkins/.ssh/id_ed25519

@@ -116,11 +116,12 @@
     password: '$6$Ogv7SOQr$ovSFzkn3VEkPC58NEDL91wBA3rmNTSYjGKVwmFwtVryF78hP.I5vKobSmCUr.7YKw31KRE/Swv03BUys.hNW3.'
     # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
 
-##-----------------------Scheduled update----------------------------------
-#
-#- name: Scheduled update
-#  ansible.builtin.cron:
-#    name: 'Update and upgrade'
-#    minute: 0
-#    hour: 5
-#    job: apt update && apt upgrade -y
+#-----------------------Download latest debian 13 lxc image----------------------------------
+
+- name: Update pve lxc repo
+  command: >
+    pveam update
+
+- name: Download latest lxc image
+  command: >
+    pveam download local $(pveam available | awk '/debian-13-standard/ {print $2}' | sort -V | tail -1)

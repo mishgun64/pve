@@ -67,6 +67,8 @@ resource "proxmox_lxc" "wireguard" {
   password        = "12345"
   unprivileged    = true
   memory          = 1024
+  start           = true
+  onboot          = true
   ssh_public_keys = <<-EOT
     ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
   EOT

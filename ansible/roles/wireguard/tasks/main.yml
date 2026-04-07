@@ -83,41 +83,6 @@
     path: /home/docker/wg_config.tar.gz
     state: absent
 
-#- name: Copy encrypted backup
-#  ansible.builtin.copy:
-#    src: wg_config.tar.gz.enc
-#    dest: /home/docker/wg_config.tar.gz.enc
-#    owner: 1000
-#    group: 1000
-#    mode: '0700'
-#
-#- name: Copy .sops.yaml
-#  ansible.builtin.copy:
-#    src: .sops.yaml
-#    dest: /home/docker/.sops.yaml
-#    owner: 1000
-#    group: 1000
-#    mode: '0755'
-#
-#- name: Decrypt backup
-#  ansible.builtin.shell: >
-#    sops -d --input-type binary --output-type binary
-#    /home/docker/wg_config.tar.gz.enc > /home/docker/wg_config.tar.gz
-#
-#- name: Extract backup
-#  ansible.builtin.unarchive:
-#    src: /home/docker/wg_config.tar.gz
-#    dest: /home/docker
-#    remote_src: yes
-#
-#- name: Remove temp files
-#  ansible.builtin.file:
-#    path: "{{ item }}"
-#    state: absent
-#  loop:
-#    - /home/docker/wg_config.tar.gz
-#    - /home/docker/wg_config.tar.gz.enc
-
 #--------------------------Auto update----------------------------------
 
 - name: Docker update via cron

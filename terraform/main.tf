@@ -56,6 +56,7 @@ resource "proxmox_vm_qemu" "media_vm" {
     id = 0
     bridge = "vmbr0"
     model  = "virtio"
+    macaddr = "bc:24:11:f1:ab:f9"
   }
 }
 
@@ -84,6 +85,7 @@ resource "proxmox_lxc" "wireguard" {
     bridge = "vmbr0"
     ip     = "192.168.2.6/24"
     gw     = "192.168.2.1"
+    hwaddr = "bc:24:11:db:27:39"
   }
 
   features {

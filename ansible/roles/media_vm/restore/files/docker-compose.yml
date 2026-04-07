@@ -99,8 +99,8 @@ services:
 
   emby:
     <<: *common-keys
-    container_name: embyserver
-    image: emby/embyserver
+    container_name: emby
+    image: linuxserver/emby:latest
     volumes:
       - ./emby_config:/config # Configuration directory
       - /media/library:/media:ro # Media directory

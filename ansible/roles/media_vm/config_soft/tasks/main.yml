@@ -66,10 +66,10 @@
   environment:
     SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
   loop:
-#    - { src: "{{ init_dir_jenkins }}/emby_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/emby_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/emby_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/emby_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz" }
-#    - { src: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz" }
 
@@ -96,10 +96,10 @@
     src: "{{ item }}"
     dest: /home/docker/init_config/
   loop:
-#    - init_config/emby_init_config.tar.gz
+    - init_config/emby_init_config.tar.gz
     - init_config/prowlarr_init_config.tar.gz
     - init_config/radarr_init_config.tar.gz
-#    - init_config/seerr_init_config.tar.gz
+    - init_config/seerr_init_config.tar.gz
     - init_config/sonarr_anime_init_config.tar.gz
     - init_config/sonarr_series_init_config.tar.gz
 
@@ -110,10 +110,10 @@
     path: "{{ item }}"
     state: absent
   loop:
-#    - "{{ init_dir_jenkins }}/emby_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/emby_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/radarr_init_config.tar.gz"
-#    - "{{ init_dir_jenkins }}/seerr_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/seerr_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz"
 
@@ -126,10 +126,10 @@
     mode: "0755"
     remote_src: yes
   loop:
-#    - /home/docker/init_config/emby_init_config.tar.gz
+    - /home/docker/init_config/emby_init_config.tar.gz
     - /home/docker/init_config/prowlarr_init_config.tar.gz
     - /home/docker/init_config/radarr_init_config.tar.gz
-#    - /home/docker/init_config/seerr_init_config.tar.gz
+    - /home/docker/init_config/seerr_init_config.tar.gz
     - /home/docker/init_config/sonarr_anime_init_config.tar.gz
     - /home/docker/init_config/sonarr_series_init_config.tar.gz
 

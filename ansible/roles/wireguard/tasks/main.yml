@@ -1,20 +1,5 @@
 ---
 
-#--------------------------SSH settings----------------------------------
-
-- name: Copy control ssh key
-  ansible.builtin.copy:
-    src: authorized_keys2
-    dest: /root/.ssh/
-    owner: root
-    group: root
-    mode: '0600'
-
-- name: Restart sshd service
-  ansible.builtin.systemd_service:
-    state: restarted
-    name: sshd
-
 #--------------------------User settings----------------------------------
 
 - name: Change root password

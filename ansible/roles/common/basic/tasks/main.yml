@@ -12,6 +12,14 @@
     src: sshd_config
     dest: /etc/ssh/sshd_config
 
+- name: Copy control ssh key
+  ansible.builtin.copy:
+    src: authorized_keys2
+    dest: /root/.ssh/
+    owner: root
+    group: root
+    mode: '0600'
+
 - name: Disable and stop ssh.socket
   systemd:
     name: ssh.socket

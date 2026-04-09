@@ -1,3 +1,5 @@
+#------------------------------------media_vm------------------------------------
+
 resource "proxmox_vm_qemu" "media_vm" {
   vmid        = 124
   name        = "media"
@@ -60,6 +62,8 @@ resource "proxmox_vm_qemu" "media_vm" {
   }
 }
 
+#------------------------------------Wireguard LXC------------------------------------
+
 resource "proxmox_lxc" "wireguard" {
   target_node     = var.target_node_name
   vmid            = 126
@@ -91,10 +95,13 @@ resource "proxmox_lxc" "wireguard" {
   }
 }
 
-resource "proxmox_lxc" "traefic" {
+#------------------------------------Traefik LXC------------------------------------
+
+
+resource "proxmox_lxc" "traefik" {
   target_node     = var.target_node_name
   vmid            = 133
-  hostname        = "traefic"
+  hostname        = "traefik"
   ostemplate      = var.lxc_ostemplate
   password        = "12345"
   unprivileged    = true
@@ -111,9 +118,9 @@ resource "proxmox_lxc" "traefic" {
 
   network {
     name   = "eth0"
-    bridge = "vmbr0"
-    ip     = "192.168.2.6/24"
-    gw     = "192.168.2.1"
+    bridge = "vmbr1"
+    ip     = "192.168.4.2/24"
+    gw     = "192.168.4.1"
     hwaddr = "bc:24:11:db:27:40"
   }
 
@@ -121,6 +128,8 @@ resource "proxmox_lxc" "traefic" {
     nesting = true
   }
 }
+
+#------------------------------------Media_vm webhook trigger------------------------------------
 
 resource "terraform_data" "media_vm_trigger" {
   depends_on = [proxmox_vm_qemu.media_vm]
@@ -139,6 +148,8 @@ resource "terraform_data" "media_vm_trigger" {
   }
 }
 
+#------------------------------------Wireguard webhook trigger------------------------------------
+
 resource "terraform_data" "wireguard_trigger" {
   depends_on = [proxmox_lxc.wireguard]
 
@@ -152,6 +163,25 @@ resource "terraform_data" "wireguard_trigger" {
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
       -H "Content-Type: application/json" \
       -d '{"event": "wireguard"}'
+    EOT
+  }
+}
+
+#------------------------------------Traefik webhook trigger------------------------------------
+
+resource "terraform_data" "traefik_trigger" {
+  depends_on = [proxmox_lxc.traefik]
+
+  triggers_replace = {
+    vm_id = proxmox_lxc.traefik.id
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 30
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
+      -H "Content-Type: application/json" \
+      -d '{"event": "traefik"}'
     EOT
   }
 }

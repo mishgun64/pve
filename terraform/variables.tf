@@ -10,7 +10,7 @@ variable "proxmox_api_token_id" {
 #   type        = string
 # }
 
-variable "lxc_ssh_public_key" {
+variable "control_ssh_key" {
   type        = string
 }
 
@@ -35,5 +35,9 @@ variable "ip_address" {
 }
 
 variable "target_node_name" {
+  type        = string
+}
+
+variable "lxc_image" {
   type        = string
 }

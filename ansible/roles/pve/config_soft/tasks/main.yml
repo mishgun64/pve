@@ -105,6 +105,20 @@
     owner: root
     group: root
 
+#--------------------------Network settings----------------------------------
+
+- name: Copy interfaces file
+  ansible.builtin.copy:
+    src: files/interfaces
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Apply settings
+  ansible.builtin.command:
+    cmd: ifreload -a
+
 #--------------------------SSH settings----------------------------------
 
 - name: Copy control ssh key

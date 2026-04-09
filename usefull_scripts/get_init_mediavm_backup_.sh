@@ -72,29 +72,20 @@ create_archive() {
 }
 
 # 3. Архивация сервисов
-
 create_archive "prowlarr" \
   ./prowlarr_config/*.db \
-#  ./prowlarr_config/*.db-wal \
-#  ./prowlarr_config/*.db-shm \
   ./prowlarr_config/config.xml
 
 create_archive "radarr" \
   ./radarr_config/*.db \
-#  ./radarr_config/*.db-wal \
-#  ./radarr_config/*.db-shm \
   ./radarr_config/config.xml
 
 create_archive "sonarr_anime" \
   ./sonarr_anime_config/*.db \
-#  ./sonarr_anime_config/*.db-wal \
-#  ./sonarr_anime_config/*.db-shm \
   ./sonarr_anime_config/config.xml
 
 create_archive "sonarr_series" \
   ./sonarr_series_config/*.db \
-#  ./sonarr_series_config/*.db-wal \
-#  ./sonarr_series_config/*.db-shm \
   ./sonarr_series_config/config.xml
 
 create_archive "seerr" \

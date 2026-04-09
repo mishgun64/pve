@@ -54,6 +54,15 @@
     - /media/library/anime
     - /media/library/series
 
+#-----------------------Increase inotify max_user_watches----------------------------------
+
+- name: Increase inotify max_user_watches
+  ansible.posix.sysctl:
+    name: fs.inotify.max_user_watches
+    value: '524288'
+    state: present
+    reload: yes
+
 #-----------------------Copy init config----------------------------------
 
 - name: Decrypt encrypted archives
@@ -207,3 +216,18 @@
     name: root
     password: '$6$fokOJwJ6nph/rD3.$x7MfhDHlm2lnWdDcne0cbWWx3.IBg6Kx5G2YVrFEQO/VCkPzOcpHz8nzIbxWJcIZQmTT1LIxUN6VmSq.hb1sI0'
     # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
+
+#-----------------------Autobackup----------------------------------
+
+- name: Initialize media services backup
+  ansible.builtin.cron:
+    name: "Initialize media services backup"
+    hour: "4"
+    minute: "0"
+    job: >-
+      curl -s -X POST
+      'http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook'
+      -H 'Content-Type: application/json'
+      -d '{"event":"media_vm_backup","node":"pve1","host":"pve1.local"}'
+    user: root
+    state: present

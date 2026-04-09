@@ -1,0 +1,24 @@
+auto lo
+iface lo inet loopback
+
+iface enp6s0 inet manual
+
+auto vmbr0
+iface vmbr0 inet static
+        address 192.168.2.2/24
+        gateway 192.168.2.1
+        bridge-ports enp6s0
+        bridge-stp off
+        bridge-fd 0
+        post-up echo 1 > /proc/sys/net/ipv6/conf/vmbr0/disable_ipv6
+
+iface enp7s0 inet manual
+
+auto vmbr1
+iface vmbr1 inet static
+        address 192.168.4.2/24
+        gateway 192.168.4.1
+        bridge-ports enp7s0
+        bridge-stp off
+        bridge-fd 0
+        post-up echo 1 > /proc/sys/net/ipv6/conf/vmbr1/disable_ipv6

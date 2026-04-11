@@ -17,17 +17,23 @@ resource "proxmox_vm_qemu" "media_vm" {
   cicustom   = "vendor=local:snippets/qemu-guest-agent.yml" # /var/lib/vz/snippets/qemu-guest-agent.yml
   ciupgrade  = true
   nameserver = "192.168.2.1"
-  ipconfig0  = "gw=192.168.2.1,ip=192.168.2.4/24"
+  ipconfig0  = "ip=192.168.2.4/24,gw=192.168.2.1"
   skip_ipv6  = true
   ciuser     = "root"
   # cipassword = "1234"
   sshkeys    = var.control_ssh_key
+
+  startup_shutdown {
+  order         = 1
+  startup_delay = 10
+  }
 
   cpu {
     cores   = 4
     sockets = 1
     type    = "host"
   }
+
   # Most cloud-init images require a serial device for their display
   serial {
     id = 0
@@ -49,6 +55,14 @@ resource "proxmox_vm_qemu" "media_vm" {
       ide1 {
         cloudinit {
           storage = "local-lvm"
+        }
+      }
+    }
+    virtio {
+      virtio1 {
+        passthrough {
+          file   = "/dev/media_vg/media_lv"
+          backup = false
         }
       }
     }

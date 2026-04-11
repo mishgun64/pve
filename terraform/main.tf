@@ -58,15 +58,15 @@ resource "proxmox_vm_qemu" "media_vm" {
         }
       }
     }
-    virtio {
-      virtio1 {
-        passthrough {
-          file   = "/dev/media_vg/media_lv"
-          backup = false
-        }
-      }
-    }
-  }
+  #   virtio {
+  #     virtio1 {
+  #       passthrough {
+  #         file   = "/dev/media_vg/media_lv"
+  #         backup = false
+  #       }
+  #     }
+  #   }
+  # }
 
   network {
     id = 0

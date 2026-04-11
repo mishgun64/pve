@@ -20,7 +20,7 @@ resource "proxmox_vm_qemu" "media_vm" {
   ipconfig0  = "gw=192.168.2.1,ip=192.168.2.4/24"
   skip_ipv6  = true
   ciuser     = "root"
-  cipassword = "1234"
+  # cipassword = "1234"
   sshkeys    = var.control_ssh_key
 
   cpu {
@@ -69,7 +69,7 @@ resource "proxmox_lxc" "wireguard" {
   vmid            = 126
   hostname        = "wireguard"
   ostemplate      = var.lxc_ostemplate
-  password        = "12345"
+  # password        = "12345"
   unprivileged    = true
   cores           = 1
   memory          = 1024
@@ -102,7 +102,7 @@ resource "proxmox_lxc" "traefik" {
   vmid            = 133
   hostname        = "traefik"
   ostemplate      = var.lxc_ostemplate
-  password        = "12345"
+  # password        = "12345"
   unprivileged    = true
   cores           = 1
   memory          = 1024

@@ -1,6 +1,8 @@
 pipeline {
     agent any
-
+    options {
+        ansiColor('xterm')
+    }
     triggers {
         GenericTrigger(
             genericVariables: [

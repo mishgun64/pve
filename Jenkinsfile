@@ -201,5 +201,21 @@ pipeline {
                 '''
             }
         }
+
+        stage('traefik') {
+            when {
+                expression { env.EVENT == 'traefik' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_config.yml
+                '''
+            }
+        }
     }
 }

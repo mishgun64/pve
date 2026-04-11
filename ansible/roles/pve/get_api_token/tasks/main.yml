@@ -1,5 +1,9 @@
 ---
 
+- name: Delete existing token
+  ansible.builtin.shell: pveum user token remove root@pam tf
+  ignore_errors: true
+  
 - name: Get root token
   ansible.builtin.shell: pveum user token add root@pam tf --privsep 0 | grep value | awk '{print $4}' | head -n2 | tail -n1
   register: api_token

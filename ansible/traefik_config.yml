@@ -1,0 +1,10 @@
+---
+
+- name: Media VM config
+  hosts: traefik_lxc
+  remote_user: root
+  gather_facts: true
+  roles:
+    - common/basic
+    - common/docker
+    - traefik/config

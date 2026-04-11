@@ -10,6 +10,8 @@ local_hosts:
       ansible_host: 192.168.2.4
     wg_lxc:
       ansible_host: 192.168.2.6
+    traefik_lxc:
+      ansible_host: 192.168.4.2
 
 
   vars:

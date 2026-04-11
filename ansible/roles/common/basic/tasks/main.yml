@@ -46,23 +46,6 @@
     state: latest
     update_cache: yes
 
-#-----------------------Install fail2ban----------------------------------
-
-#- name: Install fail2ban
-#  ansible.builtin.apt:
-#    name: fail2ban
-#    state: latest
-#
-#- name: Add fail2ban config file
-#  ansible.builtin.copy:
-#    src: jail.local
-#    dest: /etc/fail2ban/jail.local
-#
-#- name: Restart fail2ban service
-#  ansible.builtin.systemd_service:
-#    state: restarted
-#    name: fail2ban
-
 #-----------------------Install packages----------------------------------
 
 - name: Install apt packages
@@ -102,8 +85,3 @@
       apt upgrade -y &&
       apt autoremove -y &&
       apt autoclean -y
-
-#-----------------------Reboot----------------------------------
-#
-#- name: Reboot
-#  ansible.builtin.reboot:

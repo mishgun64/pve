@@ -189,17 +189,6 @@
 
 #-----------------------Auto updates----------------------------------
 
-- name: Docker update via cron
-  cron:
-    name: "Docker update and cleanup"
-    minute: "0"
-    hour: "6"
-    job: >
-      cd /home/docker &&
-      docker compose pull &&
-      docker compose up -d &&
-      docker system prune -af --volumes
-
 - name: Update VueTorrent via cron
   cron:
     name: "VueTorrent update"

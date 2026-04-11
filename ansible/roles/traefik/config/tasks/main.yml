@@ -1,0 +1,51 @@
+---
+
+#-----------------------User settings----------------------------------
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$ES3euQTVkhNu9lVN$OB5LedrbKJVnNpReELcrDpkHsERSF1iIgy9ITLpl.9q5I4K6gvwKQjTs5HkLh/P4TRatj3Fgx770P4LCEGal4.'
+    # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
+
+- name: Set shell for docker user
+  user:
+    name: docker
+    shell: /bin/bash
+
+#-----------------------Copy config files----------------------------------
+
+- name: Copy traefik directory
+  copy:
+    src: traefic/
+    dest: /home/docker/traefic/
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Copy docker-compose.yml
+  copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: docker
+    group: docker
+    mode: '0644'
+
+#--------------------------Run container----------------------------------
+
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

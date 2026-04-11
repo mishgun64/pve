@@ -6,10 +6,6 @@ variable "proxmox_api_token_id" {
   type        = string
 }
 
-# variable "proxmox_api_token_secret" {
-#   type        = string
-# }
-
 variable "control_ssh_key" {
   type        = string
 }
@@ -38,6 +34,6 @@ variable "target_node_name" {
   type        = string
 }
 
-variable "lxc_image" {
+variable "webhook_token" {
   type        = string
 }

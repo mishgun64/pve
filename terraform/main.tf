@@ -1,4 +1,4 @@
-#------------------------------------media_vm------------------------------------
+#------------------------------------Media VM------------------------------------
 
 resource "proxmox_vm_qemu" "media_vm" {
   vmid        = 124
@@ -97,7 +97,6 @@ resource "proxmox_lxc" "wireguard" {
 
 #------------------------------------Traefik LXC------------------------------------
 
-
 resource "proxmox_lxc" "traefik" {
   target_node     = var.target_node_name
   vmid            = 133
@@ -124,6 +123,13 @@ resource "proxmox_lxc" "traefik" {
     hwaddr = "bc:24:11:db:27:40"
   }
 
+  network {
+  name   = "eth1"
+  bridge = "vmbr0"
+  ip     = "192.168.2.3/24"
+  hwaddr = "bc:24:11:db:27:41"
+  }
+
   features {
     nesting = true
   }
@@ -141,7 +147,7 @@ resource "terraform_data" "media_vm_trigger" {
   provisioner "local-exec" {
     command = <<EOT
       sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
       -d '{"event": "media_vm"}'
     EOT
@@ -160,7 +166,7 @@ resource "terraform_data" "wireguard_trigger" {
   provisioner "local-exec" {
     command = <<EOT
       sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
       -d '{"event": "wireguard"}'
     EOT
@@ -179,7 +185,7 @@ resource "terraform_data" "traefik_trigger" {
   provisioner "local-exec" {
     command = <<EOT
       sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook" \
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
       -d '{"event": "traefik"}'
     EOT

@@ -46,10 +46,17 @@ resource "proxmox_vm_qemu" "media_vm" {
         disk {
           storage = "local-lvm"
           # The size of the disk should be at least as big as the disk in the template. If it's smaller, the disk will be recreated
-          size    = "30G"
+          size = "30G"
+        }
+        disk {
+          storage = "media-vg"
+          volume  = "media_lv"
+          backup  = false
         }
       }
     }
+  }
+}
     ide {
       # Some images require a cloud-init disk on the IDE controller, others on the SCSI or SATA controller
       ide1 {

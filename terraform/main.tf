@@ -66,7 +66,7 @@ resource "proxmox_vm_qemu" "media_vm" {
   #       }
   #     }
   #   }
-  # }
+  }
 
   network {
     id = 0

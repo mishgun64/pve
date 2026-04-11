@@ -4,6 +4,7 @@ variable "proxmox_api_url" {
 
 variable "proxmox_api_token_id" {
   type        = string
+  sensitive   = true
 }
 
 variable "control_ssh_key" {
@@ -36,4 +37,5 @@ variable "target_node_name" {
 
 variable "webhook_token" {
   type        = string
+  sensitive   = true
 }

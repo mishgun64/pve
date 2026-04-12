@@ -13,19 +13,17 @@ resource "proxmox_vm_qemu" "media_vm" {
   automatic_reboot = true
   start_at_node_boot = true
 
-  # Cloud-Init configuration
-  cicustom   = "vendor=local:snippets/qemu-guest-agent.yml" # /var/lib/vz/snippets/qemu-guest-agent.yml
+  cicustom   = "vendor=local:snippets/qemu-guest-agent.yml"
   ciupgrade  = true
   nameserver = "192.168.2.1"
   ipconfig0  = "ip=192.168.2.4/24,gw=192.168.2.1"
   skip_ipv6  = true
   ciuser     = "root"
-  # cipassword = "1234"
   sshkeys    = var.control_ssh_key
 
   startup_shutdown {
-  order         = 1
-  startup_delay = 10
+    order         = 1
+    startup_delay = 10
   }
 
   cpu {
@@ -34,7 +32,6 @@ resource "proxmox_vm_qemu" "media_vm" {
     type    = "host"
   }
 
-  # Most cloud-init images require a serial device for their display
   serial {
     id = 0
   }
@@ -42,12 +39,23 @@ resource "proxmox_vm_qemu" "media_vm" {
   disks {
     scsi {
       scsi0 {
-        # We have to specify the disk from our template, else Terraform will think it's not supposed to be there
         disk {
           storage = "local-lvm"
-          # The size of the disk should be at least as big as the disk in the template. If it's smaller, the disk will be recreated
-          size = "30G"
+          size    = "30G"
         }
+      }
+    }
+
+    ide {
+      ide1 {
+        cloudinit {
+          storage = "local-lvm"
+        }
+      }
+    }
+
+    virtio {
+      virtio1 {
         disk {
           storage = "media-vg"
           volume  = "media_lv"
@@ -56,29 +64,11 @@ resource "proxmox_vm_qemu" "media_vm" {
       }
     }
   }
-}
-    ide {
-      # Some images require a cloud-init disk on the IDE controller, others on the SCSI or SATA controller
-      ide1 {
-        cloudinit {
-          storage = "local-lvm"
-        }
-      }
-    }
-    virtio {
-      virtio1 {
-        passthrough {
-          file   = "/dev/media_vg/media_lv"
-          backup = false
-        }
-      }
-    }
-  }
 
   network {
-    id = 0
-    bridge = "vmbr0"
-    model  = "virtio"
+    id      = 0
+    bridge  = "vmbr0"
+    model   = "virtio"
     macaddr = "bc:24:11:f1:ab:f9"
   }
 }

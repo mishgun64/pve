@@ -159,3 +159,17 @@
 - name: Download latest lxc image
   shell: >
     pveam download local $(pveam available | awk '/debian-13-standard/ {print $2}' | sort -V | tail -1)
+
+#-----------------------Add media-vg as storage----------------------------------
+
+- name: Get storage list
+  command: pvesm status --enabled 1
+  register: storage_list
+  changed_when: false
+
+- name: Add media-vg storage if missing
+  command: >
+    pvesm add lvm media-vg
+    --vgname media_vg
+    --content images
+  when: storage_list.stdout is not search("media-vg")

@@ -95,6 +95,7 @@
       - zip
       - unzip
       - htop
+      - libguestfs-tools
     state: latest
 
 - name: Install sops binary

@@ -7,6 +7,12 @@
     mode: '0644'
     timeout: 300
 
+- name: Install qemu-guest-agent into image
+  command: >
+    virt-customize -a {{ debian_cloud_image_path }}
+    --install qemu-guest-agent
+    --run-command 'systemctl enable qemu-guest-agent'
+
 - name: Remove existing VM if exists
   shell: qm destroy {{ template_id }} --purge || true
   args:
@@ -52,21 +58,22 @@
 - name: Convert VM to template
   command: qm template {{ template_id }}
 
-- name: Ensure snippets directory exists
-  ansible.builtin.file:
-    path: /var/lib/vz/snippets
-    state: directory
-    mode: "0755"
-
-- name: Create qemu-guest-agent cloud-init snippet
-  ansible.builtin.copy:
-    dest: /var/lib/vz/snippets/qemu-guest-agent.yml
-    mode: "0644"
-    content: |
-      runcmd:
-        - apt update
-        - apt install -y qemu-guest-agent
-        - systemctl start qemu-guest-agent
+#- name: Ensure snippets directory exists
+#  ansible.builtin.file:
+#    path: /var/lib/vz/snippets
+#    state: directory
+#    mode: "0755"
+#
+#- name: Create qemu-guest-agent cloud-init snippet
+#  ansible.builtin.copy:
+#    dest: /var/lib/vz/snippets/qemu-guest-agent.yml
+#    mode: "0644"
+#    content: |
+#      runcmd:
+#        - apt update
+#        - apt install -y qemu-guest-agent
+#        - systemctl enable qemu-guest-agent
+#        - systemctl start qemu-guest-agent
 
 - name: Trigger Jenkins webhook
   uri:

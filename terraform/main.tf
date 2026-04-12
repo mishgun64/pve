@@ -56,7 +56,7 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
       servers = ["192.168.2.1"]
     }
 
-    vendor_data_file_id = "local:snippets/qemu-guest-agent.yml"
+    # vendor_data_file_id = "local:snippets/qemu-guest-agent.yml"
   }
 
   disk {

@@ -5,6 +5,7 @@ control_ssh_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5o
 lxc_ostemplate = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 target_node_name = "pve"
 webhook_token = "pve-webhook"
+debian_template_id = 9000
 memory = 512
 cores = 1
 storage_size = "5G"

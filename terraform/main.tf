@@ -1,6 +1,6 @@
 #------------------------------------Media VM------------------------------------
 
-resource "proxmox_virtual_machine" "media_vm" {
+resource "proxmox_virtual_environment_vm" "media_vm" {
   vm_id     = 124
   name      = "media"
   node_name = var.target_node_name
@@ -10,7 +10,8 @@ resource "proxmox_virtual_machine" "media_vm" {
   }
 
   clone {
-    vm_id = data.proxmox_virtual_machine.debian_template.vm_id
+    # vm_id шаблона — укажи числовой ID своего debian-cloudinit-template
+    vm_id = var.debian_template_id
   }
 
   cpu {
@@ -27,8 +28,8 @@ resource "proxmox_virtual_machine" "media_vm" {
 
   scsi_hardware = "virtio-scsi-single"
 
-  started      = true
-  on_boot      = true
+  started             = true
+  on_boot             = true
   reboot_after_update = true
 
   startup {
@@ -36,9 +37,8 @@ resource "proxmox_virtual_machine" "media_vm" {
     up_delay = "10"
   }
 
-  # Cloud-Init
   initialization {
-    upgrade = true
+    datastore_id = "local-lvm"
 
     user_account {
       username = "root"
@@ -56,9 +56,7 @@ resource "proxmox_virtual_machine" "media_vm" {
       servers = ["192.168.2.1"]
     }
 
-    # vendor cloud-init config
     vendor_data_file_id = "local:snippets/qemu-guest-agent.yml"
-    datastore_id        = "local-lvm"
   }
 
   disk {
@@ -68,13 +66,13 @@ resource "proxmox_virtual_machine" "media_vm" {
     file_format  = "raw"
   }
 
-  # Existing volume — imported, not managed by Terraform
+  # Существующий volume вне управления Terraform — не пересоздаётся
   disk {
     interface    = "virtio1"
     datastore_id = "media-vg"
     file_id      = "media-vg:media_lv"
     backup       = false
-    size         = 0 # set to actual size or use ignore_changes
+    size         = 1 # укажи реальный размер в GB
   }
 
   network_device {
@@ -84,21 +82,42 @@ resource "proxmox_virtual_machine" "media_vm" {
   }
 
   serial_device {}
+
+  lifecycle {
+    ignore_changes = [disk]
+  }
 }
 
 #------------------------------------Wireguard LXC------------------------------------
 
-resource "proxmox_linux_container" "wireguard" {
+resource "proxmox_virtual_environment_container" "wireguard" {
   node_name = var.target_node_name
   vm_id     = 126
-  hostname  = "wireguard"
+
+  unprivileged   = true
+  started        = true
+  start_on_boot  = true  # правильное имя атрибута у bpg
+
+  initialization {
+    hostname = "wireguard"
+
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+
+    # IP задаётся здесь, а не в network_interface
+    ip_config {
+      ipv4 {
+        address = "192.168.2.6/24"
+        gateway = "192.168.2.1"
+      }
+    }
+  }
 
   operating_system {
     template_file_id = var.lxc_ostemplate
-    type             = "debian" # adjust if needed
+    type             = "debian" # измени если нужно: ubuntu, centos, alpine и т.д.
   }
-
-  unprivileged = true
 
   cpu {
     cores = 1
@@ -106,15 +125,7 @@ resource "proxmox_linux_container" "wireguard" {
 
   memory {
     dedicated = 1024
-  }
-
-  started = true
-  on_boot = true
-
-  initialization {
-    user_account {
-      keys = [var.control_ssh_key]
-    }
+    swap      = 0
   }
 
   disk {
@@ -122,11 +133,11 @@ resource "proxmox_linux_container" "wireguard" {
     size         = 8
   }
 
+  # network_interface содержит только сетевые параметры (bridge, mac, vlan и т.д.)
+  # IP/GW задаётся через initialization.ip_config выше
   network_interface {
     name        = "eth0"
     bridge      = "vmbr0"
-    address     = "192.168.2.6/24"
-    gateway     = "192.168.2.1"
     mac_address = "BC:24:11:DB:27:39"
   }
 
@@ -137,17 +148,41 @@ resource "proxmox_linux_container" "wireguard" {
 
 #------------------------------------Traefik LXC------------------------------------
 
-resource "proxmox_linux_container" "traefik" {
+resource "proxmox_virtual_environment_container" "traefik" {
   node_name = var.target_node_name
   vm_id     = 133
-  hostname  = "traefik"
+
+  unprivileged   = true
+  started        = true
+  start_on_boot  = true
+
+  initialization {
+    hostname = "traefik"
+
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+
+    # Основной IP (eth0) задаётся первым ip_config блоком
+    ip_config {
+      ipv4 {
+        address = "192.168.4.2/24"
+        gateway = "192.168.4.1"
+      }
+    }
+
+    # Второй IP (eth1) — второй ip_config блок
+    ip_config {
+      ipv4 {
+        address = "192.168.2.3/24"
+      }
+    }
+  }
 
   operating_system {
     template_file_id = var.lxc_ostemplate
-    type             = "debian" # adjust if needed
+    type             = "debian"
   }
-
-  unprivileged = true
 
   cpu {
     cores = 1
@@ -155,15 +190,7 @@ resource "proxmox_linux_container" "traefik" {
 
   memory {
     dedicated = 1024
-  }
-
-  started = true
-  on_boot = true
-
-  initialization {
-    user_account {
-      keys = [var.control_ssh_key]
-    }
+    swap      = 0
   }
 
   disk {
@@ -174,15 +201,12 @@ resource "proxmox_linux_container" "traefik" {
   network_interface {
     name        = "eth0"
     bridge      = "vmbr1"
-    address     = "192.168.4.2/24"
-    gateway     = "192.168.4.1"
     mac_address = "BC:24:11:DB:27:40"
   }
 
   network_interface {
     name        = "eth1"
     bridge      = "vmbr0"
-    address     = "192.168.2.3/24"
     mac_address = "BC:24:11:DB:27:41"
   }
 
@@ -194,10 +218,10 @@ resource "proxmox_linux_container" "traefik" {
 #------------------------------------Media_vm webhook trigger------------------------------------
 
 resource "terraform_data" "media_vm_trigger" {
-  depends_on = [proxmox_virtual_machine.media_vm]
+  depends_on = [proxmox_virtual_environment_vm.media_vm]
 
   triggers_replace = {
-    vm_id = proxmox_virtual_machine.media_vm.vm_id
+    vm_id = proxmox_virtual_environment_vm.media_vm.vm_id
   }
 
   provisioner "local-exec" {
@@ -213,10 +237,10 @@ resource "terraform_data" "media_vm_trigger" {
 #------------------------------------Wireguard webhook trigger------------------------------------
 
 resource "terraform_data" "wireguard_trigger" {
-  depends_on = [proxmox_linux_container.wireguard]
+  depends_on = [proxmox_virtual_environment_container.wireguard]
 
   triggers_replace = {
-    vm_id = proxmox_linux_container.wireguard.vm_id
+    vm_id = proxmox_virtual_environment_container.wireguard.vm_id
   }
 
   provisioner "local-exec" {
@@ -232,10 +256,10 @@ resource "terraform_data" "wireguard_trigger" {
 #------------------------------------Traefik webhook trigger------------------------------------
 
 resource "terraform_data" "traefik_trigger" {
-  depends_on = [proxmox_linux_container.traefik]
+  depends_on = [proxmox_virtual_environment_container.traefik]
 
   triggers_replace = {
-    vm_id = proxmox_linux_container.traefik.vm_id
+    vm_id = proxmox_virtual_environment_container.traefik.vm_id
   }
 
   provisioner "local-exec" {

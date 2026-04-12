@@ -39,3 +39,8 @@ variable "webhook_token" {
   type        = string
   sensitive   = true
 }
+
+variable "debian_template_id" {
+  type        = number
+  description = "VM ID шаблона debian-cloudinit-template"
+}

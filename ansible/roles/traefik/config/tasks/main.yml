@@ -17,7 +17,7 @@
 
 - name: Copy traefik directory
   copy:
-    src: traefic/
+    src: traefik/
     dest: /home/docker/traefic/
     owner: docker
     group: docker

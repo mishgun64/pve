@@ -72,7 +72,7 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
     datastore_id = "media-vg"
     file_id      = "media-vg:media_lv"
     backup       = false
-    size         = 1 # укажи реальный размер в GB
+    # size         = 1 # укажи реальный размер в GB
   }
 
   network_device {
@@ -83,9 +83,9 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
 
   serial_device {}
 
-  lifecycle {
-    ignore_changes = [disk]
-  }
+  # lifecycle {
+  #   ignore_changes = [disk]
+  # }
 }
 
 #------------------------------------Wireguard LXC------------------------------------

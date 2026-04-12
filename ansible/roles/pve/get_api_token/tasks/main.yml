@@ -50,11 +50,6 @@
 - name: Add role terraform
   ansible.builtin.shell: pveum aclmod / -user terraform@pam -role Terraform
 
-- name: Show api_token
-  ansible.builtin.debug:
-    var: api_token.stdout
-
-
 - name: Ensure terraform secrets directory exists
   ansible.builtin.file:
     path: ../terraform/secrets

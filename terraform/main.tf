@@ -1,29 +1,16 @@
 #------------------------------------Media VM------------------------------------
 
-resource "proxmox_vm_qemu" "media_vm" {
-  vmid        = 124
-  name        = "media"
-  target_node = var.target_node_name
-  agent       = 1
-  memory      = 8192
-  boot        = "order=scsi0"
-  clone       = "debian-cloudinit-template"
-  scsihw      = "virtio-scsi-single"
-  vm_state    = "running"
-  automatic_reboot = true
-  start_at_node_boot = true
+resource "proxmox_virtual_machine" "media_vm" {
+  vm_id     = 124
+  name      = "media"
+  node_name = var.target_node_name
 
-  cicustom   = "vendor=local:snippets/qemu-guest-agent.yml"
-  ciupgrade  = true
-  nameserver = "192.168.2.1"
-  ipconfig0  = "ip=192.168.2.4/24,gw=192.168.2.1"
-  skip_ipv6  = true
-  ciuser     = "root"
-  sshkeys    = var.control_ssh_key
+  agent {
+    enabled = true
+  }
 
-  startup_shutdown {
-    order         = 1
-    startup_delay = 10
+  clone {
+    vm_id = data.proxmox_virtual_machine.debian_template.vm_id
   }
 
   cpu {
@@ -32,73 +19,115 @@ resource "proxmox_vm_qemu" "media_vm" {
     type    = "host"
   }
 
-  serial {
-    id = 0
+  memory {
+    dedicated = 8192
   }
 
-  disks {
-    scsi {
-      scsi0 {
-        disk {
-          storage = "local-lvm"
-          size    = "30G"
-        }
+  boot_order = ["scsi0"]
+
+  scsi_hardware = "virtio-scsi-single"
+
+  started      = true
+  on_boot      = true
+  reboot_after_update = true
+
+  startup {
+    order    = "1"
+    up_delay = "10"
+  }
+
+  # Cloud-Init
+  initialization {
+    upgrade = true
+
+    user_account {
+      username = "root"
+      keys     = [var.control_ssh_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "192.168.2.4/24"
+        gateway = "192.168.2.1"
       }
     }
 
-    ide {
-      ide1 {
-        cloudinit {
-          storage = "local-lvm"
-        }
-      }
+    dns {
+      servers = ["192.168.2.1"]
     }
 
-    virtio {
-      virtio1 {
-        disk {
-          storage = "media-vg"
-          volume  = "media_lv"
-          backup  = false
-        }
-      }
-    }
+    # vendor cloud-init config
+    vendor_data_file_id = "local:snippets/qemu-guest-agent.yml"
+    datastore_id        = "local-lvm"
   }
 
-  network {
-    id      = 0
-    bridge  = "vmbr0"
-    model   = "virtio"
-    macaddr = "bc:24:11:f1:ab:f9"
+  disk {
+    interface    = "scsi0"
+    datastore_id = "local-lvm"
+    size         = 30
+    file_format  = "raw"
   }
+
+  # Existing volume — imported, not managed by Terraform
+  disk {
+    interface    = "virtio1"
+    datastore_id = "media-vg"
+    file_id      = "media-vg:media_lv"
+    backup       = false
+    size         = 0 # set to actual size or use ignore_changes
+  }
+
+  network_device {
+    bridge      = "vmbr0"
+    model       = "virtio"
+    mac_address = "BC:24:11:F1:AB:F9"
+  }
+
+  serial_device {}
 }
 
 #------------------------------------Wireguard LXC------------------------------------
 
-resource "proxmox_lxc" "wireguard" {
-  target_node     = var.target_node_name
-  vmid            = 126
-  hostname        = "wireguard"
-  ostemplate      = var.lxc_ostemplate
-  # password        = "12345"
-  unprivileged    = true
-  cores           = 1
-  memory          = 1024
-  start           = true
-  onboot          = true
-  ssh_public_keys = var.control_ssh_key
+resource "proxmox_linux_container" "wireguard" {
+  node_name = var.target_node_name
+  vm_id     = 126
+  hostname  = "wireguard"
 
-  rootfs {
-    storage = "local-lvm"
-    size    = "8G"
+  operating_system {
+    template_file_id = var.lxc_ostemplate
+    type             = "debian" # adjust if needed
   }
 
-  network {
-    name   = "eth0"
-    bridge = "vmbr0"
-    ip     = "192.168.2.6/24"
-    gw     = "192.168.2.1"
-    hwaddr = "bc:24:11:db:27:39"
+  unprivileged = true
+
+  cpu {
+    cores = 1
+  }
+
+  memory {
+    dedicated = 1024
+  }
+
+  started = true
+  on_boot = true
+
+  initialization {
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 8
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    address     = "192.168.2.6/24"
+    gateway     = "192.168.2.1"
+    mac_address = "BC:24:11:DB:27:39"
   }
 
   features {
@@ -108,37 +137,53 @@ resource "proxmox_lxc" "wireguard" {
 
 #------------------------------------Traefik LXC------------------------------------
 
-resource "proxmox_lxc" "traefik" {
-  target_node     = var.target_node_name
-  vmid            = 133
-  hostname        = "traefik"
-  ostemplate      = var.lxc_ostemplate
-  # password        = "12345"
-  unprivileged    = true
-  cores           = 1
-  memory          = 1024
-  start           = true
-  onboot          = true
-  ssh_public_keys = var.control_ssh_key
+resource "proxmox_linux_container" "traefik" {
+  node_name = var.target_node_name
+  vm_id     = 133
+  hostname  = "traefik"
 
-  rootfs {
-    storage = "local-lvm"
-    size    = "8G"
+  operating_system {
+    template_file_id = var.lxc_ostemplate
+    type             = "debian" # adjust if needed
   }
 
-  network {
-    name   = "eth0"
-    bridge = "vmbr1"
-    ip     = "192.168.4.2/24"
-    gw     = "192.168.4.1"
-    hwaddr = "bc:24:11:db:27:40"
+  unprivileged = true
+
+  cpu {
+    cores = 1
   }
 
-  network {
-  name   = "eth1"
-  bridge = "vmbr0"
-  ip     = "192.168.2.3/24"
-  hwaddr = "bc:24:11:db:27:41"
+  memory {
+    dedicated = 1024
+  }
+
+  started = true
+  on_boot = true
+
+  initialization {
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 8
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr1"
+    address     = "192.168.4.2/24"
+    gateway     = "192.168.4.1"
+    mac_address = "BC:24:11:DB:27:40"
+  }
+
+  network_interface {
+    name        = "eth1"
+    bridge      = "vmbr0"
+    address     = "192.168.2.3/24"
+    mac_address = "BC:24:11:DB:27:41"
   }
 
   features {
@@ -149,10 +194,10 @@ resource "proxmox_lxc" "traefik" {
 #------------------------------------Media_vm webhook trigger------------------------------------
 
 resource "terraform_data" "media_vm_trigger" {
-  depends_on = [proxmox_vm_qemu.media_vm]
+  depends_on = [proxmox_virtual_machine.media_vm]
 
   triggers_replace = {
-    vm_id = proxmox_vm_qemu.media_vm.id
+    vm_id = proxmox_virtual_machine.media_vm.vm_id
   }
 
   provisioner "local-exec" {
@@ -168,10 +213,10 @@ resource "terraform_data" "media_vm_trigger" {
 #------------------------------------Wireguard webhook trigger------------------------------------
 
 resource "terraform_data" "wireguard_trigger" {
-  depends_on = [proxmox_lxc.wireguard]
+  depends_on = [proxmox_linux_container.wireguard]
 
   triggers_replace = {
-    vm_id = proxmox_lxc.wireguard.id
+    vm_id = proxmox_linux_container.wireguard.vm_id
   }
 
   provisioner "local-exec" {
@@ -187,10 +232,10 @@ resource "terraform_data" "wireguard_trigger" {
 #------------------------------------Traefik webhook trigger------------------------------------
 
 resource "terraform_data" "traefik_trigger" {
-  depends_on = [proxmox_lxc.traefik]
+  depends_on = [proxmox_linux_container.traefik]
 
   triggers_replace = {
-    vm_id = proxmox_lxc.traefik.id
+    vm_id = proxmox_linux_container.traefik.vm_id
   }
 
   provisioner "local-exec" {

@@ -67,13 +67,13 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
   }
 
   # Существующий volume вне управления Terraform — не пересоздаётся
-  disk {
-    interface    = "virtio1"
-    datastore_id = "media-vg"
-    file_id      = "media-vg:media_lv"
-    backup       = false
-    # size         = 1 # укажи реальный размер в GB
-  }
+  # disk {
+  #   interface    = "virtio1"
+  #   datastore_id = "media-vg"
+  #   file_id      = "media-vg:media_lv"
+  #   backup       = false
+  #   # size         = 1 # укажи реальный размер в GB
+  # }
 
   network_device {
     bridge      = "vmbr0"

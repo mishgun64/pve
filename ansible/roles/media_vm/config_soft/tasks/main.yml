@@ -7,6 +7,17 @@
 #    qm set 124 -virtio1 /dev/media_vg/media_lv
 #  delegate_to: pve
 
+- name: Get VM disks
+  command: qm config 124
+  register: config
+  changed_when: false
+  delegate_to: pve
+
+- name: Attach disk if not present
+  command: qm set 124 -virtio1 media-vg:media_lv
+  when: config.stdout is not search("media-vg:media_lv")
+  delegate_to: pve
+
 - name: Ensure /media directory exists
   ansible.builtin.file:
     path: /media

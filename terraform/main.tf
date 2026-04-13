@@ -49,9 +49,6 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
         address = "192.168.2.4/24"
         gateway = "192.168.2.1"
       }
-      ipv6 {
-        address = "disabled"
-      }
     }
 
     dns {
@@ -98,9 +95,6 @@ resource "proxmox_virtual_environment_container" "wireguard" {
       ipv4 {
         address = "192.168.2.6/24"
         gateway = "192.168.2.1"
-      }
-      ipv6 {
-        address = "disabled"
       }
     }
   }
@@ -156,9 +150,6 @@ resource "proxmox_virtual_environment_container" "traefik" {
       ipv4 {
         address = "192.168.4.3/24"
         gateway = "192.168.4.1"
-      }
-      ipv6 {
-        address = "disabled"
       }
     }
 

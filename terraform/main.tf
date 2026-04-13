@@ -103,7 +103,7 @@ resource "proxmox_virtual_environment_container" "wireguard" {
         address = "disabled"
       }
     }
-
+  }
   operating_system {
     template_file_id = var.lxc_ostemplate
     type             = "debian"

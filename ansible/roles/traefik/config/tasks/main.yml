@@ -25,7 +25,7 @@
 
 - name: Create acme.json
   ansible.builtin.file:
-    path: /path/to/acme.json
+    path: /home/docker/traefik/acme.json
     state: touch
     owner: docker
     group: docker

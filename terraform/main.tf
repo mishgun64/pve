@@ -49,13 +49,15 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
         address = "192.168.2.4/24"
         gateway = "192.168.2.1"
       }
+      ipv6 {
+        address = "disabled"
+      }
     }
 
     dns {
       servers = ["192.168.2.1"]
     }
 
-    # vendor_data_file_id = "local:snippets/qemu-guest-agent.yml"
   }
 
   disk {
@@ -69,10 +71,10 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
     bridge      = "vmbr0"
     model       = "virtio"
     mac_address = "BC:24:11:F1:AB:F9"
+    firewall    = true
   }
 
   serial_device {}
-
 }
 
 #------------------------------------Wireguard LXC------------------------------------
@@ -83,7 +85,7 @@ resource "proxmox_virtual_environment_container" "wireguard" {
 
   unprivileged   = true
   started        = true
-  start_on_boot  = true  # правильное имя атрибута у bpg
+  start_on_boot  = true
 
   initialization {
     hostname = "wireguard"
@@ -92,22 +94,19 @@ resource "proxmox_virtual_environment_container" "wireguard" {
       keys = [var.control_ssh_key]
     }
 
-    # IP задаётся здесь, а не в network_interface
     ip_config {
       ipv4 {
         address = "192.168.2.6/24"
         gateway = "192.168.2.1"
       }
+      ipv6 {
+        address = "disabled"
+      }
     }
-
-  #   dns {
-  #     servers = ""
-  #   }
-  # }
 
   operating_system {
     template_file_id = var.lxc_ostemplate
-    type             = "debian" # измени если нужно: ubuntu, centos, alpine и т.д.
+    type             = "debian"
   }
 
   cpu {
@@ -124,12 +123,11 @@ resource "proxmox_virtual_environment_container" "wireguard" {
     size         = 8
   }
 
-  # network_interface содержит только сетевые параметры (bridge, mac, vlan и т.д.)
-  # IP/GW задаётся через initialization.ip_config выше
   network_interface {
     name        = "eth0"
     bridge      = "vmbr0"
     mac_address = "BC:24:11:DB:27:39"
+    firewall    = true
   }
 
   features {
@@ -141,7 +139,7 @@ resource "proxmox_virtual_environment_container" "wireguard" {
 
 resource "proxmox_virtual_environment_container" "traefik" {
   node_name = var.target_node_name
-  vm_id     = 133
+  vm_id     = 143
 
   unprivileged   = true
   started        = true
@@ -154,15 +152,16 @@ resource "proxmox_virtual_environment_container" "traefik" {
       keys = [var.control_ssh_key]
     }
 
-    # Основной IP (eth0) задаётся первым ip_config блоком
     ip_config {
       ipv4 {
-        address = "192.168.4.2/24"
+        address = "192.168.4.3/24"
         gateway = "192.168.4.1"
+      }
+      ipv6 {
+        address = "disabled"
       }
     }
 
-    # Второй IP (eth1) — второй ip_config блок
     ip_config {
       ipv4 {
         address = "192.168.2.3/24"
@@ -193,12 +192,14 @@ resource "proxmox_virtual_environment_container" "traefik" {
     name        = "eth0"
     bridge      = "vmbr1"
     mac_address = "BC:24:11:DB:27:40"
+    firewall    = true
   }
 
   network_interface {
     name        = "eth1"
     bridge      = "vmbr0"
     mac_address = "BC:24:11:DB:27:41"
+    firewall    = true
   }
 
   features {

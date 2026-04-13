@@ -2,10 +2,11 @@ services:
   traefik:
     image: traefik:latest
     container_name: traefik
-    user: "1000:1000"
     restart: unless-stopped
     environment:
-      TZ: Europe/Moscow
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Moscow
     ports:
       - "80:80"
       - "443:443"

@@ -4,6 +4,8 @@ services:
     container_name: traefik
     user: "1000:1000"
     restart: unless-stopped
+    environment:
+      TZ: Europe/Moscow
     ports:
       - "80:80"
       - "443:443"

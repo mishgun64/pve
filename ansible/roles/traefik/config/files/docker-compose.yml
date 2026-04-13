@@ -2,6 +2,7 @@ services:
   traefik:
     image: traefik:latest
     container_name: traefik
+    user: "1000:1000"
     restart: unless-stopped
     ports:
       - "80:80"

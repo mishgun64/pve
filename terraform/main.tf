@@ -10,7 +10,6 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
   }
 
   clone {
-    # vm_id шаблона — укажи числовой ID своего debian-cloudinit-template
     vm_id = var.debian_template_id
   }
 
@@ -66,15 +65,6 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
     file_format  = "raw"
   }
 
-  # Существующий volume вне управления Terraform — не пересоздаётся
-  # disk {
-  #   interface    = "virtio1"
-  #   datastore_id = "media-vg"
-  #   file_id      = "media-vg:media_lv"
-  #   backup       = false
-  #   # size         = 1 # укажи реальный размер в GB
-  # }
-
   network_device {
     bridge      = "vmbr0"
     model       = "virtio"
@@ -83,9 +73,6 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
 
   serial_device {}
 
-  # lifecycle {
-  #   ignore_changes = [disk]
-  # }
 }
 
 #------------------------------------Wireguard LXC------------------------------------
@@ -112,7 +99,11 @@ resource "proxmox_virtual_environment_container" "wireguard" {
         gateway = "192.168.2.1"
       }
     }
-  }
+
+  #   dns {
+  #     servers = ""
+  #   }
+  # }
 
   operating_system {
     template_file_id = var.lxc_ostemplate

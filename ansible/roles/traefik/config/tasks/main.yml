@@ -23,6 +23,14 @@
     group: docker
     mode: '0755'
 
+- name: Create acme.json
+  ansible.builtin.file:
+    path: /path/to/acme.json
+    state: touch
+    owner: docker
+    group: docker
+    mode: '0600'
+
 - name: Copy docker-compose.yml
   copy:
     src: docker-compose.yml

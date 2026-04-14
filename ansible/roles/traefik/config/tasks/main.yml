@@ -13,6 +13,33 @@
     name: docker
     shell: /bin/bash
 
+#--------------------------Firewall rules----------------------------------
+
+- name: Decrypt rules on ansible host
+  ansible.builtin.shell: >
+    sops -d --input-type binary --output-type binary
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc >
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw
+  delegate_to: localhost
+
+- name: Copy rules to target
+  ansible.builtin.copy:
+    src: 143.fw
+    dest: /etc/pve/firewall/143.fw
+    owner: root
+    group: www-data
+    mode: '0640'
+
+- name: Remove decrypted rules from ansible host
+  ansible.builtin.file:
+    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw
+    state: absent
+  delegate_to: localhost
+
+- name: Update firewall rules
+  shell: >
+    pve-firewall compile
+
 #-----------------------Copy config files----------------------------------
 
 - name: Copy traefik directory

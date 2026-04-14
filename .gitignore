@@ -1,0 +1,4 @@
+/ansible/roles/pve/config_soft/files/cluster.fw
+/ansible/roles/media_vm/config_soft/files/124.fw
+/ansible/roles/wireguard/files/126.fw
+/ansible/roles/traefik/config/files/143.fw

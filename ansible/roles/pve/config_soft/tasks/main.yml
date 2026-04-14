@@ -41,32 +41,7 @@
   community.general.timezone:
     name: Europe/Moscow
 
-#- name: Enable NTP sync
-#  ansible.builtin.systemd:
-#    name: systemd-timesyncd
-#    enabled: true
-#    state: started
-#
-#- name: Enable NTP via timedatectl
-#  ansible.builtin.command: timedatectl set-ntp true
-#  changed_when: false
-
 #--------------------------Updates------------------------------------------------
-
-#- name: Clean apt cache
-#  apt:
-#    clean: yes
-#
-#- name: Remove apt lists
-#  file:
-#    path: /var/lib/apt/lists
-#    state: absent
-#
-#- name: Recreate apt lists directory
-#  file:
-#    path: /var/lib/apt/lists
-#    state: directory
-#    mode: '0755'
 
 - name: Update and upgrade
   ansible.builtin.apt:
@@ -143,6 +118,33 @@
     state: restarted
     name: sshd
 
+#--------------------------Firewall rules----------------------------------
+
+- name: Decrypt rules on ansible host
+  ansible.builtin.shell: >
+    sops -d --input-type binary --output-type binary
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc >
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw
+  delegate_to: localhost
+
+- name: Copy rules to target
+  ansible.builtin.copy:
+    src: cluster.fw
+    dest: /etc/pve/firewall/cluster.fw
+    owner: root
+    group: www-data
+    mode: '0640'
+
+- name: Remove decrypted rules from ansible host
+  ansible.builtin.file:
+    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw
+    state: absent
+  delegate_to: localhost
+
+- name: Update firewall rules
+  shell: >
+    pve-firewall compile
+
 #-----------------------Change root password----------------------------------
 
 - name: Change root password
@@ -163,14 +165,14 @@
 
 #-----------------------Add media-vg as storage----------------------------------
 
-- name: Get storage list
-  command: pvesm status --enabled 1
-  register: storage_list
-  changed_when: false
-
-- name: Add media-vg storage if missing
-  command: >
-    pvesm add lvm media-vg
-    --vgname media_vg
-    --content images
-  when: storage_list.stdout is not search("media-vg")
+#- name: Get storage list
+#  command: pvesm status --enabled 1
+#  register: storage_list
+#  changed_when: false
+#
+#- name: Add media-vg storage if missing
+#  command: >
+#    pvesm add lvm media-vg
+#    --vgname media_vg
+#    --content images
+#  when: storage_list.stdout is not search("media-vg")

@@ -211,26 +211,34 @@
 
 #--------------------------Firewall rules----------------------------------
 
-- name: Decrypt rules on ansible host
-  ansible.builtin.shell: >
-    sops -d --input-type binary --output-type binary
-    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc >
-    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw
-  delegate_to: localhost
+#- name: Decrypt rules on ansible host
+#  ansible.builtin.shell: >
+#    sops -d --input-type binary --output-type binary
+#    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc >
+#    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw
+#  delegate_to: localhost
+#
+#- name: Copy rules to target
+#  ansible.builtin.copy:
+#    src: 124.fw
+#    dest: /etc/pve/firewall/124.fw
+#    owner: root
+#    group: www-data
+#    mode: '0640'
+#
+#- name: Remove decrypted rules from ansible host
+#  ansible.builtin.file:
+#    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw
+#    state: absent
+#  delegate_to: localhost
 
 - name: Copy rules to target
   ansible.builtin.copy:
-    src: 124.fw
     dest: /etc/pve/firewall/124.fw
     owner: root
     group: www-data
     mode: '0640'
-
-- name: Remove decrypted rules from ansible host
-  ansible.builtin.file:
-    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw
-    state: absent
-  delegate_to: localhost
+    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
 
 - name: Update firewall rules
   shell: >

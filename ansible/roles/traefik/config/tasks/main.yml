@@ -49,6 +49,7 @@
     cmd: sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc
   register: fw_rules
   changed_when: false
+  delegate_to: localhost
 
 - name: Copy rules to target
   ansible.builtin.copy:

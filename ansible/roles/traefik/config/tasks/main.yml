@@ -35,6 +35,20 @@
 #    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw
 #    state: absent
 #  delegate_to: localhost
+#
+#- name: Copy rules to target
+#  ansible.builtin.copy:
+#    dest: /etc/pve/firewall/143.fw
+#    owner: root
+#    group: www-data
+#    mode: '0640'
+#    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc') }}"
+
+- name: Decrypt firewall rules
+  ansible.builtin.command:
+    cmd: sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc
+  register: fw_rules
+  changed_when: false
 
 - name: Copy rules to target
   ansible.builtin.copy:
@@ -42,7 +56,7 @@
     owner: root
     group: www-data
     mode: '0640'
-    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc') }}"
+    content: "{{ fw_rules.stdout }}"
 
 - name: Update firewall rules
   shell: >

@@ -15,34 +15,26 @@
 
 #--------------------------Firewall rules----------------------------------
 
-#- name: Decrypt rules on ansible host
-#  ansible.builtin.shell: >
-#    sops -d --input-type binary --output-type binary
-#    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw.enc >
-#    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw
-#  delegate_to: localhost
-#
-#- name: Copy rules to target
-#  ansible.builtin.copy:
-#    src: 126.fw
-#    dest: /etc/pve/firewall/126.fw
-#    owner: root
-#    group: www-data
-#    mode: '0640'
-#
-#- name: Remove decrypted rules from ansible host
-#  ansible.builtin.file:
-#    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw
-#    state: absent
-#  delegate_to: localhost
+- name: Decrypt rules on ansible host
+  ansible.builtin.shell: >
+    sops -d --input-type binary --output-type binary
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw.enc >
+    /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw
+  delegate_to: localhost
 
 - name: Copy rules to target
   ansible.builtin.copy:
+    src: 126.fw
     dest: /etc/pve/firewall/126.fw
     owner: root
     group: www-data
     mode: '0640'
-    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw.enc') }}"
+
+- name: Remove decrypted rules from ansible host
+  ansible.builtin.file:
+    path: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw
+    state: absent
+  delegate_to: localhost
 
 - name: Update firewall rules
   shell: >

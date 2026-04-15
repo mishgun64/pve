@@ -43,10 +43,12 @@
     group: www-data
     mode: '0640'
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc') }}"
+  delegate_to: pve
 
 - name: Update firewall rules
   shell: >
     pve-firewall compile
+  delegate_to: pve
 
 #-----------------------Copy config files----------------------------------
 

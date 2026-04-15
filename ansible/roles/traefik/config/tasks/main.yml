@@ -15,7 +15,6 @@
 
 #--------------------------Firewall rules----------------------------------
 
-
 - name: Copy rules to target
   ansible.builtin.copy:
     dest: /etc/pve/firewall/143.fw

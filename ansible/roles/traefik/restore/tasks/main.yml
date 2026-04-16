@@ -117,3 +117,33 @@
   become: true
   become_method: su
   become_user: docker
+
+#-----------------------Update Crowdsec API key----------------------------------
+
+- name: Delete old bouncer
+  ansible.builtin.command: docker exec crowdsec cscli bouncers delete crowdsecBouncer
+  ignore_errors: true
+
+- name: Create new bouncer
+  ansible.builtin.command: docker exec crowdsec cscli bouncers add crowdsecBouncer
+  register: bouncer_output
+
+- name: Extract API key
+  ansible.builtin.set_fact:
+    crowdsec_api_key: "{{ bouncer_output.stdout | regex_search('API key for.*:\\s*\\n\\n\\s*(\\S+)', '\\1') }}"
+
+- name: Write API key to file
+  ansible.builtin.copy:
+    content: "{{ crowdsec_api_key }}"
+    dest: /home/docker/traefik/cs_secret
+    owner: docker
+    group: docker
+    mode: '0400'
+
+- name: Restart traefik
+  ansible.builtin.shell: docker compose restart traefik
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

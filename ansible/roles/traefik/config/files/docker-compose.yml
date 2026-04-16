@@ -32,18 +32,6 @@ services:
     networks:
       - traefik
 
-  crowdsec-bouncer:
-    image: crowdsecurity/traefik-crowdsec-bouncer:latest
-    container_name: crowdsec-bouncer
-    restart: unless-stopped
-    environment:
-      - CROWDSEC_LAPI_URL=http://crowdsec:8080
-      - CROWDSEC_BOUNCER_API_KEY=CHANGE_ME
-    depends_on:
-      - crowdsec
-    networks:
-      - traefik
-
 networks:
   traefik:
     external: true

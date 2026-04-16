@@ -28,9 +28,8 @@
     backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
 
 - name: Encrypt acme.json
-  ansible.builtin.command:
-    cmd: >
-      sops -e acme.json > acme_{{ backup_time }}.json.enc
+  ansible.builtin.shell: >
+    sops -e acme.json > acme_{{ backup_time }}.json.enc
   args:
     chdir: /home/docker/traefik
 

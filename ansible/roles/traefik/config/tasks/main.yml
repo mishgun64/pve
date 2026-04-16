@@ -21,7 +21,7 @@
     owner: root
     group: www-data
     mode: '0640'
-    content: "{{ lookup('pipe', 'sops -d --output-type binary /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc') }}"
+    content: "{{ lookup('pipe', 'sops -d --output-type binary /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc') | replace('\r\n', '\n') | replace('\r', '\n') }}"
   delegate_to: pve
 
 #-----------------------Copy config files----------------------------------

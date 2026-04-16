@@ -18,7 +18,7 @@
 
 - name: Decrypt latest backup (locally)
   ansible.builtin.command:
-    cmd: sops -d {{ latest_backup }}
+    cmd: sops -d --output-type json {{ latest_backup }}
   register: decrypted
   delegate_to: localhost
   changed_when: false

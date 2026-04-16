@@ -10,7 +10,19 @@
       creation_rules:
         - age:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
-      
+
+- name: Create .sops.yaml on localhost
+  ansible.builtin.copy:
+    dest: /srv/backups/.sops.yaml
+    owner: jenkins
+    group: jenkins
+    mode: '0600'
+    content: |
+      creation_rules:
+        - age:
+            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
+  delegate_to: localhost
+
 - name: Generate timestamp
   ansible.builtin.set_fact:
     backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
@@ -28,3 +40,19 @@
     src: "/home/docker/traefik/acme_{{ backup_time }}.json.enc"
     dest: "/srv/backups/"
     flat: true
+
+- name: Find all backups (local)
+  ansible.builtin.find:
+    paths: /srv/backups/
+    patterns: "acme_*.json.enc"
+    file_type: file
+  register: all_backups
+  delegate_to: localhost
+
+- name: Remove old backups (keep last 5)
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
+  when: all_backups.matched | int > 5
+  delegate_to: localhost

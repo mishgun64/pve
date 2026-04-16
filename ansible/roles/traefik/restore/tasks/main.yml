@@ -140,8 +140,15 @@
     group: docker
     mode: '0400'
 
-- name: Restart traefik
-  ansible.builtin.shell: docker compose restart traefik
+- name: Enroll CrowdSec console
+  ansible.builtin.command: >
+    docker exec crowdsec cscli console enroll
+    {{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/enroll_secret.enc') | trim }}
+  no_log: true
+  ignore_errors: true
+
+- name: Restart containers
+  ansible.builtin.shell: docker compose restart
   args:
     chdir: /home/docker
   become: true

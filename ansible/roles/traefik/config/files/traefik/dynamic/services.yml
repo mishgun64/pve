@@ -7,6 +7,8 @@ http:
       tls:
         certResolver: letsencrypt
       service: emby
+      middlewares:
+        - crowdsec
 
   services:
     emby:

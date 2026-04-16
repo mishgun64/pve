@@ -38,6 +38,30 @@
     group: docker
     mode: '0755'
 
+- name: Create logs directory
+  ansible.builtin.file:
+    path: /home/docker/traefik/logs
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Create crowdsec data directory
+  ansible.builtin.file:
+    path: /home/docker/crowdsec/data
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Copy acquis.yaml
+  copy:
+    src: crowdsec/acquis.yaml
+    dest: /home/docker/crowdsec/acquis.yaml
+    owner: docker
+    group: docker
+    mode: '0644'
+
 - name: Create acme.json
   ansible.builtin.file:
     path: /home/docker/traefik/acme.json

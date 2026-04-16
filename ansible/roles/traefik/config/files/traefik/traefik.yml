@@ -17,6 +17,7 @@ entryPoints:
         entryPoint:
           to: websecure
           scheme: https
+
   websecure:
     address: ":443"
 
@@ -32,3 +33,17 @@ providers:
   file:
     directory: /etc/traefik/dynamic
     watch: true
+
+experimental:
+  plugins:
+    bouncer:
+      moduleName: github.com/crowdsecurity/traefik-crowdsec-bouncer
+      version: v1.3.0
+
+http:
+  middlewares:
+    crowdsec:
+      plugin:
+        bouncer:
+          crowdsecLapiUrl: http://crowdsec:8080
+          apiKey: "API_KEY"

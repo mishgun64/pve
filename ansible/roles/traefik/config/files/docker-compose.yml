@@ -3,10 +3,6 @@ services:
     image: traefik:latest
     container_name: traefik
     restart: unless-stopped
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Moscow
     ports:
       - "80:80"
       - "443:443"
@@ -14,3 +10,42 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
       - ./traefik/acme.json:/etc/traefik/acme.json
+      - ./traefik/logs:/var/log/traefik
+    command:
+      - --accesslog=true
+      - --accesslog.format=json
+      - --accesslog.filepath=/var/log/traefik/access.log
+    networks:
+      - traefik
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      - COLLECTIONS=crowdsecurity/traefik
+    volumes:
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./traefik/logs:/var/log/traefik:ro
+      - ./crowdsec/data:/var/lib/crowdsec/data
+    networks:
+      - traefik
+
+  crowdsec-bouncer:
+    image: crowdsecurity/cs-traefik-bouncer:latest
+    container_name: crowdsec-bouncer
+    restart: unless-stopped
+    environment:
+      - CROWDSEC_LAPI_URL=http://crowdsec:8080
+      - CROWDSEC_BOUNCER_API_KEY=CHANGE_ME
+    depends_on:
+      - crowdsec
+    networks:
+      - traefik
+
+volumes:
+  crowdsec-db:
+
+networks:
+  traefik:
+    external: true

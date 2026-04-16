@@ -33,7 +33,7 @@ services:
       - traefik
 
   crowdsec-bouncer:
-    image: crowdsecurity/cs-traefik-bouncer:latest
+    image: crowdsecurity/traefik-crowdsec-bouncer:latest
     container_name: crowdsec-bouncer
     restart: unless-stopped
     environment:

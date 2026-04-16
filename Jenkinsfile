@@ -204,18 +204,50 @@ pipeline {
             }
         }
 
-        stage('traefik') {
+        stage('traefik-config') {
             when {
-                expression { env.EVENT == 'traefik' }
+                expression { env.EVENT == 'traefik-config' }
             }
             steps {
                 script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik"
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik config"
                 }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
                     ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_config.yml
+                '''
+            }
+        }
+
+        stage('traefik-backup') {
+            when {
+                expression { env.EVENT == 'traefik-backup' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik backup"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_backup.yml
+                '''
+            }
+        }
+
+        stage('traefik-restore') {
+            when {
+                expression { env.EVENT == 'traefik-restore' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik restore"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_restore.yml
                 '''
             }
         }

@@ -129,6 +129,11 @@
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc') }}"
   delegate_to: pve
 
+- name: Convert to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/cluster.fw
+  delegate_to: pve
+
 #-----------------------Change root password----------------------------------
 
 - name: Change root password

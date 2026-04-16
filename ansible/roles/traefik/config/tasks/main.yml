@@ -21,9 +21,13 @@
     owner: root
     group: www-data
     mode: '0640'
-    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc') | string | regex_replace('\r\n', '\n') }}"
+    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/143.fw.enc')}}"
   delegate_to: pve
 
+- name: Convert to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/143.fw
+  delegate_to: pve
 #-----------------------Copy config files----------------------------------
 
 - name: Copy traefik directory

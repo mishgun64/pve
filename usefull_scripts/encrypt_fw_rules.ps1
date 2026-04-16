@@ -13,9 +13,6 @@ foreach ($file in $files) {
 
     $encFile = "$file.enc"
     Write-Host "Encrypting: $file -> $encFile"
-
-    # Используем --output вместо перенаправления потоков PowerShell
-    # Это заставит sops сам записывать файл, минуя обработку текста в PS
     & sops -e --output $encFile $file
 
     if ($LASTEXITCODE -ne 0) {

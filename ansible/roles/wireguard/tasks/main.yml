@@ -24,6 +24,10 @@
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw.enc') }}"
   delegate_to: pve
 
+- name: Convert to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/126.fw
+  delegate_to: pve
 #--------------------------Copy wg config files----------------------------------
 
 - name: Create wireguard_config directory

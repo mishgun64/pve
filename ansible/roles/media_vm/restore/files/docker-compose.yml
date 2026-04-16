@@ -7,6 +7,8 @@ x-common-keys: &common-keys
       PGID: 1000
       UMASK: 002
       TZ: Europe/Moscow
+    security_opt:
+      - no-new-privileges:true
 
 services:
   prowlarr:
@@ -121,6 +123,8 @@ services:
       -u "user;1234"
       -s "media;/media;yes;no;yes;all;none" 
       -s "config;/config;yes;no;yes"
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   default:

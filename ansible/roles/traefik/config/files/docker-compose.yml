@@ -26,6 +26,7 @@ services:
       - COLLECTIONS=crowdsecurity/traefik
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./crowdsec:/etc/crowdsec/
       - ./traefik/logs:/var/log/traefik:ro
       - ./crowdsec/data:/var/lib/crowdsec/data
     networks:
@@ -42,9 +43,6 @@ services:
       - crowdsec
     networks:
       - traefik
-
-volumes:
-  crowdsec-db:
 
 networks:
   traefik:

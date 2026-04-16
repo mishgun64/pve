@@ -6,24 +6,25 @@ $files = @(
 )
 
 foreach ($file in $files) {
-
     if (!(Test-Path $file)) {
         Write-Warning "File not found: $file"
         continue
     }
 
     $encFile = "$file.enc"
-
     Write-Host "Encrypting: $file -> $encFile"
 
-    $output = sops -e $file
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "sops failed for $file"
-        continue
-    }
+    # Запускаем sops напрямую, stdout пишем в файл — без захвата PowerShell
+    $process = Start-Process -FilePath "sops" `
+        -ArgumentList "-e", $file `
+        -NoNewWindow `
+        -Wait `
+        -RedirectStandardOutput $encFile `
+        -PassThru
 
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($encFile, $output, $utf8NoBom)
+    if ($process.ExitCode -ne 0) {
+        Write-Error "sops failed for $file"
+    }
 }
 
 Write-Host "Done"

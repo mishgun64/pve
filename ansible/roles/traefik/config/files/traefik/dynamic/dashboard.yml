@@ -9,7 +9,7 @@ http:
       service: api@internal
       middlewares:
         - auth
-        - crowdsec
+        - crowdsec@file
 
   middlewares:
     auth:

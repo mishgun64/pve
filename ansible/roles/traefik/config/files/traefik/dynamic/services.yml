@@ -8,7 +8,7 @@ http:
         certResolver: letsencrypt
       service: emby
       middlewares:
-        - crowdsec
+        - crowdsec@file
 
   services:
     emby:

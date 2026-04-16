@@ -63,3 +63,52 @@
   delegate_to: localhost
 
 #------------------------------------------Crowdsec backup------------------------------------------
+
+- name: Define paths
+  set_fact:
+    remote_archive: "/home/docker/crowdsec_{{ backup_time }}.tar.gz"
+    remote_encrypted: "/home/docker/crowdsec_{{ backup_time }}.tar.gz.enc"
+
+- name: Create .sops.yaml
+  ansible.builtin.copy:
+    dest: /home/docker/.sops.yaml
+    owner: root
+    group: root
+    mode: '0600'
+    content: |
+      creation_rules:
+        - age:
+            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
+
+- name: Create archive of CrowdSec directory
+  ansible.builtin.archive:
+    path: /home/docker/crowdsec
+    dest: "{{ remote_archive }}"
+    format: gz
+
+- name: Encrypt archive with SOPS
+  ansible.builtin.shell: >
+    sops -e {{ remote_archive }} > {{ remote_encrypted }}
+  args:
+    chdir: /home/docker
+
+- name: Fetch encrypted backup to local machine
+  ansible.builtin.fetch:
+    src: "{{ remote_encrypted }}"
+    dest: /srv/backups/
+    flat: true
+
+- name: Remove remote unencrypted archive
+  ansible.builtin.file:
+    path: "{{ remote_archive }}"
+    state: absent
+
+- name: Remove remote encrypted archive
+  ansible.builtin.file:
+    path: "{{ remote_encrypted }}"
+    state: absent
+
+- name: Keep only last 5 CrowdSec backups (local)
+  delegate_to: localhost
+  ansible.builtin.shell: |
+    ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | tail -n +6 | xargs -r rm -f

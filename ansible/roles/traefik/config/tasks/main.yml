@@ -54,6 +54,14 @@
     group: docker
     mode: '0755'
 
+- name: Create crowdsec config directory
+  ansible.builtin.file:
+    path: /home/docker/crowdsec/config
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
 - name: Copy acquis.yaml
   copy:
     src: crowdsec/acquis.yaml

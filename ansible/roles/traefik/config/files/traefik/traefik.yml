@@ -6,9 +6,6 @@ api:
   dashboard: true
   insecure: false
 
-log:
-  level: INFO
-
 entryPoints:
   web:
     address: ":80"

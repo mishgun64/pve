@@ -15,10 +15,6 @@ services:
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
       - ./traefik/acme.json:/etc/traefik/acme.json
       - ./traefik/logs:/var/log/traefik
-    command:
-      - --accesslog=true
-      - --accesslog.format=json
-      - --accesslog.filepath=/var/log/traefik/access.log
     networks:
       - traefik
 
@@ -33,7 +29,7 @@ services:
       COLLECTIONS: crowdsecurity/traefik
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - ./crowdsec:/etc/crowdsec/
+      - ./crowdsec/config:/etc/crowdsec/
       - ./traefik/logs:/var/log/traefik:ro
       - ./crowdsec/data:/var/lib/crowdsec/data
     networks:

@@ -1,5 +1,12 @@
 ---
 
+#--------------------------Stop container----------------------------------
+
+- name: Stop docker compose
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+
 #--------------------------Find and copy latest acme backup----------------------------------
 
 - name: Find latest backup
@@ -32,6 +39,65 @@
     group: docker
     mode: '0600'
   when: backup_files.matched | int > 0
+
+#--------------------------Find and copy latest crowdsec backup----------------------------------
+
+- name: Find latest CrowdSec backup (local)
+  delegate_to: localhost
+  run_once: true
+  ansible.builtin.shell: |
+    ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | head -n 1 || true
+  register: latest_backup
+
+- name: Set fact - backup exists
+  set_fact:
+    backup_exists: "{{ latest_backup.stdout | length > 0 }}"
+
+- name: Skip restore if no backup found
+  debug:
+    msg: "No CrowdSec backups found on local host. Skipping restore."
+  when: not backup_exists
+
+- name: Copy backup to remote host
+  ansible.builtin.copy:
+    src: "{{ latest_backup.stdout }}"
+    dest: "/home/docker/"
+    owner: docker
+    group: docker
+    mode: '0644'
+  when: backup_exists
+
+- name: Set remote file names
+  set_fact:
+    remote_enc: "/home/docker/{{ latest_backup.stdout | basename }}"
+    remote_tar: "/home/docker/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists
+
+- name: Decrypt backup on remote host
+  ansible.builtin.shell: >
+    sops -d {{ remote_enc }} > {{ remote_tar }}
+  when: backup_exists
+
+- name: Extract CrowdSec backup
+  ansible.builtin.unarchive:
+    src: "{{ remote_tar }}"
+    dest: /home/docker/
+    owner: docker
+    group: docker
+    remote_src: true
+  when: backup_exists
+
+- name: Remove encrypted backup on remote
+  ansible.builtin.file:
+    path: "{{ remote_enc }}"
+    state: absent
+  when: backup_exists
+
+- name: Remove decrypted tar on remote
+  ansible.builtin.file:
+    path: "{{ remote_tar }}"
+    state: absent
+  when: backup_exists
 
 #--------------------------Run container----------------------------------
 

@@ -10,8 +10,6 @@ entryPoints:
   web:
     address: ":80"
     http:
-      middlewares:
-        - crowdsec@file
       redirections:
         entryPoint:
           to: websecure
@@ -19,9 +17,6 @@ entryPoints:
 
   websecure:
     address: ":443"
-    http:
-      middlewares:
-        - crowdsec@file
 
 certificatesResolvers:
   letsencrypt:

@@ -41,6 +41,11 @@
     dest: "/srv/backups/"
     flat: true
 
+- name: Remove remote encrypted file
+  ansible.builtin.file:
+    path: "/home/docker/traefik/acme_{{ backup_time }}.json.enc"
+    state: absent
+
 - name: Find all backups (local)
   ansible.builtin.find:
     paths: /srv/backups/

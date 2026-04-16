@@ -1,0 +1,53 @@
+---
+
+#--------------------------Find and copy latest acme backup----------------------------------
+
+- name: Find latest backup
+  ansible.builtin.find:
+    paths: /srv/backups/
+    patterns: "acme_*.json.enc"
+    file_type: file
+  register: backup_files
+  delegate_to: localhost
+
+- name: Select newest backup
+  ansible.builtin.set_fact:
+    latest_backup: "{{ (backup_files.files | sort(attribute='mtime'))[-1].path }}"
+  when: backup_files.matched | int > 0
+  delegate_to: localhost
+
+- name: Decrypt latest backup (locally)
+  ansible.builtin.command:
+    cmd: sops -d {{ latest_backup }}
+  register: decrypted
+  delegate_to: localhost
+  changed_when: false
+  when: backup_files.matched | int > 0
+
+- name: Restore acme.json
+  ansible.builtin.copy:
+    dest: /home/docker/traefik/acme.json
+    content: "{{ decrypted.stdout }}"
+    owner: docker
+    group: docker
+    mode: '0600'
+  when: backup_files.matched | int > 0
+
+#--------------------------Run container----------------------------------
+
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

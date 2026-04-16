@@ -1,0 +1,30 @@
+---
+
+- name: Create .sops.yaml
+  ansible.builtin.copy:
+    dest: /home/docker/traefik/.sops.yaml
+    owner: root
+    group: root
+    mode: '0600'
+    content: |
+      creation_rules:
+        - age:
+            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
+      
+- name: Generate timestamp
+  ansible.builtin.set_fact:
+    backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
+
+- name: Encrypt acme.json
+  ansible.builtin.command:
+    cmd: >
+      sops -e /home/docker/traefik/acme.json
+      > /home/docker/traefik/acme_{{ backup_time }}.json.enc
+  args:
+    executable: /bin/bash
+
+- name: Fetch encrypted file
+  ansible.builtin.fetch:
+    src: "/home/docker/traefik/acme_{{ backup_time }}.json.enc"
+    dest: "/srv/backups/"
+    flat: true

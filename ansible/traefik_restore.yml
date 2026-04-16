@@ -1,11 +1,8 @@
 ---
 
-- name: Traefik LXC config
+- name: Traefik LXC restore
   hosts: traefik_lxc
   remote_user: root
   gather_facts: true
   roles:
-    - common/basic
-    - common/docker
-    - traefik/config
     - traefik/restore

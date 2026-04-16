@@ -54,22 +54,3 @@
     owner: docker
     group: docker
     mode: '0644'
-
-#--------------------------Run container----------------------------------
-
-- name: Pull docker compose
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-  timeout: 600
-
-- name: Start docker compose
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker

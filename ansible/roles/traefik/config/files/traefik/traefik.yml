@@ -37,8 +37,8 @@ providers:
 experimental:
   plugins:
     bouncer:
-      moduleName: github.com/crowdsecurity/traefik-crowdsec-bouncer
-      version: v1.3.0
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.5.1
 
 http:
   middlewares:

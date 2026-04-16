@@ -14,15 +14,11 @@ foreach ($file in $files) {
     $encFile = "$file.enc"
     Write-Host "Encrypting: $file -> $encFile"
 
-    # Запускаем sops напрямую, stdout пишем в файл — без захвата PowerShell
-    $process = Start-Process -FilePath "sops" `
-        -ArgumentList "-e", $file `
-        -NoNewWindow `
-        -Wait `
-        -RedirectStandardOutput $encFile `
-        -PassThru
+    # Используем --output вместо перенаправления потоков PowerShell
+    # Это заставит sops сам записывать файл, минуя обработку текста в PS
+    & sops -e --output $encFile $file
 
-    if ($process.ExitCode -ne 0) {
+    if ($LASTEXITCODE -ne 0) {
         Write-Error "sops failed for $file"
     }
 }

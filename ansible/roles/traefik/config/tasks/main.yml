@@ -77,3 +77,12 @@
     owner: docker
     group: docker
     mode: '0644'
+
+#-----------------------Autoupdate Crowdsec hub----------------------------------
+
+- name: Update and upgrade CrowdSec hub daily
+  ansible.builtin.cron:
+    name: "Crowdsec hub update/upgrade"
+    minute: "0"
+    hour: "3"
+    job: "docker exec crowdsec cscli hub update && docker exec crowdsec cscli hub upgrade"

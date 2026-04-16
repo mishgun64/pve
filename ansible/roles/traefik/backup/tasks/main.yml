@@ -1,5 +1,7 @@
 ---
 
+#------------------------------------------Traefik backup------------------------------------------
+
 - name: Create .sops.yaml
   ansible.builtin.copy:
     dest: /home/docker/traefik/.sops.yaml
@@ -59,3 +61,5 @@
   loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
   when: all_backups.matched | int > 5
   delegate_to: localhost
+
+#------------------------------------------Crowdsec backup------------------------------------------

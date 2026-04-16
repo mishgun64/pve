@@ -1,0 +1,12 @@
+http:
+  middlewares:
+    crowdsec:
+      plugin:
+        crowdsec-bouncer-traefik-plugin:
+          enabled: true
+          logLevel: INFO
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiKey: "API_KEY"
+          crowdsecLapiScheme: http
+          clientTrustedIPs: # List of client IPs to trust, they will bypass any check from the bouncer or cache (useful for LAN or VPN IP)
+            - 192.168.2.0/24

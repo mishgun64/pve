@@ -13,6 +13,8 @@ entryPoints:
   web:
     address: ":80"
     http:
+      middlewares:
+        - crowdsec@file
       redirections:
         entryPoint:
           to: websecure
@@ -20,6 +22,9 @@ entryPoints:
 
   websecure:
     address: ":443"
+    http:
+      middlewares:
+        - crowdsec@file
 
 certificatesResolvers:
   letsencrypt:
@@ -34,16 +39,14 @@ providers:
     directory: /etc/traefik/dynamic
     watch: true
 
+log:
+  level: "DEBUG"
+  filePath: "/var/log/traefik/traefik.log"
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+
 experimental:
   plugins:
     bouncer:
       moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
       version: v1.5.1
-
-http:
-  middlewares:
-    crowdsec:
-      plugin:
-        bouncer:
-          crowdsecLapiUrl: http://crowdsec:8080
-          apiKey: "API_KEY"

@@ -3,6 +3,10 @@ services:
     image: traefik:latest
     container_name: traefik
     restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
     ports:
       - "80:80"
       - "443:443"
@@ -23,7 +27,10 @@ services:
     container_name: crowdsec
     restart: unless-stopped
     environment:
-      - COLLECTIONS=crowdsecurity/traefik
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
+      COLLECTIONS: crowdsecurity/traefik
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - ./crowdsec:/etc/crowdsec/

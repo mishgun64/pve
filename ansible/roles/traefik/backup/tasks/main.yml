@@ -30,9 +30,9 @@
 - name: Encrypt acme.json
   ansible.builtin.command:
     cmd: >
-      sops -e /home/docker/traefik/acme.json
-      > /home/docker/traefik/acme_{{ backup_time }}.json.enc
+      sops -e acme.json > acme_{{ backup_time }}.json.enc
   args:
+    chdir: /home/docker/traefik
     executable: /bin/bash
 
 - name: Fetch encrypted file

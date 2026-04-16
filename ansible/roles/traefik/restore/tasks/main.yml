@@ -128,9 +128,13 @@
   ansible.builtin.command: docker exec crowdsec cscli bouncers add crowdsecBouncer
   register: bouncer_output
 
-- name: Extract API key
+- name: Extract API key (robust)
   ansible.builtin.set_fact:
-    crowdsec_api_key: "{{ bouncer_output.stdout | regex_search('API key for.*:\\s*\\n\\n\\s*(\\S+)', '\\1') }}"
+    crowdsec_api_key: >-
+      {{ bouncer_output.stdout_lines
+      | select('match', '^[A-Za-z0-9+/=]+$')
+      | list
+      | first }}
 
 - name: Write API key to file
   ansible.builtin.copy:

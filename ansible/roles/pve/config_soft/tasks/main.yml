@@ -129,11 +129,6 @@
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc') }}"
   delegate_to: pve
 
-- name: Update firewall rules
-  shell: >
-    pve-firewall compile
-  delegate_to: pve
-
 #-----------------------Change root password----------------------------------
 
 - name: Change root password

@@ -29,7 +29,7 @@
 
 - name: Encrypt acme.json
   ansible.builtin.shell: >
-    sops -e  acme.json > --input-type json acme_{{ backup_time }}.json.enc
+    sops -e --input-type json acme.json > acme_{{ backup_time }}.json.enc
   args:
     chdir: /home/docker/traefik
 

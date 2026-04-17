@@ -11,7 +11,10 @@ iface vmbr0 inet static
         bridge-stp off
         bridge-fd 0
         post-up echo 1 > /proc/sys/net/ipv6/conf/vmbr0/disable_ipv6
-
+        post-up ip route add 192.168.2.0/24 dev vmbr0 src 192.168.2.2 table 100
+        post-up ip route add default via 192.168.2.1 table 100
+        post-up ip rule add from 192.168.2.0/24 table 100 priority 100
+        pre-down ip rule del from 192.168.2.0/24 table 100 priority 100
 iface enp7s0 inet manual
 
 auto vmbr1

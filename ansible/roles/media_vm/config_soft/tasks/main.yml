@@ -177,15 +177,15 @@
     path: /home/docker/init_config
     state: absent
 
-#-----------------------Install Vuetorrent----------------------------------
+- name: Copy docker-compose file
+  ansible.builtin.copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: docker
+    group: docker
+    mode: "0644"
 
-#- name: Create VueTorrent directory
-#  file:
-#    path: /home/docker/vuetorrent
-#    state: directory
-#    owner: docker
-#    group: docker
-#    mode: '0755'
+#-----------------------Install Vuetorrent----------------------------------
 
 - name: Clone VueTorrent repository
   git:
@@ -220,7 +220,7 @@
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
   delegate_to: pve
 
-- name: Convert to ASCII
+- name: Convert rules to ASCII
   ansible.builtin.shell: >
     sed -i 's/\r//' /etc/pve/firewall/124.fw
   delegate_to: pve

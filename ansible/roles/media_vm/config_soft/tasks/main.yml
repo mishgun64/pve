@@ -233,10 +233,10 @@
 #    unsafe_writes: true
 #  delegate_to: pve
 #
-#- name: Convert rules to ASCII
-#  ansible.builtin.shell: >
-#    sed -i 's/\r//' /etc/pve/firewall/124.fw
-#  delegate_to: pve
+- name: Convert rules to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/124.fw
+  delegate_to: pve
 
 #-----------------------Change root password----------------------------------
 

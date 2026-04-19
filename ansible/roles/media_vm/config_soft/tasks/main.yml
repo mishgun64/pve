@@ -217,12 +217,9 @@
   delegate_to: localhost
 
 - name: Write to pmxcfs
-  ansible.builtin.shell: >
-    cat > /etc/pve/firewall/124.fw << 'EOF'
-    {{ fw_content }}
-    EOF
+  ansible.builtin.shell: cat > /etc/pve/firewall/124.fw
   args:
-    executable: /bin/bash
+    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
   become: true
   delegate_to: pve
 

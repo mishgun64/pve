@@ -22,6 +22,7 @@
     group: www-data
     mode: '0640'
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/wireguard/files/126.fw.enc') }}"
+    unsafe_writes: true
   delegate_to: pve
 
 - name: Convert to ASCII

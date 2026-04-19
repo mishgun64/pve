@@ -218,6 +218,7 @@
     group: www-data
     mode: '0640'
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
+    unsafe_writes: true
   delegate_to: pve
 
 - name: Convert rules to ASCII

@@ -127,6 +127,7 @@
     group: www-data
     mode: '0640'
     content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc') }}"
+    unsafe_writes: true
   delegate_to: pve
 
 - name: Convert to ASCII

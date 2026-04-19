@@ -202,10 +202,9 @@ resource "proxmox_virtual_environment_container" "traefik" {
 
 resource "terraform_data" "media_vm_trigger" {
   depends_on = [proxmox_virtual_environment_vm.media_vm]
-
-  triggers_replace = {
-    vm_id = proxmox_virtual_environment_vm.media_vm.vm_id
-  }
+    lifecycle {
+      replace_triggered_by = [proxmox_virtual_environment_vm.media_vm]
+    }
 
   provisioner "local-exec" {
     command = <<EOT

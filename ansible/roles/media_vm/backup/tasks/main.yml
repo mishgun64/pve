@@ -211,3 +211,12 @@
         | cut -d' ' -f2- \
         | xargs -r rm -f
     done
+
+#-----------------------Run docker compose stack----------------------------------
+
+- name: Run docker compose stack
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker

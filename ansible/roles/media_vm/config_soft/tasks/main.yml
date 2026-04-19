@@ -211,20 +211,35 @@
 
 #--------------------------Firewall rules----------------------------------
 
-- name: Copy rules to target
-  ansible.builtin.copy:
-    dest: /etc/pve/firewall/124.fw
+- name: Decrypt locally
+  ansible.builtin.set_fact:
+    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
+  delegate_to: localhost
+
+- name: Write to pmxcfs
+  ansible.builtin.shell: >
+    cat > /etc/pve/firewall/124.fw << 'EOF'
+    {{ fw_content }}
+    EOF
+  args:
+    executable: /bin/bash
+  become: true
+  delegate_to: pve
+
+#- name: Copy rules to target
+#  ansible.builtin.copy:
+#    dest: /etc/pve/firewall/124.fw
 #    owner: root
 #    group: www-data
 #    mode: '0640'
-    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
-    unsafe_writes: true
-  delegate_to: pve
-
-- name: Convert rules to ASCII
-  ansible.builtin.shell: >
-    sed -i 's/\r//' /etc/pve/firewall/124.fw
-  delegate_to: pve
+#    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
+#    unsafe_writes: true
+#  delegate_to: pve
+#
+#- name: Convert rules to ASCII
+#  ansible.builtin.shell: >
+#    sed -i 's/\r//' /etc/pve/firewall/124.fw
+#  delegate_to: pve
 
 #-----------------------Change root password----------------------------------
 

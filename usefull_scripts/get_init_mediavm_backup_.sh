@@ -96,6 +96,10 @@ create_archive "emby" \
   ./emby_config/config \
   ./emby_config/data
 
+create_archive "jellyfin" \
+  ./jellyfin_config/*.xml \
+  ./jellyfin_config/data
+
 # 4. Шифрование всех архивов
 for file in "$BASE_DIR"/*.tar.gz; do
   SOPS_CONFIG=./init_config/.sops.yaml sops -e "$file" > "$file.enc"

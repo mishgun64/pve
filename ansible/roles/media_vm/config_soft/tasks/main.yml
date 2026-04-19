@@ -87,6 +87,7 @@
     SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
   loop:
     - { src: "{{ init_dir_jenkins }}/emby_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/emby_init_config.tar.gz" }
+    - { src: "{{ init_dir_jenkins }}/jellyfin_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/jellyfin_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz" }
     - { src: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz" }
@@ -117,6 +118,7 @@
     dest: /home/docker/init_config/
   loop:
     - init_config/emby_init_config.tar.gz
+    - init_config/jellyfin_init_config.tar.gz
     - init_config/prowlarr_init_config.tar.gz
     - init_config/radarr_init_config.tar.gz
     - init_config/seerr_init_config.tar.gz
@@ -131,6 +133,7 @@
     state: absent
   loop:
     - "{{ init_dir_jenkins }}/emby_init_config.tar.gz"
+    - "{{ init_dir_jenkins }}/jellyfin_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/radarr_init_config.tar.gz"
     - "{{ init_dir_jenkins }}/seerr_init_config.tar.gz"
@@ -147,6 +150,7 @@
     remote_src: yes
   loop:
     - /home/docker/init_config/emby_init_config.tar.gz
+    - /home/docker/init_config/jellyfin_init_config.tar.gz
     - /home/docker/init_config/prowlarr_init_config.tar.gz
     - /home/docker/init_config/radarr_init_config.tar.gz
     - /home/docker/init_config/seerr_init_config.tar.gz
@@ -215,6 +219,7 @@
   ansible.builtin.set_fact:
     fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
   delegate_to: localhost
+  no_log: true
 
 - name: Write to pmxcfs
   ansible.builtin.shell: cat > /etc/pve/firewall/124.fw
@@ -222,6 +227,7 @@
     stdin: "{{ fw_content | replace('\r\n', '\n') }}"
   become: true
   delegate_to: pve
+  no_log: true
 
 #- name: Copy rules to target
 #  ansible.builtin.copy:

@@ -120,15 +120,29 @@
 
 #--------------------------Firewall rules----------------------------------
 
-- name: Copy rules to target
-  ansible.builtin.copy:
-    dest: /etc/pve/firewall/cluster.fw
+- name: Decrypt locally
+  ansible.builtin.set_fact:
+    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc') }}"
+  delegate_to: localhost
+  no_log: true
+
+- name: Write to pmxcfs
+  ansible.builtin.shell: cat > /etc/pve/firewall/cluster.fw
+  args:
+    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
+  become: true
+  delegate_to: pve
+  no_log: true
+
+#- name: Copy rules to target
+#  ansible.builtin.copy:
+#    dest: /etc/pve/firewall/cluster.fw
 #    owner: root
 #    group: www-data
 #    mode: '0640'
-    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc') }}"
-    unsafe_writes: true
-  delegate_to: pve
+#    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/pve/config_soft/files/cluster.fw.enc') }}"
+#    unsafe_writes: true
+#  delegate_to: pve
 
 - name: Convert to ASCII
   ansible.builtin.shell: >

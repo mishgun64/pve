@@ -1,5 +1,7 @@
 ---
 
+#-----------------------Find latest backups on control node----------------------------------
+
 - name: Ensure backup dir exists on target
   file:
     path: /home/docker/backups
@@ -25,6 +27,8 @@
   loop: "{{ backup_files.files | sort(attribute='mtime', reverse=True) }}"
   when: latest_backups is not defined or latest_backups[svc] is not defined
 
+#-----------------------Delivery latest backups to target----------------------------------
+
 - name: Copy latest backups to target
   copy:
     src: "{{ item.value.path }}"
@@ -49,6 +53,7 @@
       emby: /home/docker/emby_config/
       jellyfin: /home/docker/jellyfin_config/
       seerr: /home/docker/seerr_config/
+      qbittorrent: /home/docker/qbittorrent_config/data
 
 - name: Unarchive backups
   unarchive:
@@ -79,6 +84,8 @@
     owner: docker
     group: docker
     recurse: true
+
+#-----------------------Run docker compose stack----------------------------------
 
 - name: Pull docker compose stack
   ansible.builtin.shell: docker compose pull

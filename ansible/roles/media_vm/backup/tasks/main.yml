@@ -59,7 +59,15 @@
       name: Backup
     status_code: [200, 201]
 
+
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
+
+- name: Stop docker compose stack
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
 
 - name: Create backups directory
   become: true
@@ -154,6 +162,16 @@
   loop: "{{ found_zips.files }}"
   args:
     removes: "{{ item.path }}"
+
+#-----------------------Get backups from qbittorrent----------------------------------
+
+- name: Backup qbittorrent
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/qbittorrent_config/data/BT_backup
+    dest: "/home/docker/backups/qbittorrent_backup_{{ backup_ts }}.zip"
+    format: zip
 
 #-----------------------Move backups to control node----------------------------------
 

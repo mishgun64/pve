@@ -220,10 +220,9 @@ resource "terraform_data" "media_vm_trigger" {
 
 resource "terraform_data" "wireguard_trigger" {
   depends_on = [proxmox_virtual_environment_container.wireguard]
-
-  triggers_replace = {
-    vm_id = proxmox_virtual_environment_container.wireguard.vm_id
-  }
+    lifecycle {
+      replace_triggered_by = [proxmox_virtual_environment_container.wireguard]
+    }
 
   provisioner "local-exec" {
     command = <<EOT
@@ -239,10 +238,9 @@ resource "terraform_data" "wireguard_trigger" {
 
 resource "terraform_data" "traefik_trigger" {
   depends_on = [proxmox_virtual_environment_container.traefik]
-
-  triggers_replace = {
-    vm_id = proxmox_virtual_environment_container.traefik.vm_id
-  }
+    lifecycle {
+      replace_triggered_by = [proxmox_virtual_environment_container.traefik]
+    }
 
   provisioner "local-exec" {
     command = <<EOT

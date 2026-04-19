@@ -42,6 +42,14 @@
   become: true
   become_user: docker
 
+- name: Create qbittorent dir
+  ansible.builtin.file:
+    path: /home/docker/qbittorrent_config/data
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
 - name: Define service directories
   set_fact:
     service_dirs:

@@ -7,5 +7,5 @@
   roles:
     - common/basic
     - common/docker
-    - traefik/config
+    - prosody/config
 #    - traefik/restore

@@ -5,6 +5,7 @@ modules_enabled = {
     "saslauth";
     "tls";
     "disco";
+    "admin_shell";
 
     -- Presence / client sync
     "carbons";
@@ -42,3 +43,5 @@ http_upload_file_size_limit = 50 * 1024 * 1024
 
 -- Traefik делает TLS
 c2s_require_encryption = false
+
+legacy_ssl_ports = { 5223 }

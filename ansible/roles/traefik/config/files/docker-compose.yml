@@ -21,8 +21,7 @@ services:
     security_opt:
       - no-new-privileges:true
     depends_on:
-      crowdsec:
-        condition: service_started
+      - crowdsec
 
   crowdsec:
     image: crowdsecurity/crowdsec:latest

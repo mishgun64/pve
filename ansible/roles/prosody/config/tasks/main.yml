@@ -59,6 +59,14 @@
     group: docker
     mode: '0755'
 
+- name: Create certs directory
+  ansible.builtin.file:
+    path: /home/docker/config/certs
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
 - name: Copy prosody.cfg.lua
   copy:
     src: prosody.cfg.lua

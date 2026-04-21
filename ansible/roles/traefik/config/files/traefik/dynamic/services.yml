@@ -18,6 +18,17 @@ http:
       middlewares:
         - crowdsec@file
 
+  services:
+    emby:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.4:8097"
+
+    upload-service:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.4.4:5280"
+
 tcp:
   routers:
     xmpp:
@@ -29,10 +40,6 @@ tcp:
         passthrough: true
 
   services:
-    emby:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.2.4:8097"
     xmpp-service:
       loadBalancer:
         servers:

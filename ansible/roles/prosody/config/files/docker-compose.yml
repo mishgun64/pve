@@ -1,6 +1,6 @@
 services:
   prosody:
-    image: prosody/prosody:latest
+    image: prosodyim/prosody:13.0
     container_name: prosody
     restart: unless-stopped
     ports:

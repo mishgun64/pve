@@ -1,4 +1,4 @@
-admins = { "admin@xmpp.mishgun.com" }
+admins = { "admin@mishgun.com" }
 
 modules_enabled = {
     "roster";
@@ -9,10 +9,6 @@ modules_enabled = {
     -- Presence / client sync
     "carbons";
     "smacks";
-
-    -- MUC (группы)
-    "muc";
-    "muc_mam";
 
     -- Message archive
     "mam";
@@ -32,16 +28,17 @@ modules_enabled = {
 
 allow_registration = false
 
--- File upload лимиты
-http_upload_file_size_limit = 50 * 1024 * 1024
+VirtualHost "mishgun.com"
 
--- MUC настройки
+-- MUC (группы)
 Component "conference.mishgun.com" "muc"
   name = "Chat Rooms"
   modules_enabled = { "muc_mam" }
 
--- Upload endpoint
+-- Upload
 Component "upload.mishgun.com" "http_upload"
 
--- TLS (Traefik завершает TLS, но Prosody всё равно нужен)
+http_upload_file_size_limit = 50 * 1024 * 1024
+
+-- Traefik делает TLS
 c2s_require_encryption = false

@@ -2,17 +2,16 @@ http:
   routers:
     emby:
       rule: "Host(`emby.mishgun.com`)"
-      entryPoints:
-        - websecure
+      entryPoints: websecure
       tls:
         certResolver: letsencrypt
       service: emby
       middlewares:
         - crowdsec@file
+
     upload:
       rule: "Host(`upload.mishgun.com`)"
-      entryPoints:
-        - websecure
+      entryPoints: websecure
       tls:
         certResolver: letsencrypt
       service: upload-service
@@ -24,12 +23,10 @@ tcp:
     xmpp:
       entryPoints:
         - xmpp
-      rule: "HostSNI(`xmpp.mishgun.com`)"
+      rule: "HostSNI(`*`)"
       service: xmpp-service
       tls:
         passthrough: true
-      middlewares:
-        - crowdsec@file
 
   services:
     emby:

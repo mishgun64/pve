@@ -229,42 +229,41 @@ resource "proxmox_virtual_environment_container" "prosody" {
     }
   }
 
-    operating_system {
-      template_file_id = var.lxc_ostemplate
-      type             = "debian"
-    }
+  operating_system {
+    template_file_id = var.lxc_ostemplate
+    type             = "debian"
+  }
 
-    cpu {
-      cores = 1
-    }
+  cpu {
+    cores = 1
+  }
 
-    memory {
-      dedicated = 1024
-      swap      = 0
-    }
+  memory {
+    dedicated = 1024
+    swap      = 0
+  }
 
-    disk {
-      datastore_id = "local-lvm"
-      size         = 7
-    }
+  disk {
+    datastore_id = "local-lvm"
+    size         = 7
+  }
 
-    network_interface {
-      name        = "eth0"
-      bridge      = "vmbr1"
-      mac_address = "BC:24:11:DB:27:42"
-      firewall    = true
-    }
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr1"
+    mac_address = "BC:24:11:DB:27:42"
+    firewall    = true
+  }
 
-    network_interface {
-      name        = "eth1"
-      bridge      = "vmbr0"
-      mac_address = "BC:24:11:DB:27:43"
-      firewall    = true
-    }
+  network_interface {
+    name        = "eth1"
+    bridge      = "vmbr0"
+    mac_address = "BC:24:11:DB:27:43"
+    firewall    = true
+  }
 
-    features {
-      nesting = true
-    }
+  features {
+    nesting = true
   }
 }
 

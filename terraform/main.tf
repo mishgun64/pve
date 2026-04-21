@@ -334,7 +334,7 @@ resource "terraform_data" "prosody_trigger" {
       sleep 30
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
-      -d '{"event": "prosody"}'
+      -d '{"event": "prosody-config"}'
     EOT
   }
 }

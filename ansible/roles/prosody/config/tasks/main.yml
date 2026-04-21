@@ -1,0 +1,95 @@
+---
+
+#-----------------------User settings----------------------------------
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$CBpzuPQip5YBOAPE$9KEsjowFx5czhEGtx/P8j8q3vVlvDcg5XIOh2J46fEm8uPGw9dRxNaVSJfAgVxETndudMPQHSVKiwzETl0yCw/'
+    # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
+
+- name: Set shell for docker user
+  user:
+    name: docker
+    shell: /bin/bash
+
+#--------------------------Firewall rules----------------------------------
+
+- name: Decrypt locally
+  ansible.builtin.set_fact:
+    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/prosody/config/files/144.fw.enc') }}"
+  delegate_to: localhost
+  no_log: true
+
+- name: Write to pmxcfs
+  ansible.builtin.shell: cat > /etc/pve/firewall/144.fw
+  args:
+    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
+  become: true
+  delegate_to: pve
+  no_log: true
+
+- name: Convert to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/144.fw
+  delegate_to: pve
+#-----------------------Copy config files----------------------------------
+
+- name: Create logs directory
+  ansible.builtin.file:
+    path: /home/docker/logs
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Create data directory
+  ansible.builtin.file:
+    path: /home/docker/data
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Create config directory
+  ansible.builtin.file:
+    path: /home/docker/config
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Copy prosody.cfg.lua
+  copy:
+    src: prosody.cfg.lua
+    dest: /home/docker/config/prosody.cfg.lua
+    owner: docker
+    group: docker
+    mode: '0644'
+
+- name: Copy docker-compose.yml
+  copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: docker
+    group: docker
+    mode: '0644'
+
+#--------------------------Run container----------------------------------
+
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

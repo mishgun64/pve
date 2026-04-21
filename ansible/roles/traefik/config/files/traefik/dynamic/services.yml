@@ -9,9 +9,34 @@ http:
       service: emby
       middlewares:
         - crowdsec@file
+    upload:
+      rule: "Host(`upload.mishgun.com`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      service: upload-service
+      middlewares:
+        - crowdsec@file
+
+tcp:
+  routers:
+    xmpp:
+      entryPoints:
+        - xmpp
+      rule: "HostSNI(`xmpp.mishgun.com`)"
+      service: xmpp-service
+      tls:
+        passthrough: true
+      middlewares:
+        - crowdsec@file
 
   services:
     emby:
       loadBalancer:
         servers:
           - url: "http://192.168.2.4:8097"
+    xmpp-service:
+      loadBalancer:
+        servers:
+          - address: "192.168.4.4:5222"

@@ -5,17 +5,22 @@ http:
     openfire-admin:
       rule: "Host(`xmpp-admin.mishgun.com`)"
       entryPoints: websecure
-      tls:
-        certResolver: letsencrypt
+      tls: {}
       service: openfire-admin
       middlewares:
-        - crowdsec@file
+        - xmpp-admin-ipwhitelist
     openfire-bosh:
       rule: "Host(`xmpp.mishgun.com`)"
       entryPoints: websecure
       tls:
         certResolver: letsencrypt
       service: openfire-bosh
+
+  middlewares:
+    xmpp-admin-ipwhitelist:
+      ipAllowList:
+        sourceRange:
+          - "192.168.1.129/32"
 
   services:
     openfire-admin:

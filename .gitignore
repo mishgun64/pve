@@ -3,4 +3,4 @@
 /ansible/roles/wireguard/files/126.fw
 /ansible/roles/traefik/config/files/143.fw
 /ansible/roles/traefik/config/files/enroll_secret
-/ansible/roles/prosody/config/files/144.fw
+/ansible/roles/openfire/config/files/144.fw

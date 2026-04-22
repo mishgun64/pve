@@ -198,9 +198,9 @@ resource "proxmox_virtual_environment_container" "traefik" {
   }
 }
 
-#------------------------------------Prosody LXC------------------------------------
+#------------------------------------Openfire LXC------------------------------------
 
-resource "proxmox_virtual_environment_container" "prosody" {
+resource "proxmox_virtual_environment_container" "openfire" {
   node_name = var.target_node_name
   vm_id     = 144
 
@@ -209,7 +209,7 @@ resource "proxmox_virtual_environment_container" "prosody" {
   start_on_boot = true
 
   initialization {
-    hostname = "prosody"
+    hostname = "openfire"
 
     user_account {
       keys = [var.control_ssh_key]
@@ -267,7 +267,7 @@ resource "proxmox_virtual_environment_container" "prosody" {
   }
 }
 
-#------------------------------------Media_vm webhook trigger------------------------------------
+#------------------------------------Media_VM webhook trigger------------------------------------
 
 resource "terraform_data" "media_vm_trigger" {
   depends_on = [proxmox_virtual_environment_vm.media_vm]
@@ -321,12 +321,12 @@ resource "terraform_data" "traefik_trigger" {
   }
 }
 
-#------------------------------------Prosody webhook trigger------------------------------------
+#------------------------------------OpenFire webhook trigger------------------------------------
 
-resource "terraform_data" "prosody_trigger" {
-  depends_on = [proxmox_virtual_environment_container.prosody]
+resource "terraform_data" "openfire_trigger" {
+  depends_on = [proxmox_virtual_environment_container.openfire]
     lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.prosody]
+      replace_triggered_by = [proxmox_virtual_environment_container.openfire]
     }
 
   provisioner "local-exec" {
@@ -334,7 +334,7 @@ resource "terraform_data" "prosody_trigger" {
       sleep 30
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
-      -d '{"event": "prosody-config"}'
+      -d '{"event": "openfire-config"}'
     EOT
   }
 }

@@ -12,7 +12,7 @@ local_hosts:
       ansible_host: 192.168.2.6
     traefik_lxc:
       ansible_host: 192.168.2.3
-    prosody_lxc:
+    openfire_lxc:
       ansible_host: 192.168.2.7
 
   vars:

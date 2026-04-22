@@ -252,18 +252,18 @@ pipeline {
             }
         }
 
-        stage('prosody-config') {
+        stage('openfire-config') {
             when {
-                expression { env.EVENT == 'prosody-config' }
+                expression { env.EVENT == 'openfire-config' }
             }
             steps {
                 script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Prosody-config"
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Openfire-config"
                 }
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/prosody_config.yml
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/openfire_config.yml
                 '''
             }
         }

@@ -1,0 +1,16 @@
+http:
+  routers:
+    emby:
+      rule: "Host(`emby.mishgun.com`)"
+      entryPoints: websecure
+      tls:
+        certResolver: letsencrypt
+      service: emby
+      middlewares:
+        - crowdsec@file
+
+  services:
+    emby:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.4:8097"

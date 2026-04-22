@@ -9,4 +9,4 @@ http:
           crowdsecLapiKeyFile: /etc/traefik/cs_secret
           crowdsecLapiScheme: http
           clientTrustedIPs: # List of client IPs to trust, they will bypass any check from the bouncer or cache (useful for LAN or VPN IP)
-            - 192.168.2.0/24
+            - 192.168.1.0/24

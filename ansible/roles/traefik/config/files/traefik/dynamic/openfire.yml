@@ -1,0 +1,45 @@
+---
+
+http:
+  routers:
+    openfire-admin:
+      rule: "Host(`xmpp-admin.mishgun.com`)"
+      entryPoints: websecure
+      tls:
+        certResolver: letsencrypt
+      service: openfire-admin
+      middlewares:
+        - crowdsec@file
+    openfire-bosh:
+      rule: "Host(`xmpp.mishgun.com`)"
+      entryPoints: websecure
+      tls:
+        certResolver: letsencrypt
+      service: openfire-bosh
+
+  services:
+    openfire-admin:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.4.4:9090"
+    openfire-bosh:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.4.4:7443"
+
+tcp:
+  routers:
+    openfire-c2s:
+      entryPoints:
+        - xmpp
+      rule: "HostSNI(`*`)"
+      service: openfire-c2s
+      tls:
+        passthrough: false
+        certResolver: letsencrypt
+
+  services:
+    openfire-c2s:
+      loadBalancer:
+        servers:
+          - address: "192.168.4.4:5222"

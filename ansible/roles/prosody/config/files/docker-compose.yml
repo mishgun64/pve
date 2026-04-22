@@ -1,19 +1,15 @@
 services:
-  prosody:
-    image: prosodyim/prosody:13.0
-    container_name: prosody
+  openfire:
+    image: nasqueron/openfire:latest
+    container_name: openfire
     restart: unless-stopped
-    ports:
-      - "5222:5222"   # XMPP client-to-server
-      - "5223:5223"
-      - "5280:5280"   # HTTP (BOSH / web / uploads если включено)
     volumes:
-      - ./data:/var/lib/prosody
-      - ./config:/etc/prosody
-      - ./logs:/var/log/prosody
-      - ./config/certs:/etc/prosody/certs
+      - ./data:/var/lib/openfire
+    ports:
+      - "5222:5222"   # c2s (клиент-сервер)
+      - "7443:7443"   # HTTP binding / BOSH
+      - "9090:9090"   # веб-админка (локально)
     environment:
-      LOCAL_DOMAINS: xmpp.mishgun.com
       PUID: 1000
       PGID: 1000
       TZ: Europe/Moscow

@@ -51,6 +51,14 @@
     group: docker
     mode: '0755'
 
+- name: Create mariadb directory
+  ansible.builtin.file:
+    path: /home/docker/mariadb-data
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
 - name: Copy docker-compose.yml
   copy:
     src: docker-compose.yml
@@ -58,6 +66,14 @@
     owner: docker
     group: docker
     mode: '0644'
+
+- name: Decrypt and write .env file
+  copy:
+    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/openfire/config/files/.env.enc') }}"
+    dest: /home/docker/.env
+    owner: docker
+    group: docker
+    mode: '0600'
 
 #--------------------------Run container----------------------------------
 

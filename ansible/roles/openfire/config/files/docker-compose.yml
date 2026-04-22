@@ -1,8 +1,31 @@
 services:
+  mariadb:
+    image: mariadb:latest
+    container_name: openfire-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Europe/Moscow
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+    networks:
+      - openfire-net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   openfire:
     image: nasqueron/openfire:latest
     container_name: openfire
     restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
     volumes:
       - ./data:/var/lib/openfire
     ports:
@@ -13,5 +36,15 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Moscow
+      DB_HOST: mariadb
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
     security_opt:
       - no-new-privileges:true
+    networks:
+      - openfire-net
+
+networks:
+  openfire-net:
+    driver: bridge

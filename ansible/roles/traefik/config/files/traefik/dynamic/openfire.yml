@@ -2,13 +2,13 @@
 
 http:
   routers:
-    openfire-admin:
-      rule: "Host(`xmpp-admin.mishgun.com`)"
-      entryPoints: websecure
-      tls: {}
-      service: openfire-admin
-      middlewares:
-        - xmpp-admin-ipwhitelist
+#    openfire-admin:
+#      rule: "Host(`xmpp-admin.mishgun.com`)"
+#      entryPoints: websecure
+#      tls: {}
+#      service: openfire-admin
+#      middlewares:
+#        - xmpp-admin-ipwhitelist
     openfire-bosh:
       rule: "Host(`xmpp.mishgun.com`)"
       entryPoints: websecure
@@ -16,17 +16,17 @@ http:
         certResolver: letsencrypt
       service: openfire-bosh
 
-  middlewares:
-    xmpp-admin-ipwhitelist:
-      ipAllowList:
-        sourceRange:
-          - "192.168.1.129/32"
+#  middlewares:
+#    xmpp-admin-ipwhitelist:
+#      ipAllowList:
+#        sourceRange:
+#          - "192.168.1.129/32"
 
   services:
-    openfire-admin:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.4.4:9090"
+#    openfire-admin:
+#      loadBalancer:
+#        servers:
+#          - url: "http://192.168.4.4:9090"
     openfire-bosh:
       loadBalancer:
         servers:

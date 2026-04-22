@@ -259,6 +259,10 @@
     name: "Initialize media services backup"
     hour: "4"
     minute: "0"
-    job: "/usr/bin/curl -s -X POST 'http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook' -H 'Content-Type: application/json' -d '{\"event\":\"media_vm_backup\",\"node\":\"pve1\",\"host\":\"pve1.local\"}'"
+    job: >-
+      /usr/bin/curl -s -X POST
+      "http://192.168.1.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+      -H "Content-Type: application/json"
+      -d '{"event":"media_vm_backup","node":"pve1","host":"pve1.local"}'
     user: root
     state: present

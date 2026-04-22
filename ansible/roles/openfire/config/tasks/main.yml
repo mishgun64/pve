@@ -69,7 +69,7 @@
 
 - name: Decrypt and write .env file
   copy:
-    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/openfire/config/files/.env.enc') }}"
+    content: "{{ lookup('pipe', 'sops -d --input-type dotenv --output-type dotenv /var/lib/jenkins/jobs/pve/workspace/ansible/roles/openfire/config/files/.env.enc') }}"
     dest: /home/docker/.env
     owner: docker
     group: docker

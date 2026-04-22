@@ -58,24 +58,29 @@
     msg: "No CrowdSec backups found on local host. Skipping restore."
   when: not backup_exists
 
-- name: Copy backup to remote host
+- name: Decrypt CrowdSec backup locally
+  ansible.builtin.shell: |
+    sops -d {{ latest_backup.stdout }} > /tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}
+  delegate_to: localhost
+  when: backup_exists
+
+- name: Set local decrypted path
+  set_fact:
+    local_tar: "/tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists
+
+- name: Copy decrypted backup to remote host
   ansible.builtin.copy:
-    src: "{{ latest_backup.stdout }}"
+    src: "{{ local_tar }}"
     dest: "/home/docker/"
     owner: docker
     group: docker
     mode: '0644'
   when: backup_exists
 
-- name: Set remote file names
+- name: Set remote tar path
   set_fact:
-    remote_enc: "/home/docker/{{ latest_backup.stdout | basename }}"
     remote_tar: "/home/docker/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}"
-  when: backup_exists
-
-- name: Decrypt backup on remote host
-  ansible.builtin.shell: >
-    sops -d {{ remote_enc }} > {{ remote_tar }}
   when: backup_exists
 
 - name: Extract CrowdSec backup
@@ -87,16 +92,17 @@
     remote_src: true
   when: backup_exists
 
-- name: Remove encrypted backup on remote
-  ansible.builtin.file:
-    path: "{{ remote_enc }}"
-    state: absent
-  when: backup_exists
-
 - name: Remove decrypted tar on remote
   ansible.builtin.file:
     path: "{{ remote_tar }}"
     state: absent
+  when: backup_exists
+
+- name: Remove decrypted tar locally
+  ansible.builtin.file:
+    path: "{{ local_tar }}"
+    state: absent
+  delegate_to: localhost
   when: backup_exists
 
 #--------------------------Run container----------------------------------

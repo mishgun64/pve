@@ -35,13 +35,13 @@
   delegate_to: pve
 #-----------------------Copy config files----------------------------------
 
-- name: Create logs directory
-  ansible.builtin.file:
-    path: /home/docker/logs
-    state: directory
-    owner: docker
-    group: docker
-    mode: '0755'
+#- name: Create logs directory
+#  ansible.builtin.file:
+#    path: /home/docker/logs
+#    state: directory
+#    owner: docker
+#    group: docker
+#    mode: '0755'
 
 - name: Create data directory
   ansible.builtin.file:
@@ -51,29 +51,29 @@
     group: docker
     mode: '0755'
 
-- name: Create config directory
-  ansible.builtin.file:
-    path: /home/docker/config
-    state: directory
-    owner: docker
-    group: docker
-    mode: '0755'
-
-- name: Create certs directory
-  ansible.builtin.file:
-    path: /home/docker/config/certs
-    state: directory
-    owner: docker
-    group: docker
-    mode: '0755'
-
-- name: Copy prosody.cfg.lua
-  copy:
-    src: prosody.cfg.lua
-    dest: /home/docker/config/prosody.cfg.lua
-    owner: docker
-    group: docker
-    mode: '0644'
+#- name: Create config directory
+#  ansible.builtin.file:
+#    path: /home/docker/config
+#    state: directory
+#    owner: docker
+#    group: docker
+#    mode: '0755'
+#
+#- name: Create certs directory
+#  ansible.builtin.file:
+#    path: /home/docker/config/certs
+#    state: directory
+#    owner: docker
+#    group: docker
+#    mode: '0755'
+#
+#- name: Copy prosody.cfg.lua
+#  copy:
+#    src: prosody.cfg.lua
+#    dest: /home/docker/config/prosody.cfg.lua
+#    owner: docker
+#    group: docker
+#    mode: '0644'
 
 - name: Copy docker-compose.yml
   copy:

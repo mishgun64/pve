@@ -32,8 +32,7 @@ services:
     ports:
       - "5222:5222"   # c2s (клиент-сервер)
     environment:
-      PUID: 1000
-      PGID: 1000
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: Europe/Moscow
     security_opt:
       - no-new-privileges:true

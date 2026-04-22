@@ -1,0 +1,18 @@
+---
+
+tcp:
+  routers:
+    prosody-c2s:
+      entryPoints:
+        - xmpp
+      rule: "HostSNI(`xmpp.mishgun.com`)"
+      service: prosody-c2s
+      tls:
+        passthrough: false
+        certResolver: letsencrypt
+
+  services:
+    prosody-c2s:
+      loadBalancer:
+        servers:
+          - address: "192.168.4.4:5222"

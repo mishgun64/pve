@@ -17,7 +17,7 @@
 
 - name: Decrypt locally
   ansible.builtin.set_fact:
-    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/openfire/config/files/144.fw.enc') }}"
+    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/prosody/config/files/144.fw.enc') }}"
   delegate_to: localhost
   no_log: true
 
@@ -51,6 +51,23 @@
     group: docker
     mode: '0755'
 
+- name: Create config directory
+  ansible.builtin.file:
+    path: /home/docker/config
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Copy prosody.cfg.lua
+  copy:
+    src: prosody.cfg.lua
+    dest: /home/docker/config/prosody.cfg.lua
+    owner: docker
+    group: docker
+    mode: '0644'
+
+
 - name: Create mariadb directory
   ansible.builtin.file:
     path: /home/docker/mariadb-data
@@ -69,7 +86,7 @@
 
 - name: Decrypt and write .env file
   copy:
-    content: "{{ lookup('pipe', 'sops -d --input-type dotenv --output-type dotenv /var/lib/jenkins/jobs/pve/workspace/ansible/roles/openfire/config/files/.env.enc') }}"
+    content: "{{ lookup('pipe', 'sops -d --input-type dotenv --output-type dotenv /var/lib/jenkins/jobs/pve/workspace/ansible/roles/prosody/config/files/.env.enc') }}"
     dest: /home/docker/.env
     owner: docker
     group: docker

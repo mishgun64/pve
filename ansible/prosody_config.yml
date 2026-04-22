@@ -1,0 +1,11 @@
+---
+
+- name: prosody LXC config
+  hosts: prosody_lxc
+  remote_user: root
+  gather_facts: true
+  roles:
+    - common/basic
+    - common/docker
+    - prosody/config
+#    - prosody/restore

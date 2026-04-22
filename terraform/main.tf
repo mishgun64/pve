@@ -198,9 +198,9 @@ resource "proxmox_virtual_environment_container" "traefik" {
   }
 }
 
-#------------------------------------Openfire LXC------------------------------------
+#------------------------------------Prosody LXC------------------------------------
 
-resource "proxmox_virtual_environment_container" "openfire" {
+resource "proxmox_virtual_environment_container" "prosody" {
   node_name = var.target_node_name
   vm_id     = 144
 
@@ -209,7 +209,7 @@ resource "proxmox_virtual_environment_container" "openfire" {
   start_on_boot = true
 
   initialization {
-    hostname = "openfire"
+    hostname = "prosody"
 
     user_account {
       keys = [var.control_ssh_key]
@@ -321,12 +321,12 @@ resource "terraform_data" "traefik_trigger" {
   }
 }
 
-#------------------------------------OpenFire webhook trigger------------------------------------
+#------------------------------------prosody webhook trigger------------------------------------
 
-resource "terraform_data" "openfire_trigger" {
-  depends_on = [proxmox_virtual_environment_container.openfire]
+resource "terraform_data" "prosody_trigger" {
+  depends_on = [proxmox_virtual_environment_container.prosody]
     lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.openfire]
+      replace_triggered_by = [proxmox_virtual_environment_container.prosody]
     }
 
   provisioner "local-exec" {
@@ -334,7 +334,7 @@ resource "terraform_data" "openfire_trigger" {
       sleep 30
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
-      -d '{"event": "openfire-config"}'
+      -d '{"event": "prosody-config"}'
     EOT
   }
 }

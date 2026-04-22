@@ -1,7 +1,7 @@
 services:
   mariadb:
     image: mariadb:latest
-    container_name: openfire-mariadb
+    container_name: prosody-mariadb
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -12,39 +12,34 @@ services:
     volumes:
       - ./mariadb-data:/var/lib/mysql
     networks:
-      - openfire-net
+      - prosody-net
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  openfire:
-    image: nasqueron/openfire:latest
-    container_name: openfire
+  prosody:
+    image: prosodyim/prosody:13.0
+    container_name: prosody
     restart: unless-stopped
     depends_on:
       mariadb:
         condition: service_healthy
     volumes:
-      - ./data:/var/lib/openfire
+      - ./prosody/config:/etc/prosody
+      - ./prosody/data:/var/lib/prosody
     ports:
       - "5222:5222"   # c2s (клиент-сервер)
-      - "7443:7443"   # HTTP binding / BOSH
-      - "9090:9090"   # веб-админка (локально)
     environment:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Moscow
-      DB_HOST: mariadb
-      DB_NAME: ${MYSQL_DATABASE}
-      DB_USERNAME: ${MYSQL_USER}
-      DB_PASSWORD: ${MYSQL_PASSWORD}
     security_opt:
       - no-new-privileges:true
     networks:
-      - openfire-net
+      - prosody-net
 
 networks:
-  openfire-net:
+  prosody-net:
     driver: bridge

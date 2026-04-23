@@ -17,7 +17,7 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/cs_secret:/etc/traefik/cs_secret:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
-      - ./certs/acme.json:/etc/traefik/acme.json
+      - ./certs:/etc/traefik/certs
       - ./traefik/logs:/var/log/traefik
       - ./acme-dns:/acme-dns
     networks:
@@ -67,12 +67,11 @@ services:
     command: >
       file
       --watch
-      --source /acme.json
+      --source /certs/acme.json
       --dest /certs
       --domain-subdir
       --post-hook "chmod 644 /certs/mishgun.com/privatekey.pem"
     volumes:
-      - ./certs/acme.json:/acme.json:ro
       - ./certs:/certs
     networks:
       - proxy

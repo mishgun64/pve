@@ -25,7 +25,7 @@ certificatesResolvers:
   letsencrypt:
     acme:
       email: heimcbk201@gmail.com
-      storage: /etc/traefik/acme.json
+      storage: /etc/traefik/certs/acme.json
       dnsChallenge:
         provider: acme-dns
         resolvers:

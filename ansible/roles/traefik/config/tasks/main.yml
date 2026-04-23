@@ -112,15 +112,21 @@
       [lockd]
       port=32768
       udp-port=32768
-  notify:
-    - restart nfs-server
+
+- name: Restart nfs-server
+  systemd:
+    name: nfs-server
+    state: restarted
+    enabled: yes
 
 - name: Configure NFS export
   lineinfile:
     path: /etc/exports
     line: "/home/docker/dumped-certs  192.168.2.7(ro,sync,no_subtree_check,no_root_squash)"
     state: present
-  notify: exportfs reload
+
+- name: Reload exports
+  command: exportfs -ra
 
 - name: Ensure nfs-server is started and enabled
   systemd:

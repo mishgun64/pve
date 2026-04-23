@@ -66,6 +66,14 @@
     group: docker
     mode: '0644'
 
+- name: Copy acme-dns config
+  copy:
+    src: acme-dns/config.cfg
+    dest: /home/docker/acme-dns/config/config.cfg
+    owner: docker
+    group: docker
+    mode: '0644'
+
 - name: Create acme.json
   ansible.builtin.file:
     path: /home/docker/certs/acme.json

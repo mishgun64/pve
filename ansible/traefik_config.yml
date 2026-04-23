@@ -8,4 +8,4 @@
     - common/basic
     - common/docker
     - traefik/config
-#    - traefik/restore
+    - traefik/restore

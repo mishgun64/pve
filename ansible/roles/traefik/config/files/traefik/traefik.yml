@@ -30,10 +30,6 @@ certificatesResolvers:
         provider: acme-dns
         resolvers:
           - "auth.mishgun.com:53"
-      domains:
-        - main: "mishgun.com"
-          sans:
-            - "*.mishgun.com"
 
 providers:
   file:

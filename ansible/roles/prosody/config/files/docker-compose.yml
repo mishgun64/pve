@@ -27,12 +27,15 @@ services:
       mariadb:
         condition: service_healthy
     volumes:
-      - ./prosody/config:/etc/prosody
-      - ./prosody/data:/var/lib/prosody
+      - ./config:/etc/prosody
+      - ./data:/var/lib/prosody
     ports:
       - "5222:5222"   # c2s (клиент-сервер)
+      - "5280:5280"
     environment:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      PUID: 1000
+      PGID: 1000
       TZ: Europe/Moscow
     security_opt:
       - no-new-privileges:true

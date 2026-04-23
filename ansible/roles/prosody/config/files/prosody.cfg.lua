@@ -1,12 +1,13 @@
 -- Основные настройки
-admins = { "admin@mishgun.com" }
+admins = { "admin@xmpp.mishgun.com" }
 network_backend = "epoll"
 
--- Модули
 modules_enabled = {
   "roster";
   "saslauth";
   "tls";
+  "acme";
+  "http";
   "dialback";
   "disco";
   "carbons";
@@ -27,18 +28,23 @@ modules_enabled = {
   "csi_simple";
 }
 
-modules_disabled = {}
-
--- Разрешить регистрацию (отключи после создания пользователей)
-allow_registration = false
-
--- TLS
-ssl = {
-  key = "/etc/prosody/certs/mishgun.com.key";
-  certificate = "/etc/prosody/certs/mishgun.com.crt";
+acme = {
+  email = "heimcbk201@gmail.com";
+  tos_agree = true;
+  challenge = "http-01";
 }
 
--- База данных MariaDB
+http_ports = { 5280 }
+http_interfaces = { "*" }
+https_ports = { 5281 }
+https_interfaces = { "*" }
+
+modules_disabled = {}
+
+allow_registration = false
+
+-- ssl блок УДАЛЁН — ACME управляет сертификатами сам
+
 storage = "sql"
 sql = {
   driver = "MySQL";
@@ -46,26 +52,21 @@ sql = {
   host = "mariadb";
   port = 3306;
   username = "prosody";
-  password = os.getenv("MYSQL_PASSWORD");
+  password = Lua.os.getenv("MYSQL_PASSWORD");
 }
 
--- Виртуальный хост
-VirtualHost "mishgun.com"
+VirtualHost "xmpp.mishgun.com"
   enabled = true
 
--- Компонент для групповых чатов (MUC)
-Component "conference.mishgun.com" "muc"
+Component "conference.xmpp.mishgun.com" "muc"
   modules_enabled = { "muc_mam" }
 
--- BOSH
 consider_bosh_secure = true
 cross_domain_bosh = true
-
--- WebSocket
 consider_websocket_secure = true
 cross_domain_websocket = true
 
 log = {
-  info = "/var/log/prosody/prosody.log";
-  error = "/var/log/prosody/prosody.err";
+  info = "*info";   -- в stdout для docker logs
+  error = "*error";
 }

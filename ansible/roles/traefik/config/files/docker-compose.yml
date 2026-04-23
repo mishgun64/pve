@@ -70,7 +70,7 @@ services:
       --source /acme.json
       --dest /dumped-certs
       --domain-subdir
-      --post-hook "chmod 644 /certs/mishgun.com/privatekey.pem"
+      --post-hook "chmod 644 /dumped-certs/mishgun.com/privatekey.pem"
     volumes:
       - ./certs/traefik/acme.json:/acme.json:ro
       - ./certs/dumped-certs:/dumped-certs

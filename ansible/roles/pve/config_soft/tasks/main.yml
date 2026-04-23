@@ -171,11 +171,23 @@
 
 - name: Create /srv/certs directory
   ansible.builtin.file:
-    path: /srv/certs
+    path: /srv/certs/traefik
     state: directory
     owner: 101000
     group: 101000
     mode: '0755'
+
+- name: Create /srv/certs directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: 101000
+    group: 101000
+    mode: '0755'
+  loop:
+    - /srv/certs/traefik
+    - /srv/certs/dumped-certs
+
 
 #-----------------------Add media-vg as storage----------------------------------
 

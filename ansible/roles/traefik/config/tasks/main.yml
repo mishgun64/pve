@@ -92,11 +92,30 @@
 
 #-----------------------NFS server for certs----------------------------------
 
+- name: Enable NFS features for traefik LXC
+  ansible.builtin.lineinfile:
+    path: /etc/pve/lxc/143.conf
+    line: "features: nfs=1,keyctl=1"
+    state: present
+  delegate_to: pve
+
+- name: restart lxc 143
+  ansible.builtin.shell: pct reboot 143
+  delegate_to: pve
+
 - name: Install nfs-kernel-server
   apt:
     name: nfs-kernel-server
     state: present
     update_cache: yes
+
+- name: Wait for LXC to come back
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: 22
+    delay: 10
+    timeout: 60
+  delegate_to: localhost
 
 - name: Configure NFS ports in nfs.conf
   blockinfile:

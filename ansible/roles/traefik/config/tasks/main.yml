@@ -95,7 +95,8 @@
 - name: Enable NFS features for traefik LXC
   ansible.builtin.lineinfile:
     path: /etc/pve/lxc/143.conf
-    line: "features: nfs=1,keyctl=1"
+    regexp: "^features:"
+    line: "features: mount=nfs,keyctl=1"
     state: present
   delegate_to: pve
 

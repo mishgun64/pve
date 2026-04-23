@@ -1,4 +1,3 @@
--- Основные настройки
 admins = { "admin@xmpp.mishgun.com" }
 network_backend = "epoll"
 
@@ -6,7 +5,6 @@ modules_enabled = {
   "roster";
   "saslauth";
   "tls";
-  "acme";
   "http";
   "dialback";
   "disco";
@@ -26,13 +24,6 @@ modules_enabled = {
   "websocket";
   "smacks";
   "csi_simple";
-}
-
-acme = {
-  email = "heimcbk201@gmail.com";
-  tos_agree = true;
-  challenge = "http-01";
-}
 
 http_ports = { 5280 }
 http_interfaces = { "*" }
@@ -40,10 +31,12 @@ https_ports = { 5281 }
 https_interfaces = { "*" }
 
 modules_disabled = {}
-
 allow_registration = false
 
--- ssl блок УДАЛЁН — ACME управляет сертификатами сам
+-- certmanager найдёт автоматически:
+-- /etc/prosody/certs/mishgun.com/certificate.pem
+-- /etc/prosody/certs/mishgun.com/privatekey.pem
+certificates = "/etc/prosody/certs"
 
 storage = "sql"
 sql = {
@@ -67,6 +60,6 @@ consider_websocket_secure = true
 cross_domain_websocket = true
 
 log = {
-  info = "*info";   -- в stdout для docker logs
+  info = "*info";
   error = "*error";
 }

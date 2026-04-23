@@ -7,6 +7,8 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Moscow
+      ACME_DNS_API_BASE: http://auth.mishgun.com:8080
+      ACME_DNS_STORAGE_PATH: /acme-dns/acme-dns.json
     ports:
       - "80:80"
       - "443:443"
@@ -17,12 +19,27 @@ services:
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
       - ./traefik/acme.json:/etc/traefik/acme.json
       - ./traefik/logs:/var/log/traefik
+      - ./acme-dns:/acme-dns
     networks:
       - proxy
     security_opt:
       - no-new-privileges:true
     depends_on:
       - crowdsec
+      - acme-dns
+
+  acme-dns:
+    image: joohoi/acme-dns:latest
+    container_name: acme-dns
+    restart: unless-stopped
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    volumes:
+      - ./acme-dns/config:/etc/acme-dns:ro
+      - ./acme-dns/data:/var/lib/acme-dns
+    networks:
+      - proxy
 
   crowdsec:
     image: crowdsecurity/crowdsec:latest
@@ -42,6 +59,23 @@ services:
       - proxy
     security_opt:
       - no-new-privileges:true
+
+  traefik-certs-dumper:
+    image: ldez/traefik-certs-dumper:latest
+    container_name: traefik-certs-dumper
+    restart: unless-stopped
+    command: >
+      file
+      --watch
+      --source /acme.json
+      --dest /certs
+      --domain-subdir
+      --post-hook "chmod 644 /certs/mishgun.com/privatekey.pem"
+    volumes:
+      - ./traefik/acme.json:/acme.json:ro
+      - ./dumped-certs:/certs
+    networks:
+      - proxy
 
 networks:
   proxy:

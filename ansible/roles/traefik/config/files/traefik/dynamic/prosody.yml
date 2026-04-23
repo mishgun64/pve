@@ -1,20 +1,5 @@
 ---
 
-http:
-  routers:
-    # Проброс http-01 challenge и BOSH/WebSocket
-    xmpp-http:
-      entryPoints:
-        - web
-      rule: "Host(`xmpp.mishgun.com`)"
-      service: prosody-http
-
-  services:
-    prosody-http:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.4.4:5280"
-
 tcp:
   routers:
     prosody-c2s:

@@ -3,8 +3,7 @@ http:
     emby:
       rule: "Host(`emby.mishgun.com`)"
       entryPoints: websecure
-      tls:
-        certResolver: letsencrypt
+      tls: {}
       service: emby
       middlewares:
         - crowdsec@file

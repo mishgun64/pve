@@ -43,29 +43,20 @@
     group: docker
     mode: '0755'
 
-- name: Create logs directory
+- name: Create required directories
   ansible.builtin.file:
-    path: /home/docker/traefik/logs
+    path: "{{ item }}"
     state: directory
     owner: docker
     group: docker
     mode: '0755'
-
-- name: Create crowdsec data directory
-  ansible.builtin.file:
-    path: /home/docker/crowdsec/data
-    state: directory
-    owner: docker
-    group: docker
-    mode: '0755'
-
-- name: Create crowdsec config directory
-  ansible.builtin.file:
-    path: /home/docker/crowdsec/config
-    state: directory
-    owner: docker
-    group: docker
-    mode: '0755'
+  loop:
+    - /home/docker/traefik/logs
+    - /home/docker/crowdsec/data
+    - /home/docker/crowdsec/config
+    - /home/docker/acme-dns/config
+    - /home/docker/acme-dns/data
+    - /home/docker/dumped-certs
 
 - name: Copy acquis.yaml
   copy:
@@ -83,6 +74,14 @@
     group: docker
     mode: '0600'
 
+#- name: Create acme.json with correct permissions
+#  ansible.builtin.file:
+#    path: /home/docker/traefik/acme.json
+#    state: touch
+#    owner: docker
+#    group: docker
+#    mode: '0600'
+
 - name: Copy docker-compose.yml
   copy:
     src: docker-compose.yml
@@ -90,6 +89,44 @@
     owner: docker
     group: docker
     mode: '0644'
+
+#-----------------------NFS server for certs----------------------------------
+
+- name: Install nfs-kernel-server
+  apt:
+    name: nfs-kernel-server
+    state: present
+    update_cache: yes
+
+- name: Configure NFS ports in nfs.conf
+  blockinfile:
+    path: /etc/nfs.conf
+    block: |
+      [mountd]
+      port=20048
+
+      [statd]
+      port=32765
+      outgoing-port=32766
+
+      [lockd]
+      port=32768
+      udp-port=32768
+  notify:
+    - restart nfs-server
+
+- name: Configure NFS export
+  lineinfile:
+    path: /etc/exports
+    line: "/home/docker/dumped-certs  192.168.2.7(ro,sync,no_subtree_check,no_root_squash)"
+    state: present
+  notify: exportfs reload
+
+- name: Ensure nfs-server is started and enabled
+  systemd:
+    name: nfs-server
+    state: started
+    enabled: yes
 
 #-----------------------Autoupdate Crowdsec hub----------------------------------
 

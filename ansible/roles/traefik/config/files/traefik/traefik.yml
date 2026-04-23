@@ -26,8 +26,14 @@ certificatesResolvers:
     acme:
       email: heimcbk201@gmail.com
       storage: /etc/traefik/acme.json
-      httpChallenge:
-        entryPoint: web
+      dnsChallenge:
+        provider: acme-dns
+        resolvers:
+          - "auth.mishgun.com:53"
+      domains:
+        - main: "mishgun.com"
+          sans:
+            - "*.mishgun.com"
 
 providers:
   file:

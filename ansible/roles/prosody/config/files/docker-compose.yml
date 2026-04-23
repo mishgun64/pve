@@ -29,6 +29,7 @@ services:
     volumes:
       - ./config:/etc/prosody
       - ./data:/var/lib/prosody
+      - ./certs:/etc/prosody/certs:ro
     ports:
       - "5222:5222"   # c2s (клиент-сервер)
       - "5280:5280"

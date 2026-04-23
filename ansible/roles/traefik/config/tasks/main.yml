@@ -56,7 +56,7 @@
     - /home/docker/crowdsec/config
     - /home/docker/acme-dns/config
     - /home/docker/acme-dns/data
-    - /home/docker/dumped-certs
+    - /home/docker/certs
 
 - name: Copy acquis.yaml
   copy:
@@ -68,19 +68,11 @@
 
 - name: Create acme.json
   ansible.builtin.file:
-    path: /home/docker/traefik/acme.json
+    path: /home/docker/certs/acme.json
     state: touch
     owner: docker
     group: docker
     mode: '0600'
-
-#- name: Create acme.json with correct permissions
-#  ansible.builtin.file:
-#    path: /home/docker/traefik/acme.json
-#    state: touch
-#    owner: docker
-#    group: docker
-#    mode: '0600'
 
 - name: Copy docker-compose.yml
   copy:
@@ -90,69 +82,12 @@
     group: docker
     mode: '0644'
 
-#-----------------------NFS server for certs----------------------------------
+#-----------------------Add mount point----------------------------------
 
-- name: Enable NFS features for traefik LXC
-  ansible.builtin.lineinfile:
-    path: /etc/pve/lxc/143.conf
-    regexp: "^features:"
-    line: "features: mount=nfs,keyctl=1"
-    state: present
+- name: Add mount point to container 143
+  ansible.builtin.command: >
+    pct set 143 -mp0 /srv/certs/,mp=/home/docker/certs
   delegate_to: pve
-
-- name: restart lxc 143
-  ansible.builtin.shell: pct reboot 143
-  delegate_to: pve
-
-- name: Install nfs-kernel-server
-  apt:
-    name: nfs-kernel-server
-    state: present
-    update_cache: yes
-
-- name: Wait for LXC to come back
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: 22
-    delay: 10
-    timeout: 60
-  delegate_to: localhost
-
-- name: Configure NFS ports in nfs.conf
-  blockinfile:
-    path: /etc/nfs.conf
-    block: |
-      [mountd]
-      port=20048
-
-      [statd]
-      port=32765
-      outgoing-port=32766
-
-      [lockd]
-      port=32768
-      udp-port=32768
-
-- name: Restart nfs-server
-  systemd:
-    name: nfs-server
-    state: restarted
-    enabled: yes
-
-- name: Configure NFS export
-  lineinfile:
-    path: /etc/exports
-    line: "/home/docker/dumped-certs  192.168.2.7(ro,sync,no_subtree_check,no_root_squash)"
-    state: present
-
-- name: Reload exports
-  command: exportfs -ra
-
-- name: Ensure nfs-server is started and enabled
-  systemd:
-    name: nfs-server
-    state: started
-    enabled: yes
 
 #-----------------------Autoupdate Crowdsec hub----------------------------------
 

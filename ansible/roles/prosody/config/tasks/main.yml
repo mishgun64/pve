@@ -72,27 +72,12 @@
     group: docker
     mode: '0400'
 
-#--------------------------NFS share certs----------------------------------
+#-----------------------Add mount point----------------------------------
 
-- name: Install nfs-common
-  apt:
-    name: nfs-common
-    state: present
-    update_cache: yes
-
-- name: Create mount point
-  file:
-    path: /home/docker/certs
-    state: directory
-    mode: '0755'
-
-- name: Mount NFS share
-  mount:
-    src: "192.168.2.3:/home/docker/dumped-certs"
-    path: /home/docker/certs
-    fstype: nfs
-    opts: ro,defaults
-    state: mounted
+- name: Add mount point to container 143
+  ansible.builtin.command: >
+    pct set 144 -mp0 /srv/certs/,mp=/home/docker/certs
+  delegate_to: pve
 
 #--------------------------Run container----------------------------------
 

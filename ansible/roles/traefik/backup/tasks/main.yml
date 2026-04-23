@@ -33,7 +33,7 @@
   ansible.builtin.shell: >
     sops -e --input-type json acme.json > acme_{{ backup_time }}.json.enc
   args:
-    chdir: /home/docker/traefik
+    chdir: /home/docker/certs
 
 - name: Fetch encrypted file
   ansible.builtin.fetch:

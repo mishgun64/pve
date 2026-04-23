@@ -167,6 +167,16 @@
   shell: >
     pveam download local $(pveam available | awk '/debian-13-standard/ {print $2}' | sort -V | tail -1)
 
+#-----------------------Create tls certs dir----------------------------------
+
+- name: Create /srv/certs directory
+  ansible.builtin.file:
+    path: /srv/certs
+    state: directory
+    owner: 101000
+    group: 101000
+    mode: '0755'
+
 #-----------------------Add media-vg as storage----------------------------------
 
 #- name: Get storage list

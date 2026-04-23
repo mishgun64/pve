@@ -33,7 +33,7 @@
 
 - name: Restore acme.json
   ansible.builtin.copy:
-    dest: /home/docker/traefik/acme.json
+    dest: /home/docker/certs/acme.json
     content: "{{ decrypted.stdout }}"
     owner: docker
     group: docker

@@ -74,8 +74,14 @@ services:
     volumes:
       - ./certs/traefik/acme.json:/acme.json:ro
       - ./certs/dumped-certs:/dumped-certs
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
     networks:
       - proxy
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   proxy:

@@ -1,0 +1,21 @@
+---
+
+http:
+  routers:
+    wildcard-cert:
+      rule: "Host(`mishgun.com`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "mishgun.com"
+            sans:
+              - "*.mishgun.com"
+      service: noop
+
+  services:
+    noop:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1"

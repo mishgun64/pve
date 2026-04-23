@@ -4,8 +4,7 @@ http:
       rule: "Host(`traefik.mishgun.com`)"
       entryPoints:
         - websecure
-      tls:
-        certResolver: letsencrypt
+      tls: {}
       service: api@internal
       middlewares:
         - auth

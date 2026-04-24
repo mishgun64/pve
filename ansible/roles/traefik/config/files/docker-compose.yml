@@ -38,6 +38,12 @@ services:
     volumes:
       - ./acme-dns/config:/etc/acme-dns:ro
       - ./acme-dns/data:/var/lib/acme-dns
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
+    security_opt:
+      - no-new-privileges:true
     networks:
       - proxy
 

@@ -160,3 +160,43 @@
   become: true
   become_method: su
   become_user: docker
+
+#-----------------------ACME-DNS registration----------------------------------
+
+- name: Check if acme-dns already registered
+  ansible.builtin.stat:
+    path: /home/docker/acme-dns/acme-dns.json
+  register: acme_dns_json
+
+- name: Register domain in acme-dns
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:8080/register"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body: "{}"
+    body_format: json
+    return_content: yes
+    status_code: 201
+  register: acme_dns_register
+  when: not acme_dns_json.stat.exists
+
+- name: Save acme-dns registration to file
+  ansible.builtin.copy:
+    content: |
+      {
+        "mishgun.com": {{ acme_dns_register.json | to_nice_json }},
+        "*.mishgun.com": {{ acme_dns_register.json | to_nice_json }}
+      }
+    dest: /home/docker/acme-dns/acme-dns.json
+    owner: docker
+    group: docker
+    mode: '0600'
+  when: not acme_dns_json.stat.exists
+
+- name: Show registration result
+  ansible.builtin.debug:
+    msg: |
+      Add CNAME at your DNS provider:
+      _acme-challenge.mishgun.com  CNAME  {{ acme_dns_register.json.fulldomain }}
+  when: not acme_dns_json.stat.exists

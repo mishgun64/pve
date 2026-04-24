@@ -170,11 +170,10 @@
 
 - name: Register domain in acme-dns
   ansible.builtin.shell: |
-    docker run --rm --network proxy curlimages/curl:latest \
-      curl -s -X POST \
+    curl -s -X POST \
       -H 'Content-Type: application/json' \
       -d '{}' \
-      http://acme-dns:8080/register
+      http://127.0.0.1:8080/register
   register: acme_dns_register
   when: not acme_dns_json.stat.exists
 

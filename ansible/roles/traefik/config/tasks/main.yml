@@ -56,7 +56,7 @@
     - /home/docker/crowdsec/config
     - /home/docker/acme-dns/config
     - /home/docker/acme-dns/data
-    - /home/docker/certs/traefik      # добавить
+    - /home/docker/certs/traefik
     - /home/docker/certs/dumped-certs
 
 - name: Copy acquis.yaml

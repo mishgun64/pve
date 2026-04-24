@@ -29,7 +29,7 @@ services:
       - acme-dns
 
   acme-dns:
-    image: joohoi/acme-dns:latest
+    image: joohoi/acme-dns:v1.0
     container_name: acme-dns
     restart: unless-stopped
     ports:

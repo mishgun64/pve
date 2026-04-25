@@ -47,65 +47,65 @@
     paths: /srv/backups/
     patterns: "acme-dns_*.tar.gz.enc"
     file_type: file
-  register: backup_files_acme-dns
+  register: backup_files_acme_dns
   delegate_to: localhost
 
 - name: Select newest backup
   ansible.builtin.set_fact:
-    latest_backup_acme-dns: "{{ (backup_files_acme-dns.files | sort(attribute='mtime'))[-1].path }}"
-  when: backup_files_acme-dns.matched | int > 0
+    latest_backup_acme_dns: "{{ (backup_files_acme_dns.files | sort(attribute='mtime'))[-1].path }}"
+  when: backup_files_acme_dns.matched | int > 0
   delegate_to: localhost
 
 - name: Set fact - backup exists
   set_fact:
-    backup_exists_acme-dns: "{{ latest_backup_acme-dns.stdout | length > 0 }}"
+    backup_exists_acme_dns: "{{ latest_backup_acme_dns.stdout | length > 0 }}"
 
 - name: Decrypt acme-dns backup locally
   ansible.builtin.shell: |
-    sops -d --input-type binary --output-type binary {{ latest_backup_acme-dns.stdout }} > /tmp/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}
+    sops -d --input-type binary --output-type binary {{ latest_backup_acme_dns.stdout }} > /tmp/{{ (latest_backup_acme_dns.stdout | basename) | regex_replace('.enc$', '') }}
   delegate_to: localhost
-  when: backup_exists_acme-dns
+  when: backup_exists_acme_dns
 
 - name: Set local decrypted path
   set_fact:
-    local_tar_acme-dns: "/tmp/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}"
-  when: backup_exists_acme-dns
+    local_tar_acme_dns: "/tmp/{{ (latest_backup_acme_dns.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_acme_dns
 
 - name: Copy decrypted backup to remote host
   ansible.builtin.copy:
-    src: "{{ local_tar_acme-dns }}"
+    src: "{{ local_tar_acme_dns }}"
     dest: "/home/docker/"
     owner: docker
     group: docker
     mode: '0644'
-  when: backup_exists_acme-dns
+  when: backup_exists_acme_dns
 
 - name: Set remote tar path
   set_fact:
-    remote_tar_acme-dns: "/home/docker/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}"
-  when: backup_exists_acme-dns
+    remote_tar_acme_dns: "/home/docker/{{ (latest_backup_acme_dns.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_acme_dns
 
 - name: Extract acme-dns backup
   ansible.builtin.unarchive:
-    src: "{{ remote_tar_acme-dns }}"
+    src: "{{ remote_tar_acme_dns }}"
     dest: /home/docker/
     owner: docker
     group: docker
     remote_src: true
-  when: backup_exists_acme-dns
+  when: backup_exists_acme_dns
 
 - name: Remove decrypted tar on remote
   ansible.builtin.file:
-    path: "{{ remote_tar_acme-dns }}"
+    path: "{{ remote_tar_acme_dns }}"
     state: absent
-  when: backup_exists_acme-dns
+  when: backup_exists_acme_dns
 
 - name: Remove decrypted tar locally
   ansible.builtin.file:
-    path: "{{ local_tar_acme-dns }}"
+    path: "{{ local_tar_acme_dns }}"
     state: absent
   delegate_to: localhost
-  when: backup_exists_acme-dns
+  when: backup_exists_acme_dns
 
 #--------------------------Find and copy latest crowdsec backup----------------------------------
 

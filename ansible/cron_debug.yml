@@ -11,7 +11,7 @@
       ansible.builtin.cron:
         name: "traefik-backup webhook"
         hour: "1"
-        minute: "27"
+        minute: "35"
         job: >-
           curl -X POST
           "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"

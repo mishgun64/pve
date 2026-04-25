@@ -267,5 +267,21 @@ pipeline {
                 '''
             }
         }
+
+        stage('cron-debug') {
+            when {
+                expression { env.EVENT == 'cron-debug' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Cron-debug"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/cron_debug.yml
+                '''
+            }
+        }
     }
 }

@@ -4,7 +4,7 @@
 
 - name: Create .sops.yaml
   ansible.builtin.copy:
-    dest: /home/docker/traefik/.sops.yaml
+    dest: /home/docker/certs/traefik/.sops.yaml
     owner: root
     group: root
     mode: '0600'
@@ -37,19 +37,77 @@
 
 - name: Fetch encrypted file
   ansible.builtin.fetch:
-    src: "/home/docker/traefik/acme_{{ backup_time }}.json.enc"
+    src: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
     dest: "/srv/backups/"
     flat: true
 
 - name: Remove remote encrypted file
   ansible.builtin.file:
-    path: "/home/docker/traefik/acme_{{ backup_time }}.json.enc"
+    path: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
     state: absent
 
 - name: Find all backups (local)
   ansible.builtin.find:
     paths: /srv/backups/
     patterns: "acme_*.json.enc"
+    file_type: file
+  register: all_backups
+  delegate_to: localhost
+
+- name: Remove old backups (keep last 5)
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
+  when: all_backups.matched | int > 5
+  delegate_to: localhost
+
+#------------------------------------------ACME-DNS backup------------------------------------------
+
+- name: Create .sops.yaml
+  ansible.builtin.copy:
+    dest: /home/docker/.sops.yaml
+    owner: root
+    group: root
+    mode: '0600'
+    content: |
+      creation_rules:
+        - age:
+            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
+
+- name: Archive acme-dns data directory and database file
+  ansible.builtin.archive:
+    path:
+      - /home/docker/acme-dns/data
+      - /home/docker/acme-dns/acme-dns.db
+    dest: /home/docker/acme-dns_{{ backup_time }}.tar.gz
+    format: gz
+    remove: no
+
+- name: Encrypt archive with SOPS
+  ansible.builtin.shell: >
+    sops -e --input-type binary --output-type binary acme-dns_{{ backup_time }}.tar.gz > acme-dns_{{ backup_time }}.tar.gz.enc
+  args:
+    chdir: /home/docker
+
+- name: Fetch encrypted file
+  ansible.builtin.fetch:
+    src: "/home/docker/acme-dns_{{ backup_time }}.tar.gz.enc"
+    dest: "/srv/backups/"
+    flat: true
+
+- name: Remove remote encrypted file
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /home/docker/acme-dns_{{ backup_time }}.tar.gz.enc
+    - /home/docker/acme-dns_{{ backup_time }}.tar.gz
+
+- name: Find all backups (local)
+  ansible.builtin.find:
+    paths: /srv/backups/
+    patterns: "acme-dns_*.tar.gz.enc"
     file_type: file
   register: all_backups
   delegate_to: localhost
@@ -88,7 +146,7 @@
 
 - name: Encrypt archive with SOPS
   ansible.builtin.shell: >
-    sops -e {{ remote_archive }} > {{ remote_encrypted }}
+    sops -e --input-type binary --output-type binary {{ remote_archive }} > {{ remote_encrypted }}
   args:
     chdir: /home/docker
 

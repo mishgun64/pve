@@ -29,7 +29,8 @@ certificatesResolvers:
       dnsChallenge:
         provider: acme-dns
         resolvers:
-          - "auth.mishgun.com:53"
+          - "8.8.8.8:53"
+          - "1.1.1.1:53"
 
 providers:
   file:

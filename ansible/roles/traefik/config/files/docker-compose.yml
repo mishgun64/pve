@@ -37,7 +37,7 @@ services:
       - "53:53/tcp"
       - "127.0.0.1:8080:8080"
     volumes:
-      - ./acme-dns/config:/etc/acme-dns:ro
+      - ./acme-dns/config:/etc/acme-dns
       - ./acme-dns/data:/var/lib/acme-dns
     environment:
       PUID: 1000

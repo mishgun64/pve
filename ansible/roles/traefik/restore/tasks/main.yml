@@ -1,6 +1,6 @@
 ---
 
-#--------------------------Stop container----------------------------------
+#--------------------------Stop container--------------------------------------------------
 
 - name: Stop docker compose
   ansible.builtin.shell: docker compose down
@@ -14,31 +14,98 @@
     paths: /srv/backups/
     patterns: "acme_*.json.enc"
     file_type: file
-  register: backup_files
+  register: backup_files_acme
   delegate_to: localhost
 
 - name: Select newest backup
   ansible.builtin.set_fact:
-    latest_backup: "{{ (backup_files.files | sort(attribute='mtime'))[-1].path }}"
-  when: backup_files.matched | int > 0
+    latest_backup_acme: "{{ (backup_files_acme.files | sort(attribute='mtime'))[-1].path }}"
+  when: backup_files_acme.matched | int > 0
   delegate_to: localhost
 
 - name: Decrypt latest backup (locally)
   ansible.builtin.command:
-    cmd: sops -d --output-type json {{ latest_backup }}
-  register: decrypted
+    cmd: sops -d --output-type json {{ latest_backup_acme }}
+  register: decrypted_acme
   delegate_to: localhost
   changed_when: false
-  when: backup_files.matched | int > 0
+  when: backup_files_acme.matched | int > 0
 
 - name: Restore acme.json
   ansible.builtin.copy:
     dest: /home/docker/certs/acme.json
-    content: "{{ decrypted.stdout }}"
+    content: "{{ decrypted_acme.stdout }}"
     owner: docker
     group: docker
     mode: '0600'
-  when: backup_files.matched | int > 0
+  when: backup_files_acme.matched | int > 0
+
+#--------------------------Find and copy latest ACME-DNS backup----------------------------------
+
+- name: Find latest backup
+  ansible.builtin.find:
+    paths: /srv/backups/
+    patterns: "acme-dns_*.tar.gz.enc"
+    file_type: file
+  register: backup_files_acme-dns
+  delegate_to: localhost
+
+- name: Select newest backup
+  ansible.builtin.set_fact:
+    latest_backup_acme-dns: "{{ (backup_files_acme-dns.files | sort(attribute='mtime'))[-1].path }}"
+  when: backup_files_acme-dns.matched | int > 0
+  delegate_to: localhost
+
+- name: Set fact - backup exists
+  set_fact:
+    backup_exists_acme-dns: "{{ latest_backup_acme-dns.stdout | length > 0 }}"
+
+- name: Decrypt acme-dns backup locally
+  ansible.builtin.shell: |
+    sops -d {{ latest_backup_acme-dns.stdout }} > /tmp/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}
+  delegate_to: localhost
+  when: backup_exists_acme-dns
+
+- name: Set local decrypted path
+  set_fact:
+    local_tar_acme-dns: "/tmp/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_acme-dns
+
+- name: Copy decrypted backup to remote host
+  ansible.builtin.copy:
+    src: "{{ local_tar_acme-dns }}"
+    dest: "/home/docker/"
+    owner: docker
+    group: docker
+    mode: '0644'
+  when: backup_exists_acme-dns
+
+- name: Set remote tar path
+  set_fact:
+    remote_tar_acme-dns: "/home/docker/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_acme-dns
+
+- name: Extract acme-dns backup
+  ansible.builtin.unarchive:
+    src: "{{ remote_tar_acme-dns }}"
+    dest: /home/docker/
+    owner: docker
+    group: docker
+    remote_src: true
+  when: backup_exists_acme-dns
+
+- name: Remove decrypted tar on remote
+  ansible.builtin.file:
+    path: "{{ remote_tar_acme-dns }}"
+    state: absent
+  when: backup_exists_acme-dns
+
+- name: Remove decrypted tar locally
+  ansible.builtin.file:
+    path: "{{ local_tar_acme-dns }}"
+    state: absent
+  delegate_to: localhost
+  when: backup_exists_acme-dns
 
 #--------------------------Find and copy latest crowdsec backup----------------------------------
 
@@ -47,65 +114,65 @@
   run_once: true
   ansible.builtin.shell: |
     ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | head -n 1 || true
-  register: latest_backup
+  register: latest_backup_crowdsec
 
 - name: Set fact - backup exists
   set_fact:
-    backup_exists: "{{ latest_backup.stdout | length > 0 }}"
+    backup_exists: "{{ latest_backup_crowdsec.stdout | length > 0 }}"
 
 - name: Skip restore if no backup found
   debug:
     msg: "No CrowdSec backups found on local host. Skipping restore."
-  when: not backup_exists
+  when: not backup_exists_crowdsec
 
 - name: Decrypt CrowdSec backup locally
   ansible.builtin.shell: |
-    sops -d {{ latest_backup.stdout }} > /tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}
+    sops -d {{ latest_backup_crowdsec.stdout }} > /tmp/{{ (latest_backup_crowdsec.stdout | basename) | regex_replace('.enc$', '') }}
   delegate_to: localhost
-  when: backup_exists
+  when: backup_exists_crowdsec
 
 - name: Set local decrypted path
   set_fact:
-    local_tar: "/tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}"
-  when: backup_exists
+    local_tar_crowdsec: "/tmp/{{ (latest_backup_crowdsec.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_crowdsec
 
 - name: Copy decrypted backup to remote host
   ansible.builtin.copy:
-    src: "{{ local_tar }}"
+    src: "{{ local_tar_crowdsec }}"
     dest: "/home/docker/"
     owner: docker
     group: docker
     mode: '0644'
-  when: backup_exists
+  when: backup_exists_crowdsec
 
 - name: Set remote tar path
   set_fact:
-    remote_tar: "/home/docker/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}"
-  when: backup_exists
+    remote_tar_crowdsec: "/home/docker/{{ (latest_backup_crowdsec.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_crowdsec
 
 - name: Extract CrowdSec backup
   ansible.builtin.unarchive:
-    src: "{{ remote_tar }}"
+    src: "{{ remote_tar_crowdsec }}"
     dest: /home/docker/
     owner: docker
     group: docker
     remote_src: true
-  when: backup_exists
+  when: backup_exists_crowdsec
 
 - name: Remove decrypted tar on remote
   ansible.builtin.file:
-    path: "{{ remote_tar }}"
+    path: "{{ remote_tar_crowdsec }}"
     state: absent
-  when: backup_exists
+  when: backup_exists_crowdsec
 
 - name: Remove decrypted tar locally
   ansible.builtin.file:
-    path: "{{ local_tar }}"
+    path: "{{ local_tar_crowdsec }}"
     state: absent
   delegate_to: localhost
-  when: backup_exists
+  when: backup_exists_crowdsec
 
-#--------------------------Run container----------------------------------
+#--------------------------Run container---------------------------------------
 
 - name: Pull docker compose
   ansible.builtin.shell: docker compose pull

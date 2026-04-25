@@ -33,20 +33,20 @@
   ansible.builtin.shell: >
     sops -e --input-type json acme.json > acme_{{ backup_time }}.json.enc
   args:
-    chdir: /home/docker/certs
+    chdir: /home/docker/certs/traefik
 
-- name: Fetch encrypted file
+- name: Fetch encrypted acme.json
   ansible.builtin.fetch:
     src: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
     dest: "/srv/backups/"
     flat: true
 
-- name: Remove remote encrypted file
+- name: Remove remote encrypted acme.json
   ansible.builtin.file:
     path: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
     state: absent
 
-- name: Find all backups (local)
+- name: Find all acme.json backups (local)
   ansible.builtin.find:
     paths: /srv/backups/
     patterns: "acme_*.json.enc"
@@ -54,7 +54,7 @@
   register: all_backups
   delegate_to: localhost
 
-- name: Remove old backups (keep last 5)
+- name: Remove old acme.json backups (keep last 5)
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
@@ -84,19 +84,19 @@
     format: gz
     remove: no
 
-- name: Encrypt archive with SOPS
+- name: Encrypt acme-dns archive with SOPS
   ansible.builtin.shell: >
     sops -e --input-type binary --output-type binary acme-dns_{{ backup_time }}.tar.gz > acme-dns_{{ backup_time }}.tar.gz.enc
   args:
     chdir: /home/docker
 
-- name: Fetch encrypted file
+- name: Fetch encrypted acme-dns backup
   ansible.builtin.fetch:
     src: "/home/docker/acme-dns_{{ backup_time }}.tar.gz.enc"
     dest: "/srv/backups/"
     flat: true
 
-- name: Remove remote encrypted file
+- name: Remove remote encrypted acme-dns backup
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
@@ -104,7 +104,7 @@
     - /home/docker/acme-dns_{{ backup_time }}.tar.gz.enc
     - /home/docker/acme-dns_{{ backup_time }}.tar.gz
 
-- name: Find all backups (local)
+- name: Find all acme-dns backups (local)
   ansible.builtin.find:
     paths: /srv/backups/
     patterns: "acme-dns_*.tar.gz.enc"
@@ -112,7 +112,7 @@
   register: all_backups
   delegate_to: localhost
 
-- name: Remove old backups (keep last 5)
+- name: Remove old acme-dns backups (keep last 5)
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
@@ -122,7 +122,7 @@
 
 #------------------------------------------Crowdsec backup------------------------------------------
 
-- name: Define paths
+- name: Define crowdsec paths
   set_fact:
     remote_archive: "/home/docker/crowdsec_{{ backup_time }}.tar.gz"
     remote_encrypted: "/home/docker/crowdsec_{{ backup_time }}.tar.gz.enc"
@@ -144,24 +144,24 @@
     dest: "{{ remote_archive }}"
     format: gz
 
-- name: Encrypt archive with SOPS
+- name: Encrypt crowdsec archive with SOPS
   ansible.builtin.shell: >
     sops -e --input-type binary --output-type binary {{ remote_archive }} > {{ remote_encrypted }}
   args:
     chdir: /home/docker
 
-- name: Fetch encrypted backup to local machine
+- name: Fetch encrypted crowdsec backup to local machine
   ansible.builtin.fetch:
     src: "{{ remote_encrypted }}"
     dest: /srv/backups/
     flat: true
 
-- name: Remove remote unencrypted archive
+- name: Remove remote unencrypted crowdsec archive
   ansible.builtin.file:
     path: "{{ remote_archive }}"
     state: absent
 
-- name: Remove remote encrypted archive
+- name: Remove remote encrypted crowdsec archive
   ansible.builtin.file:
     path: "{{ remote_encrypted }}"
     state: absent

@@ -62,7 +62,7 @@
 
 - name: Decrypt acme-dns backup locally
   ansible.builtin.shell: |
-    sops -d {{ latest_backup_acme-dns.stdout }} > /tmp/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}
+    sops -d --input-type binary --output-type binary {{ latest_backup_acme-dns.stdout }} > /tmp/{{ (latest_backup_acme-dns.stdout | basename) | regex_replace('.enc$', '') }}
   delegate_to: localhost
   when: backup_exists_acme-dns
 
@@ -216,7 +216,7 @@
 - name: Enroll CrowdSec console
   ansible.builtin.command: >
     docker exec crowdsec cscli console enroll
-    {{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/enroll_secret.enc') | trim }}
+    {{ lookup('pipe', 'sops -d  /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/enroll_secret.enc') | trim }}
   no_log: true
   ignore_errors: true
 

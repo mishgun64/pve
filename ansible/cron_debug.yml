@@ -1,7 +1,7 @@
 ---
 
 - name: Запланировать traefik-backup webhook на 01:00
-  hosts: traefik
+  hosts: traefik_lxc
   remote_user: root
   gather_facts: false
 

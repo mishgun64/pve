@@ -116,7 +116,7 @@
 
 - name: Set fact - crowdsec backup exists
   set_fact:
-    backup_exists: "{{ latest_backup_crowdsec.stdout | length > 0 }}"
+    backup_exists_crowdsec: "{{ latest_backup_crowdsec.stdout | length > 0 }}"
 
 - name: Skip restore if no crowdsec backup found
   debug:

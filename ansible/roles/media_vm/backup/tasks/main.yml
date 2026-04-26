@@ -201,7 +201,6 @@
 
 - name: Create service directories on control node
   delegate_to: localhost
-  become: true
   ansible.builtin.file:
     path: "/srv/backups/{{ item }}"
     state: directory

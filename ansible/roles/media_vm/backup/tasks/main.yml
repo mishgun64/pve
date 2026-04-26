@@ -182,15 +182,50 @@
     patterns: "*.zip"
   register: backup_files
 
-- name: Fetch backups
+- name: Extract service names
+  set_fact:
+    services: "{{ services | default([]) + [service] }}"
+  vars:
+    filename: "{{ item.path | basename }}"
+    service: >-
+      {{
+        filename
+        | regex_replace('_backup.*$', '')
+        | regex_replace('_v[0-9\\.]+.*$', '')
+      }}
+  loop: "{{ backup_files.files }}"
+
+- name: Make services unique
+  set_fact:
+    unique_services: "{{ services | unique }}"
+
+- name: Create service directories on control node
+  delegate_to: localhost
+  become: true
+  ansible.builtin.file:
+    path: "/srv/backups/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ unique_services }}"
+
+- name: Fetch backups into service directories
   ansible.builtin.fetch:
     src: "{{ item.path }}"
-    dest: /srv/backups/
+    dest: "/srv/backups/{{ (item.path | basename)
+      | regex_replace('_backup.*$', '')
+      | regex_replace('_v[0-9\\.]+.*$', '') }}/"
     flat: yes
-    owner: jenkins
-    group: jenkins
-    mode: "0700"
   loop: "{{ backup_files.files }}"
+
+#- name: Fetch backups
+#  ansible.builtin.fetch:
+#    src: "{{ item.path }}"
+#    dest: /srv/backups/
+#    flat: yes
+#    owner: jenkins
+#    group: jenkins
+#    mode: "0700"
+#  loop: "{{ backup_files.files }}"
 
 - name: Remove remote backups directory
   become: true
@@ -200,17 +235,17 @@
 
 #-----------------------Remove old backups on control node----------------------------------
 
-- name: Cleanup old backups via shell
-  delegate_to: localhost
-  run_once: true
-  shell: |
-    for svc in $(find /srv/backups -maxdepth 1 -type f -name "*.zip" -printf "%f\n" | sed -E 's/_.*//' | sort -u); do
-      find /srv/backups -maxdepth 1 -type f -name "${svc}_*.zip" -printf "%T@ %p\n" \
-        | sort -nr \
-        | tail -n +6 \
-        | cut -d' ' -f2- \
-        | xargs -r rm -f
-    done
+#- name: Cleanup old backups via shell
+#  delegate_to: localhost
+#  run_once: true
+#  shell: |
+#    for svc in $(find /srv/backups -maxdepth 1 -type f -name "*.zip" -printf "%f\n" | sed -E 's/_.*//' | sort -u); do
+#      find /srv/backups -maxdepth 1 -type f -name "${svc}_*.zip" -printf "%T@ %p\n" \
+#        | sort -nr \
+#        | tail -n +6 \
+#        | cut -d' ' -f2- \
+#        | xargs -r rm -f
+#    done
 
 #-----------------------Run docker compose stack----------------------------------
 

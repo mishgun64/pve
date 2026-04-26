@@ -32,7 +32,6 @@ services:
       - ./certs:/etc/prosody/certs:ro
     ports:
       - "5222:5222"   # c2s (клиент-сервер)
-      - "5280:5280"
     environment:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       PUID: 1000

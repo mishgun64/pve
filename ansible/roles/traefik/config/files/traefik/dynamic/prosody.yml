@@ -7,8 +7,6 @@ tcp:
         - xmpp
       rule: "HostSNI(`*`)"
       service: prosody-c2s
-      tls:
-        passthrough: true
 
   services:
     prosody-c2s:

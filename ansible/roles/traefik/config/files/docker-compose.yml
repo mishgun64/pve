@@ -83,6 +83,8 @@ services:
       - --crt-ext=.pem
       - --version
       - v2
+      - --post-hook
+      - "chown -R 1000:1000 /dumped-certs"
     volumes:
       - ./certs/traefik/acme.json:/acme.json:ro
       - ./certs/dumped-certs:/dumped-certs

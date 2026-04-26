@@ -1,4 +1,4 @@
-admins = { "admin@xmpp.mishgun.com" }
+admins = { "admin@mishgun.com" }
 network_backend = "epoll"
 
 modules_enabled = {
@@ -20,10 +20,10 @@ modules_enabled = {
   "ping";
   "register";
   "admin_adhoc";
-  "bosh";
-  "websocket";
+  "admin_shell";
   "smacks";
   "csi_simple";
+}
 
 http_ports = { 5280 }
 http_interfaces = { "*" }
@@ -32,11 +32,6 @@ https_interfaces = { "*" }
 
 modules_disabled = {}
 allow_registration = false
-
--- certmanager найдёт автоматически:
--- /etc/prosody/certs/mishgun.com/certificate.pem
--- /etc/prosody/certs/mishgun.com/privatekey.pem
-certificates = "/etc/prosody/certs"
 
 storage = "sql"
 sql = {
@@ -48,10 +43,14 @@ sql = {
   password = Lua.os.getenv("MYSQL_PASSWORD");
 }
 
-VirtualHost "xmpp.mishgun.com"
+VirtualHost "mishgun.com"
   enabled = true
+  ssl = {
+    key = "/etc/prosody/certs/mishgun.com/privatekey.pem";
+    certificate = "/etc/prosody/certs/mishgun.com/certificate.pem";
+  }
 
-Component "conference.xmpp.mishgun.com" "muc"
+Component "conference.mishgun.com" "muc"
   modules_enabled = { "muc_mam" }
 
 consider_bosh_secure = true

@@ -1,97 +1,97 @@
 ---
 
-##-----------------------Find latest backups on control node----------------------------------
-#
-#- name: Ensure backup dir exists on target
-#  file:
-#    path: /home/docker/backups
-#    state: directory
-#    mode: '0755'
-#
-#- name: Find backups on control node
-#  find:
-#    paths: /srv/backups
-#    patterns: "*.zip"
-#  delegate_to: localhost
-#  register: backup_files
-#
-#- name: Init latest_backups
-#  set_fact:
-#    latest_backups: {}
-#
-#- name: Build latest backups dict
-#  set_fact:
-#    latest_backups: "{{ latest_backups | default({}) | combine({svc: item}) }}"
-#  vars:
-#    svc: "{{ item.path | basename | regex_replace('_.*$', '') }}"
-#  loop: "{{ backup_files.files | sort(attribute='mtime', reverse=True) }}"
-#  when: latest_backups is not defined or latest_backups[svc] is not defined
-#
-##-----------------------Delivery latest backups to target----------------------------------
-#
-#- name: Copy latest backups to target
-#  copy:
-#    src: "{{ item.value.path }}"
-#    dest: "/home/docker/backups/{{ item.value.path | basename }}"
-#  loop: "{{ latest_backups | dict2items }}"
-#
-#- name: Stop docker compose stack
-#  ansible.builtin.shell: docker compose down
-#  args:
-#    chdir: /home/docker
-#  become: true
-#  become_user: docker
-#
-#- name: Create qbittorent dir
-#  ansible.builtin.file:
-#    path: /home/docker/qbittorrent_config/data
-#    state: directory
-#    owner: docker
-#    group: docker
-#    mode: '0755'
-#
-#- name: Define service directories
-#  set_fact:
-#    service_dirs:
-#      prowlarr: /home/docker/prowlarr_config/
-#      radarr: /home/docker/radarr_config/
-#      sonarr-anime: /home/docker/sonarr_anime_config/
-#      sonarr-series: /home/docker/sonarr_series_config/
-#      bazarr: /home/docker/bazarr_config/
-#      emby: /home/docker/emby_config/
-#      jellyfin: /home/docker/jellyfin_config/
-#      seerr: /home/docker/seerr_config/
-#      qbittorrent: /home/docker/qbittorrent_config/data
-#
-#- name: Unarchive backups
-#  unarchive:
-#    src: "/home/docker/backups/{{ item.value.path | basename }}"
-#    dest: "{{ service_dirs[item.key] }}"
-#    owner: docker
-#    group: docker
-#    remote_src: yes
-#  loop: "{{ latest_backups | dict2items }}"
-#  when: item.key in service_dirs
-#
-#- name: Find wal and shm files
-#  find:
-#    paths: /home/docker
-#    patterns: "*-wal, *-shm"
-#    recurse: yes
-#  register: found_files
-#
-#- name: Remove wal and shm files
-#  file:
-#    path: "{{ item.path }}"
-#    state: absent
-#  loop: "{{ found_files.files }}"
-#
-#- name: Fix ownership of docker home
-#  ansible.builtin.file:
-#    path: /home/docker
-#    owner: docker
-#    group: docker
-#    recurse: true
+#-----------------------Find latest backups on control node----------------------------------
+
+- name: Ensure backup dir exists on target
+  file:
+    path: /home/docker/backups
+    state: directory
+    mode: '0755'
+
+- name: Find backups on control node
+  find:
+    paths: /srv/backups
+    patterns: "*.zip"
+  delegate_to: localhost
+  register: backup_files
+
+- name: Init latest_backups
+  set_fact:
+    latest_backups: {}
+
+- name: Build latest backups dict
+  set_fact:
+    latest_backups: "{{ latest_backups | default({}) | combine({svc: item}) }}"
+  vars:
+    svc: "{{ item.path | basename | regex_replace('_.*$', '') }}"
+  loop: "{{ backup_files.files | sort(attribute='mtime', reverse=True) }}"
+  when: latest_backups is not defined or latest_backups[svc] is not defined
+
+#-----------------------Delivery latest backups to target----------------------------------
+
+- name: Copy latest backups to target
+  copy:
+    src: "{{ item.value.path }}"
+    dest: "/home/docker/backups/{{ item.value.path | basename }}"
+  loop: "{{ latest_backups | dict2items }}"
+
+- name: Stop docker compose stack
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
+
+- name: Create qbittorent dir
+  ansible.builtin.file:
+    path: /home/docker/qbittorrent_config/data
+    state: directory
+    owner: docker
+    group: docker
+    mode: '0755'
+
+- name: Define service directories
+  set_fact:
+    service_dirs:
+      prowlarr: /home/docker/prowlarr_config/
+      radarr: /home/docker/radarr_config/
+      sonarr-anime: /home/docker/sonarr_anime_config/
+      sonarr-series: /home/docker/sonarr_series_config/
+      bazarr: /home/docker/bazarr_config/
+      emby: /home/docker/emby_config/
+      jellyfin: /home/docker/jellyfin_config/
+      seerr: /home/docker/seerr_config/
+      qbittorrent: /home/docker/qbittorrent_config/data
+
+- name: Unarchive backups
+  unarchive:
+    src: "/home/docker/backups/{{ item.value.path | basename }}"
+    dest: "{{ service_dirs[item.key] }}"
+    owner: docker
+    group: docker
+    remote_src: yes
+  loop: "{{ latest_backups | dict2items }}"
+  when: item.key in service_dirs
+
+- name: Find wal and shm files
+  find:
+    paths: /home/docker
+    patterns: "*-wal, *-shm"
+    recurse: yes
+  register: found_files
+
+- name: Remove wal and shm files
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ found_files.files }}"
+
+- name: Fix ownership of docker home
+  ansible.builtin.file:
+    path: /home/docker
+    owner: docker
+    group: docker
+    recurse: true
 
 #-----------------------Run docker compose stack----------------------------------
 

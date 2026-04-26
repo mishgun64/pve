@@ -71,13 +71,18 @@ services:
     image: ldez/traefik-certs-dumper:latest
     container_name: traefik-certs-dumper
     restart: unless-stopped
-    command: >
-      file
-      --watch
-      --source /acme.json
-      --dest /dumped-certs
-      --domain-subdir
-      --post-hook "chmod 644 /dumped-certs/mishgun.com/privatekey.pem"
+    command:
+      - file
+      - --watch
+      - --source
+      - /acme.json
+      - --dest
+      - /dumped-certs
+      - --domain-subdir
+      - --key-ext=.pem
+      - --crt-ext=.pem
+      - --version
+      - v2
     volumes:
       - ./certs/traefik/acme.json:/acme.json:ro
       - ./certs/dumped-certs:/dumped-certs

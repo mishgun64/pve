@@ -76,7 +76,7 @@
 
 - name: Add mount point to container 143
   ansible.builtin.command: >
-    pct set 144 -mp0 /srv/certs/,mp=/home/docker/certs
+    pct set 144 -mp0 /srv/certs/dumped-certs/,mp=/home/docker/certs
   delegate_to: pve
 
 #--------------------------Run container----------------------------------

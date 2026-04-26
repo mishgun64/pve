@@ -31,6 +31,11 @@
   changed_when: false
   when: backup_files_acme.matched | int > 0
 
+- name: Remove acme.json if it's a directory
+  ansible.builtin.file:
+    path: /home/docker/certs/traefik/acme.json
+    state: absent
+
 - name: Restore acme.json
   ansible.builtin.copy:
     dest: /home/docker/certs/traefik/acme.json

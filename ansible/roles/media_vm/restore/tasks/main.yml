@@ -21,34 +21,32 @@
     parsed_backups: "{{ parsed_backups | default([]) + [item_parsed] }}"
   vars:
     fname: "{{ item.path | basename }}"
+
     service: "{{ item.path | regex_replace('^.*/media/([^/]+)/.*$', '\\1') }}"
 
-    ts: >-
-      {{
-        fname
-        | regex_search('(\\d{4}\\.\\d{2}\\.\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2})')
-      }}
-
-    ts_norm: >-
-      {{
-        ts
-        | regex_replace('\\.', '-')
-        | regex_replace('_', ' ')
-      }}
+    ts: "{{ fname | regex_search('([0-9]{4}\\.[0-9]{2}\\.[0-9]{2}_[0-9]{2}\\.[0-9]{2}\\.[0-9]{2})') }}"
 
     item_parsed:
       path: "{{ item.path }}"
       service: "{{ service }}"
-      ts: "{{ ts_norm }}"
+      ts: "{{ ts }}"
   loop: "{{ backup_files.files }}"
-  when: ts is defined
+  when:
+    - ts is not none
+    - ts | length > 0
+
+- debug:
+    var: parsed_backups
 
 - name: Build latest backups per service
   set_fact:
     latest_backups: "{{ latest_backups | default({}) | combine({item.service: item}) }}"
   loop: "{{ parsed_backups | sort(attribute='ts', reverse=True) }}"
-  when: latest_backups[item.service] is not defined
-  
+  when:
+    - item.ts is defined
+    - item.ts | length > 0
+    - latest_backups[item.service] is not defined
+
 #-----------------------Delivery latest backups to target----------------------------------
 
 - name: Copy latest backups to target

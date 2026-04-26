@@ -8,25 +8,47 @@
     state: directory
     mode: '0755'
 
-- name: Find backups on control node
+- name: Find all backups in media
   find:
-    paths: /srv/backups
+    paths: /srv/backups/media
     patterns: "*.zip"
-  delegate_to: localhost
+    recurse: yes
   register: backup_files
+  delegate_to: localhost
 
-- name: Init latest_backups
+- name: Parse backup metadata
   set_fact:
-    latest_backups: {}
-
-- name: Build latest backups dict
-  set_fact:
-    latest_backups: "{{ latest_backups | default({}) | combine({svc: item}) }}"
+    parsed_backups: "{{ parsed_backups | default([]) + [item_parsed] }}"
   vars:
-    svc: "{{ item.path | basename | regex_replace('_.*$', '') }}"
-  loop: "{{ backup_files.files | sort(attribute='mtime', reverse=True) }}"
-  when: latest_backups is not defined or latest_backups[svc] is not defined
+    fname: "{{ item.path | basename }}"
+    service: "{{ item.path | regex_replace('^.*/media/([^/]+)/.*$', '\\1') }}"
 
+    ts: >-
+      {{
+        fname
+        | regex_search('(\\d{4}\\.\\d{2}\\.\\d{2}_\\d{2}\\.\\d{2}\\.\\d{2})')
+      }}
+
+    ts_norm: >-
+      {{
+        ts
+        | regex_replace('\\.', '-')
+        | regex_replace('_', ' ')
+      }}
+
+    item_parsed:
+      path: "{{ item.path }}"
+      service: "{{ service }}"
+      ts: "{{ ts_norm }}"
+  loop: "{{ backup_files.files }}"
+  when: ts is defined
+
+- name: Build latest backups per service
+  set_fact:
+    latest_backups: "{{ latest_backups | default({}) | combine({item.service: item}) }}"
+  loop: "{{ parsed_backups | sort(attribute='ts', reverse=True) }}"
+  when: latest_backups[item.service] is not defined
+  
 #-----------------------Delivery latest backups to target----------------------------------
 
 - name: Copy latest backups to target

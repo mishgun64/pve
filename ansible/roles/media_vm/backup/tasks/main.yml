@@ -202,7 +202,7 @@
 - name: Create service directories on control node
   delegate_to: localhost
   ansible.builtin.file:
-    path: "/srv/backups/{{ item }}"
+    path: "/srv/backups/media/{{ item }}"
     state: directory
     mode: "0755"
   loop: "{{ unique_services }}"
@@ -210,21 +210,11 @@
 - name: Fetch backups into service directories
   ansible.builtin.fetch:
     src: "{{ item.path }}"
-    dest: "/srv/backups/{{ (item.path | basename)
+    dest: "/srv/backups/media/{{ (item.path | basename)
       | regex_replace('_backup.*$', '')
       | regex_replace('_v[0-9\\.]+.*$', '') }}/"
     flat: yes
   loop: "{{ backup_files.files }}"
-
-#- name: Fetch backups
-#  ansible.builtin.fetch:
-#    src: "{{ item.path }}"
-#    dest: /srv/backups/
-#    flat: yes
-#    owner: jenkins
-#    group: jenkins
-#    mode: "0700"
-#  loop: "{{ backup_files.files }}"
 
 - name: Remove remote backups directory
   become: true

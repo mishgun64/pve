@@ -198,6 +198,7 @@
     version: latest-release
     single_branch: yes
     update: yes
+    force: yes
   become: true
   become_user: docker
 

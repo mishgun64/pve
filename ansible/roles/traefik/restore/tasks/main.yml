@@ -35,6 +35,7 @@
   ansible.builtin.file:
     path: /home/docker/certs/traefik/acme.json
     state: absent
+  when: backup_files_acme.matched | int > 0
 
 - name: Restore acme.json
   ansible.builtin.copy:

@@ -50,9 +50,10 @@
 #-----------------------Delivery latest backups to target----------------------------------
 
 - name: Copy latest backups to target
-  copy:
+  ansible.builtin.copy:
     src: "{{ item.value.path }}"
     dest: "/home/docker/backups/{{ item.value.path | basename }}"
+    mode: '0644'
   loop: "{{ latest_backups | dict2items }}"
 
 - name: Stop docker compose stack
@@ -62,7 +63,7 @@
   become: true
   become_user: docker
 
-- name: Create qbittorent dir
+- name: Create qbittorrent dir
   ansible.builtin.file:
     path: /home/docker/qbittorrent_config/data
     state: directory
@@ -83,28 +84,37 @@
       seerr: /home/docker/seerr_config/
       qbittorrent: /home/docker/qbittorrent_config/data
 
+- name: Validate archives exist before restore
+  stat:
+    path: "/home/docker/backups/{{ item.value.path | basename }}"
+  register: archive_stat
+  loop: "{{ latest_backups | dict2items }}"
+
 - name: Unarchive backups
   unarchive:
-    src: "/home/docker/backups/{{ item.value.path | basename }}"
-    dest: "{{ service_dirs[item.key] }}"
+    src: "/home/docker/backups/{{ item.item.value.path | basename }}"
+    dest: "{{ service_dirs[item.item.key] }}"
     owner: docker
     group: docker
     remote_src: yes
-  loop: "{{ latest_backups | dict2items }}"
-  when: item.key in service_dirs
+  loop: "{{ archive_stat.results }}"
+  when:
+    - item.stat.exists
+    - item.item.key in service_dirs
 
 - name: Find wal and shm files
-  find:
+  ansible.builtin.find:
     paths: /home/docker
     patterns: "*-wal, *-shm"
     recurse: yes
   register: found_files
 
 - name: Remove wal and shm files
-  file:
+  ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
   loop: "{{ found_files.files }}"
+  when: found_files.matched | default(0) > 0
 
 - name: Fix ownership of docker home
   ansible.builtin.file:

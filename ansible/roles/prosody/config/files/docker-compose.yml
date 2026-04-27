@@ -56,10 +56,10 @@ services:
       CROWDSEC_LAPI_KEY: ${CROWDSEC_AGENT_KEY}   # ключ, созданный на сервере
       # Отключаем встроенный LAPI — работаем только как агент
       DISABLE_LOCAL_API: true
-      COLLECTIONS: crowdsecurity/xmpp
+      COLLECTIONS: crowdsecurity/linux crowdsecurity/base-http-scenarios
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
-      - ./crowdsec/config:/etc/crowdsec/
+#      - ./crowdsec/config:/etc/crowdsec/
       - ./logs:/var/log/prosody:ro       # логи Prosody
       - ./crowdsec/data:/var/lib/crowdsec/data
     networks:

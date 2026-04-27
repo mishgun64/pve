@@ -139,25 +139,6 @@
     pct set 144 -mp0 /srv/certs/dumped-certs/,mp=/home/docker/certs
   delegate_to: pve
 
-#--------------------------Run container----------------------------------
-
-- name: Pull docker compose
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-  timeout: 600
-
-- name: Start docker compose
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-
 #-----------------------Autobackup----------------------------------
 
 - name: Initialize prosody backup

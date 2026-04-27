@@ -52,7 +52,7 @@
 - name: Fetch encrypted file
   ansible.builtin.fetch:
     src: "/home/docker/prosody_{{ backup_time }}.tar.gz.enc"
-    dest: "/srv/backups/prosody"
+    dest: "/srv/backups/prosody/prosody_{{ backup_time }}.tar.gz.enc"
     flat: true
 
 - name: Remove remote backup files

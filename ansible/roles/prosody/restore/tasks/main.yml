@@ -102,6 +102,10 @@
   delegate_to: traefik_lxc
   no_log: true
 
+- name: Debug raw output
+  ansible.builtin.debug:
+    msg: "{{ machine_output.stdout }}"
+
 - name: Parse credentials
   ansible.builtin.set_fact:
     crowdsec_login: "{{ machine_output.stdout | regex_search('login:\\s*(\\S+)', '\\1') | first }}"

@@ -36,25 +36,46 @@
 
 #-----------------------Install Crowdsec bouncer----------------------------------
 
-- name: Install CrowdSec repo script deps
-  ansible.builtin.apt:
-    name:
-      - curl
-      - gnupg
-    state: present
-    update_cache: yes
+#- name: Install CrowdSec repo script deps
+#  ansible.builtin.apt:
+#    name:
+#      - curl
+#      - gnupg
+#    state: present
+#    update_cache: yes
 
-- name: Add CrowdSec repository
-  ansible.builtin.shell: |
-    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | bash
-  args:
-    creates: /etc/apt/sources.list.d/crowdsec_crowdsec.list
+- name: Add CrowdSec GPG key
+  ansible.builtin.get_url:
+    url: https://packagecloud.io/crowdsec/crowdsec/gpgkey
+    dest: /usr/share/keyrings/crowdsec.gpg
+    mode: '0644'
+
+- name: Add CrowdSec repository (force bookworm)
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/crowdsec_crowdsec.list
+    content: |
+      deb [signed-by=/usr/share/keyrings/crowdsec.gpg] https://packagecloud.io/crowdsec/crowdsec/debian/ bookworm main
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
 
 - name: Install firewall bouncer (nftables)
   ansible.builtin.apt:
     name: crowdsec-firewall-bouncer-nftables
     state: present
-    update_cache: yes
+
+#- name: Add CrowdSec repository
+#  ansible.builtin.shell: |
+#    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | bash
+#  args:
+#    creates: /etc/apt/sources.list.d/crowdsec_crowdsec.list
+#
+#- name: Install firewall bouncer (nftables)
+#  ansible.builtin.apt:
+#    name: crowdsec-firewall-bouncer-nftables
+#    state: present
+#    update_cache: yes
 
 #-----------------------Copy config files----------------------------------
 

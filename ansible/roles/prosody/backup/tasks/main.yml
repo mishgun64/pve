@@ -59,9 +59,9 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
-    loop:
-      - /home/docker/prosody_{{ backup_time }}.tar.gz
-      - /home/docker/prosody_{{ backup_time }}.tar.gz.enc
+  loop:
+    - "/home/docker/prosody_{{ backup_time }}.tar.gz"
+    - "/home/docker/prosody_{{ backup_time }}.tar.gz.enc"
 
 - name: Find all backups (local)
   ansible.builtin.find:

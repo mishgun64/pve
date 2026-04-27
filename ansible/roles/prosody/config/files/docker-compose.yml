@@ -43,9 +43,9 @@ services:
     networks:
       - prosody-net
 
-  crowdsec-agent:
+  crowdsec:
     image: crowdsecurity/crowdsec:latest
-    container_name: crowdsec-agent
+    container_name: crowdsec
     restart: unless-stopped
     environment:
       PUID: 1000

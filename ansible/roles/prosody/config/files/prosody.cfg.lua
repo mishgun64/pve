@@ -40,12 +40,12 @@ modules_enabled = {
 
   -- Администрирование
   "announce";         -- Рассылка от администратора всем пользователям
+  "disco";
 }
 
 modules_disabled = {
   -- Федерация (S2S)
   "dialback";
-  "disco";
   -- BOSH и WebSocket
   "bosh";
   "websocket";
@@ -67,7 +67,7 @@ sql = {
 }
 
 -- Архив сообщений
-archive_expires_after = "4w"
+archive_expires_after = "4y"
 default_archive_policy = true
 
 -- Передача файлов (HTTP Upload)

@@ -72,26 +72,6 @@
   delegate_to: localhost
   when: backup_exists_prosody
 
-
-#--------------------------Run container----------------------------------
-
-- name: Pull docker compose
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-  timeout: 600
-
-- name: Start docker compose
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-
 #-----------------------Add bouncer api key----------------------------------
 
 - name: Delete existing bouncer (ignore errors)
@@ -133,10 +113,19 @@
     line: "CROWDSEC_AGENT_KEY={{ crowdsec_agent_key }}"
     create: yes
 
-#-----------------------Restart containers----------------------------------
+#--------------------------Run container----------------------------------
 
-- name: Restart containers
-  ansible.builtin.shell: docker compose restart
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
   args:
     chdir: /home/docker
   become: true

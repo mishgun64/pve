@@ -109,8 +109,10 @@
   no_log: true
 
 - name: Parse credentials
-  debug: crowdsec_agent_key
-  
+  ansible.builtin.debug:
+    msg:
+      password: "{{ crowdsec_agent_key }}"
+
 - name: Update CROWDSEC_AGENT_KEY in .env
   ansible.builtin.lineinfile:
     path: /home/docker/.env

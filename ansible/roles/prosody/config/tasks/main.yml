@@ -116,16 +116,6 @@
     src: crowdsec-firewall-bouncer.yaml
     dest: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
 
-- name: Copy config.yaml
-  copy:
-    src: config.yaml
-    dest: /home/docker/crowdsec/config/config.yaml
-
-- name: Copy local_api_credentials.yaml
-  copy:
-    src: local_api_credentials.yaml
-    dest: /home/docker/crowdsec/config/local_api_credentials.yaml
-
 - name: Copy docker-compose.yml
   copy:
     src: docker-compose.yml

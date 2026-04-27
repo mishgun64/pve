@@ -100,11 +100,14 @@
   ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f -
   register: machine_output
   delegate_to: traefik_lxc
+  no_log: true
 
-- name: Extract password from output
+- name: Parse credentials
   ansible.builtin.set_fact:
-    crowdsec_agent_key: >-
-      {{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') }}
+    crowdsec_url: "{{ machine_output.stdout | regex_search('url:\\s*(\\S+)', '\\1') }}"
+    crowdsec_login: "{{ machine_output.stdout | regex_search('login:\\s*(\\S+)', '\\1') }}"
+    crowdsec_agent_key: "{{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') }}"
+  no_log: true
 
 - name: Update CROWDSEC_AGENT_KEY in .env
   ansible.builtin.lineinfile:
@@ -112,6 +115,7 @@
     regexp: '^CROWDSEC_AGENT_KEY='
     line: "CROWDSEC_AGENT_KEY={{ crowdsec_agent_key }}"
     create: yes
+  no_log: true
 
 #--------------------------Run container----------------------------------
 

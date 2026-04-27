@@ -100,7 +100,6 @@
   ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f -
   register: machine_output
   delegate_to: traefik_lxc
-  no_log: true
 
 - name: Debug raw output
   ansible.builtin.debug:

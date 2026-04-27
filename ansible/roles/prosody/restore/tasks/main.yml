@@ -117,12 +117,11 @@
     msg:
       password: "{{ crowdsec_agent_key }}"
 
-- name: Update CROWDSEC_AGENT_KEY in .env
+- name: Update CrowdSec agent password
   ansible.builtin.lineinfile:
-    path: /home/docker/.env
-    regexp: '^CROWDSEC_AGENT_KEY='
-    line: "CROWDSEC_AGENT_KEY={{ crowdsec_agent_key }}"
-    create: yes
+    path: /home/docker/crowdsec/config/local_api_credentials.yaml
+    regexp: '^password:'
+    line: "password: {{ crowdsec_agent_key }}"
 #  no_log: true
 
 #--------------------------Run container----------------------------------

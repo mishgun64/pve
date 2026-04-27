@@ -33,6 +33,29 @@
   ansible.builtin.shell: >
     sed -i 's/\r//' /etc/pve/firewall/144.fw
   delegate_to: pve
+
+#-----------------------Install Crowdsec bouncer----------------------------------
+
+- name: Install CrowdSec repo script deps
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+
+- name: Add CrowdSec repository
+  ansible.builtin.shell: |
+    curl -s https://packagecloud.io/install/repositories/crowdsec/crowdsec/script.deb.sh | bash
+  args:
+    creates: /etc/apt/sources.list.d/crowdsec_crowdsec.list
+
+- name: Install firewall bouncer (nftables)
+  ansible.builtin.apt:
+    name: crowdsec-firewall-bouncer-nftables
+    state: present
+    update_cache: yes
+
 #-----------------------Copy config files----------------------------------
 
 - name: Create required directories
@@ -47,6 +70,9 @@
     - /home/docker/config
     - /home/docker/certs
     - /home/docker/mariadb-data
+    - /home/docker/crowdsec/config
+    - /home/docker/crowdsec/data
+    - /home/docker/logs
 
 - name: Copy prosody.cfg.lua
   copy:
@@ -55,6 +81,19 @@
     owner: docker
     group: docker
     mode: '0644'
+
+- name: Copy acquis.yaml
+  copy:
+    src: acquis.yaml
+    dest: /home/docker/crowdsec/acquis.yaml
+    owner: docker
+    group: docker
+    mode: '0644'
+
+- name: Copy acquis.yaml
+  copy:
+    src: crowdsec-firewall-bouncer.yaml
+    dest: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
 
 - name: Copy docker-compose.yml
   copy:
@@ -97,3 +136,18 @@
   become: true
   become_method: su
   become_user: docker
+
+#-----------------------Autobackup----------------------------------
+
+- name: Initialize prosody backup
+  ansible.builtin.cron:
+    name: "Initialize prosody backup"
+    hour: "4"
+    minute: "30"
+    job: >-
+      curl -X POST
+      "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+      -H "Content-Type: application/json"
+      -d '{"event":"prosody-backup","node":"pve1","host":"pve1.local"}'
+      >> /var/log/traefik-backup-webhook.log 2>&1
+    state: "{{ state | default('present') }}"

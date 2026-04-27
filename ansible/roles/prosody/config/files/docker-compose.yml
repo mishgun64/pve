@@ -30,6 +30,7 @@ services:
       - ./config:/etc/prosody
       - ./data:/var/lib/prosody
       - ./certs:/etc/prosody/certs:ro
+      - ./logs:/var/log/prosody
     ports:
       - "5222:5222"   # c2s (клиент-сервер)
     environment:
@@ -41,6 +42,30 @@ services:
       - no-new-privileges:true
     networks:
       - prosody-net
+
+  crowdsec-agent:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec-agent
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
+      # Регистрируемся как агент на удалённом LAPI
+      CROWDSEC_LAPI_URL: http://192.168.4.3:8081
+      CROWDSEC_LAPI_KEY: ${CROWDSEC_AGENT_KEY}   # ключ, созданный на сервере
+      # Отключаем встроенный LAPI — работаем только как агент
+      DISABLE_LOCAL_API: true
+      COLLECTIONS: crowdsecurity/xmpp
+    volumes:
+      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - ./crowdsec/config:/etc/crowdsec/
+      - ./logs:/var/log/prosody:ro       # логи Prosody
+      - ./crowdsec/data:/var/lib/crowdsec/data
+    networks:
+      - prosody-net
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   prosody-net:

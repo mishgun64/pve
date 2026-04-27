@@ -268,6 +268,38 @@ pipeline {
             }
         }
 
+        stage('prosody-backup') {
+            when {
+                expression { env.EVENT == 'prosody-backup' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Prosody-backup"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/prosody_backup.yml
+                '''
+            }
+        }
+
+        stage('prosody-restore') {
+            when {
+                expression { env.EVENT == 'prosody-restore' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Prosody-restore"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/prosody_restore.yml
+                '''
+            }
+        }
+
         stage('cron-debug') {
             when {
                 expression { env.EVENT == 'cron-debug' }

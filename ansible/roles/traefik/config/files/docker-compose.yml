@@ -62,6 +62,8 @@ services:
       - ./crowdsec/config:/etc/crowdsec/
       - ./traefik/logs:/var/log/traefik:ro
       - ./crowdsec/data:/var/lib/crowdsec/data
+    ports:
+      - "192.168.4.3:8081:8080"
     networks:
       - proxy
     security_opt:

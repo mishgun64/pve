@@ -1,0 +1,4 @@
+filenames:
+  - /var/log/prosody/*.log
+labels:
+  type: syslog

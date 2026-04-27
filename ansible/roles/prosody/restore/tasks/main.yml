@@ -106,7 +106,7 @@
   ansible.builtin.set_fact:
     crowdsec_login: "{{ machine_output.stdout | regex_search('login:\\s*(\\S+)', '\\1') | first }}"
     crowdsec_agent_key: "{{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') | first }}"
-  no_log: true
+#  no_log: true
 
 - name: Parse credentials
   ansible.builtin.debug:

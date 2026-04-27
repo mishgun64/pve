@@ -72,6 +72,25 @@
   delegate_to: localhost
   when: backup_exists_prosody
 
+#--------------------------Run container----------------------------------
+
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+
 #-----------------------Add bouncer api key----------------------------------
 
 - name: Delete existing bouncer (ignore errors)
@@ -98,6 +117,14 @@
     {{ lookup('pipe', 'sops -d  /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/enroll_secret.enc') | trim }}
   no_log: true
   ignore_errors: true
+
+- name: Restart containers
+  ansible.builtin.shell: docker compose restart
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
 
 #-----------------------Agent registration----------------------------------
 
@@ -129,21 +156,3 @@
 #    line: "password: {{ crowdsec_agent_key }}"
 ##  no_log: true
 
-#--------------------------Run container----------------------------------
-
-- name: Pull docker compose
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-  timeout: 600
-
-- name: Start docker compose
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker

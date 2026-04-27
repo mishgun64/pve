@@ -123,7 +123,7 @@
     regexp: '^CROWDSEC_AGENT_KEY='
     line: "CROWDSEC_AGENT_KEY={{ crowdsec_agent_key }}"
     create: yes
-  no_log: true
+#  no_log: true
 
 #--------------------------Run container----------------------------------
 

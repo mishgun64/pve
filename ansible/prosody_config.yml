@@ -7,6 +7,6 @@
   roles:
     - common/basic
     - common/docker
-    - prosody/backup
+#    - prosody/backup
     - prosody/config
     - prosody/restore

@@ -1,0 +1,144 @@
+---
+
+#--------------------------Stop container----------------------------------
+
+- name: Stop docker compose
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+
+#--------------------------Find and copy latest prosody backup----------------------------------
+
+- name: Find latest prosody backup
+  delegate_to: localhost
+  run_once: true
+  ansible.builtin.shell: |
+    ls -1t /srv/backups/prosody/prosody_*.tar.gz.enc 2>/dev/null | head -n 1 || true
+  register: latest_backup_prosody
+
+- name: Set fact - prosody backup exists
+  set_fact:
+    backup_exists_prosody: "{{ latest_backup_prosody.stdout | length > 0 }}"
+
+- name: Skip restore if no prosody backup found
+  debug:
+    msg: "No prosody backups found on local host. Skipping restore."
+  when: not backup_exists_prosody
+
+- name: Decrypt prosody backup locally
+  ansible.builtin.shell: |
+    sops -d --input-type binary --output-type binary {{ latest_backup_prosody.stdout }} > /tmp/{{ (latest_backup_prosody.stdout | basename) | regex_replace('.enc$', '') }}
+  delegate_to: localhost
+  when: backup_exists_prosody
+
+- name: Set local decrypted prosody path
+  set_fact:
+    local_tar_prosody: "/tmp/{{ (latest_backup_prosody.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_prosody
+
+- name: Copy decrypted prosody backup to remote host
+  ansible.builtin.copy:
+    src: "{{ local_tar_prosody }}"
+    dest: "/home/docker/"
+    owner: docker
+    group: docker
+    mode: '0644'
+  when: backup_exists_prosody
+
+- name: Set remote prosody tar path
+  set_fact:
+    remote_tar_prosody: "/home/docker/{{ (latest_backup_prosody.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_prosody
+
+- name: Extract prosody backup
+  ansible.builtin.unarchive:
+    src: "{{ remote_tar_prosody }}"
+    dest: /home/docker/
+    owner: docker
+    group: docker
+    remote_src: true
+  when: backup_exists_prosody
+
+- name: Remove decrypted prosody tar on remote
+  ansible.builtin.file:
+    path: "{{ remote_tar_prosody }}"
+    state: absent
+  when: backup_exists_prosody
+
+- name: Remove decrypted prosody tar locally
+  ansible.builtin.file:
+    path: "{{ local_tar_prosody }}"
+    state: absent
+  delegate_to: localhost
+  when: backup_exists_prosody
+
+
+#--------------------------Run container----------------------------------
+
+- name: Pull docker compose
+  ansible.builtin.shell: docker compose pull
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  timeout: 600
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+
+#-----------------------Add bouncer api key----------------------------------
+
+- name: Delete existing bouncer (ignore errors)
+  ansible.builtin.shell: docker exec crowdsec cscli bouncers delete prosody-firewall-bouncer
+  ignore_errors: true
+  delegate_to: traefik_lxc
+
+- name: Add bouncer
+  ansible.builtin.shell: docker exec crowdsec cscli bouncers add prosody-firewall-bouncer
+  register: bouncer_output
+  delegate_to: traefik_lxc
+
+- name: Extract bouncer key
+  ansible.builtin.set_fact:
+    crowdsec_bouncer_key: "{{ bouncer_output.stdout_lines[2] | trim }}"
+
+- name: Update api_key in crowdsec firewall bouncer config
+  ansible.builtin.lineinfile:
+    path: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+    regexp: '^api_key:'
+    line: "api_key: {{ crowdsec_bouncer_key }}"
+
+#-----------------------Agent registration----------------------------------
+
+- name: Add CrowdSec machine (prosody-agent)
+  ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto
+  register: machine_output
+  delegate_to: traefik_lxc
+
+- name: Extract password from output
+  ansible.builtin.set_fact:
+    crowdsec_agent_key: >-
+      {{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') }}
+
+- name: Update CROWDSEC_AGENT_KEY in .env
+  ansible.builtin.lineinfile:
+    path: /home/docker/.env
+    regexp: '^CROWDSEC_AGENT_KEY='
+    line: "CROWDSEC_AGENT_KEY={{ crowdsec_agent_key }}"
+    create: yes
+
+#-----------------------Restart containers----------------------------------
+
+- name: Restart containers
+  ansible.builtin.shell: docker compose restart
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

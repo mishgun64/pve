@@ -97,9 +97,10 @@
 #-----------------------Agent registration----------------------------------
 
 - name: Add CrowdSec machine (prosody-agent)
-  ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f -
+  ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f - 2>&1
   register: machine_output
   delegate_to: traefik_lxc
+  no_log: true
 
 - name: Debug raw output
   ansible.builtin.debug:

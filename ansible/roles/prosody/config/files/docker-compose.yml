@@ -51,16 +51,11 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Moscow
-      # Регистрируемся как агент на удалённом LAPI
-#      CROWDSEC_LAPI_URL: http://192.168.4.3:8081
-#      CROWDSEC_LAPI_KEY: ${CROWDSEC_AGENT_KEY}   # ключ, созданный на сервере
-      # Отключаем встроенный LAPI — работаем только как агент
-#      DISABLE_LOCAL_API: true
       COLLECTIONS: crowdsecurity/linux crowdsecurity/base-http-scenarios
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - ./crowdsec/config:/etc/crowdsec/
-      - ./logs:/var/log/prosody:ro       # логи Prosody
+      - ./logs:/var/log/prosody:ro
       - ./crowdsec/data:/var/lib/crowdsec/data
     networks:
       - prosody-net

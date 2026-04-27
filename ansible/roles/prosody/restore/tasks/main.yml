@@ -77,12 +77,10 @@
 - name: Delete existing bouncer (ignore errors)
   ansible.builtin.shell: docker exec crowdsec cscli bouncers delete prosody-firewall-bouncer
   ignore_errors: true
-  delegate_to: traefik_lxc
 
 - name: Add bouncer
   ansible.builtin.shell: docker exec crowdsec cscli bouncers add prosody-firewall-bouncer
   register: bouncer_output
-  delegate_to: traefik_lxc
 
 - name: Extract bouncer key
   ansible.builtin.set_fact:
@@ -94,35 +92,42 @@
     regexp: '^api_key:'
     line: "api_key: {{ crowdsec_bouncer_key }}"
 
+- name: Enroll CrowdSec console
+  ansible.builtin.command: >
+    docker exec crowdsec cscli console enroll
+    {{ lookup('pipe', 'sops -d  /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/enroll_secret.enc') | trim }}
+  no_log: true
+  ignore_errors: true
+
 #-----------------------Agent registration----------------------------------
 
-- name: Add CrowdSec machine (prosody-agent)
-  ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f - 2>&1
-  register: machine_output
-  delegate_to: traefik_lxc
-#  no_log: true
-
-- name: Debug raw output
-  ansible.builtin.debug:
-    msg: "{{ machine_output.stdout }}"
-
-- name: Parse credentials
-  ansible.builtin.set_fact:
-    crowdsec_login: "{{ machine_output.stdout | regex_search('login:\\s*(\\S+)', '\\1') | first }}"
-    crowdsec_agent_key: "{{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') | first }}"
-#  no_log: true
-
-- name: Parse credentials
-  ansible.builtin.debug:
-    msg:
-      password: "{{ crowdsec_agent_key }}"
-
-- name: Update CrowdSec agent password
-  ansible.builtin.lineinfile:
-    path: /home/docker/crowdsec/config/local_api_credentials.yaml
-    regexp: '^password:'
-    line: "password: {{ crowdsec_agent_key }}"
-#  no_log: true
+#- name: Add CrowdSec machine (prosody-agent)
+#  ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f - 2>&1
+#  register: machine_output
+#  delegate_to: traefik_lxc
+##  no_log: true
+#
+#- name: Debug raw output
+#  ansible.builtin.debug:
+#    msg: "{{ machine_output.stdout }}"
+#
+#- name: Parse credentials
+#  ansible.builtin.set_fact:
+#    crowdsec_login: "{{ machine_output.stdout | regex_search('login:\\s*(\\S+)', '\\1') | first }}"
+#    crowdsec_agent_key: "{{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') | first }}"
+##  no_log: true
+#
+#- name: Parse credentials
+#  ansible.builtin.debug:
+#    msg:
+#      password: "{{ crowdsec_agent_key }}"
+#
+#- name: Update CrowdSec agent password
+#  ansible.builtin.lineinfile:
+#    path: /home/docker/crowdsec/config/local_api_credentials.yaml
+#    regexp: '^password:'
+#    line: "password: {{ crowdsec_agent_key }}"
+##  no_log: true
 
 #--------------------------Run container----------------------------------
 

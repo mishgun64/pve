@@ -55,6 +55,7 @@ allow_registration = false
 
 -- Федерация отключена
 s2s_ports = {}
+c2s_require_encryption = true
 
 storage = "sql"
 sql = {
@@ -72,10 +73,12 @@ default_archive_policy = true
 
 -- Передача файлов (HTTP Upload)
 -- Нужен reverse proxy (nginx) на 443 -> 5280
+
 http_ports = { 5280 }
-http_interfaces = { "127.0.0.1" }  -- Только локально, снаружи через nginx
+http_interfaces = { "*" }
 http_file_share_size_limit = 20 * 1024 * 1024  -- 20 MB максимальный размер файла
 http_file_share_expires_after = "4w"            -- Файлы хранятся 4 недели
+http_file_share_base_url = "https://upload.mishgun.com"
 
 -- Защита от флуда
 limits = {

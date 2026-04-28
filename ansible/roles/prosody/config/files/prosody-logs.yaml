@@ -1,0 +1,71 @@
+# Парсер CrowdSec для Prosody XMPP
+# Расположение: /etc/crowdsec/parsers/s01-parse/prosody-logs.yaml
+
+name: user/prosody-logs
+description: "Парсер логов Prosody XMPP сервера"
+filter: "evt.Parsed.program == 'prosody'"
+onsuccess: next_stage
+
+nodes:
+  # Неудачная аутентификация (основной паттерн)
+  - filter: "evt.Parsed.message contains 'Failed authentication'"
+    grok:
+      name: PROSODY_AUTH_FAIL
+      apply_on: message
+      patterns:
+        - "Failed authentication for user '%{USER:xmpp_user}' from IP address %{IP:src_ip}"
+        - "Failed authentication attempt \\(SASL\\) for %{USER:xmpp_user} from %{IP:src_ip}"
+    statics:
+      - meta: log_type
+        value: "failed_auth"
+      - target: evt.Meta.source_ip
+        expression: evt.Parsed.src_ip
+      - target: evt.Meta.service
+        value: "xmpp"
+
+  # Неверный пароль через syslog
+  - filter: "evt.Parsed.message contains 'Invalid password'"
+    grok:
+      name: PROSODY_INVALID_PASS
+      apply_on: message
+      patterns:
+        - "Invalid password for user %{USER:xmpp_user}@%{HOSTNAME:xmpp_host} from %{IP:src_ip}"
+        - "Invalid password attempt for %{USER:xmpp_user} \\(%{IP:src_ip}\\)"
+    statics:
+      - meta: log_type
+        value: "invalid_password"
+      - target: evt.Meta.source_ip
+        expression: evt.Parsed.src_ip
+      - target: evt.Meta.service
+        value: "xmpp"
+
+  # Превышение лимита попыток
+  - filter: "evt.Parsed.message contains 'Too many authentication failures'"
+    grok:
+      name: PROSODY_TOO_MANY
+      apply_on: message
+      patterns:
+        - "Too many authentication failures for %{IP:src_ip}"
+    statics:
+      - meta: log_type
+        value: "too_many_failures"
+      - target: evt.Meta.source_ip
+        expression: evt.Parsed.src_ip
+      - target: evt.Meta.service
+        value: "xmpp"
+
+  # Разрыв TLS/соединения при попытке аутентификации
+  - filter: "evt.Parsed.message contains 'SASL' and evt.Parsed.message contains 'failure'"
+    grok:
+      name: PROSODY_SASL_FAIL
+      apply_on: message
+      patterns:
+        - "SASL %{WORD:sasl_mechanism} failure for %{USER:xmpp_user}@%{HOSTNAME:xmpp_host} from %{IP:src_ip}"
+        - "SASL authentication failure from %{IP:src_ip}"
+    statics:
+      - meta: log_type
+        value: "sasl_failure"
+      - target: evt.Meta.source_ip
+        expression: evt.Parsed.src_ip
+      - target: evt.Meta.service
+        value: "xmpp"

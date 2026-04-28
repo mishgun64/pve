@@ -1,4 +1,6 @@
 filenames:
+  - /var/log/prosody/prosody.log
   - /var/log/prosody/*.log
 labels:
   type: syslog
+  program: prosody

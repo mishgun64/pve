@@ -58,6 +58,8 @@ services:
       - ./crowdsec/config:/etc/crowdsec/
       - ./logs:/var/log/prosody:ro
       - ./crowdsec/data:/var/lib/crowdsec/data
+      - ./crowdsec/parsers:/etc/crowdsec/parsers/s01-parse:ro
+      - ./crowdsec/scenarios:/etc/crowdsec/scenarios:ro
     networks:
       - prosody-net
     security_opt:

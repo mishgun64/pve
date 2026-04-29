@@ -129,6 +129,12 @@
     owner: docker
     group: docker
     mode: '0400'
+
+- name: Restart crowdsec firewall bouncer
+  ansible.builtin.service:
+    name: crowdsec-firewall-bouncer
+    state: restarted
+
 #--------------------------Clone/update prosody community modules----------------------------------
 
 - name: Ensure mercurial is installed

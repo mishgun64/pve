@@ -28,12 +28,20 @@
 
 #--------------------------Extract----------------------------------
 
+- name: Remove old SQL dumps before extraction
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_fileglob:
+    - "/home/docker/mariadb_*.sql"
+
 - name: Extract backup
   ansible.builtin.unarchive:
     src: "/tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}"
     dest: /home/docker/
     remote_src: false
   when: backup_exists
+
 
 #--------------------------START DB FIRST----------------------------------
 
@@ -52,11 +60,20 @@
 
 #--------------------------Restore SQL----------------------------------
 
+- name: Find unarchived SQL dump
+  ansible.builtin.shell: ls -1 /home/docker/mariadb_*.sql | head -n 1
+  register: found_sql
+
 - name: Import MariaDB dump
   ansible.builtin.shell: |
     docker exec -i prosody-mariadb \
       sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD"' \
-      < /home/docker/mariadb_{{ backup_time }}.sql
+      < {{ found_sql.stdout }}
+
+- name: Cleanup SQL dump after restore
+  ansible.builtin.file:
+    path: "{{ found_sql.stdout }}"
+    state: absent
 
 #--------------------------Start full stack----------------------------------
 

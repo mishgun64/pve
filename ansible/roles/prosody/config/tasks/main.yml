@@ -168,7 +168,7 @@
 
 #-----------------------Autobackup----------------------------------
 
-- name: Initialize prosody backup
+- name: Add cron task for prosody backup
   ansible.builtin.cron:
     name: "Initialize prosody backup"
     hour: "4"

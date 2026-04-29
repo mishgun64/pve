@@ -1,99 +1,78 @@
----
-#------------------------------------------Stop docker compose stack------------------------------------------
+#------------------------------------------Stop stack safely------------------------------------------
 
-- name: Stop docker compose
-  ansible.builtin.shell: docker compose down
+- name: Stop docker compose (clean shutdown)
+  ansible.builtin.shell: docker compose down -v
   args:
     chdir: /home/docker
 
-#------------------------------------------Prosody backup------------------------------------------
-
-- name: Create .sops.yaml
-  ansible.builtin.copy:
-    dest: /home/docker/.sops.yaml
-    owner: root
-    group: root
-    mode: '0600'
-    content: |
-      creation_rules:
-        - age:
-            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
-
-- name: Create backup directory on control
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: directory
-    owner: jenkins
-    group: jenkins
-    mode: '0755'
-  loop:
-    - /srv/backups/prosody
-  delegate_to: localhost
+#------------------------------------------Generate timestamp------------------------------------------
 
 - name: Generate timestamp
   ansible.builtin.set_fact:
     backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
 
-- name: Archive Prosody
+#------------------------------------------Create backup dir------------------------------------------
+
+- name: Create backup directory on control
+  ansible.builtin.file:
+    path: /srv/backups/prosody
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+#------------------------------------------MYSQL DUMP------------------------------------------
+
+- name: Dump MariaDB (safe logical backup)
+  ansible.builtin.shell: |
+    docker exec prosody-mariadb mysqldump \
+      --all-databases \
+      --single-transaction \
+      --routines \
+      --triggers \
+      > /home/docker/mariadb_{{ backup_time }}.sql
+  become: true
+
+#------------------------------------------Archive only safe data------------------------------------------
+
+- name: Archive Prosody (NO raw mariadb-data anymore)
   become: true
   ansible.builtin.archive:
     path:
       - /home/docker/crowdsec/data
-      - /home/docker/mariadb-data
+      - /home/docker/mariadb_{{ backup_time }}.sql
     dest: "/home/docker/prosody_{{ backup_time }}.tar.gz"
     format: gz
 
-- name: Encrypt Prosody archive with SOPS
+#------------------------------------------Encrypt------------------------------------------
+
+- name: Encrypt archive
   ansible.builtin.shell: >
     sops -e --input-type binary --output-type binary prosody_{{ backup_time }}.tar.gz > prosody_{{ backup_time }}.tar.gz.enc
   args:
     chdir: /home/docker
 
-- name: Fetch encrypted file
+#------------------------------------------Fetch------------------------------------------
+
+- name: Fetch encrypted backup
   ansible.builtin.fetch:
     src: "/home/docker/prosody_{{ backup_time }}.tar.gz.enc"
-    dest: "/srv/backups/prosody/prosody_{{ backup_time }}.tar.gz.enc"
+    dest: "/srv/backups/prosody/"
     flat: true
 
-- name: Remove remote backup files
+#------------------------------------------Cleanup------------------------------------------
+
+- name: Cleanup remote files
   ansible.builtin.file:
     path: "{{ item }}"
     state: absent
   loop:
     - "/home/docker/prosody_{{ backup_time }}.tar.gz"
     - "/home/docker/prosody_{{ backup_time }}.tar.gz.enc"
+    - "/home/docker/mariadb_{{ backup_time }}.sql"
 
-- name: Find all backups (local)
-  ansible.builtin.find:
-    paths: /srv/backups/prosody
-    patterns: "prosody_*.tar.gz.enc"
-    file_type: file
-  register: all_backups
-  delegate_to: localhost
-
-- name: Remove old backups (keep last 5)
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    state: absent
-  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
-  when: all_backups.matched | int > 5
-  delegate_to: localhost
-
-#------------------------------------------Run docker compose stack------------------------------------------
-
-- name: Pull docker compose
-  ansible.builtin.shell: docker compose pull
-  args:
-    chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker
-  timeout: 600
+#------------------------------------------Start stack------------------------------------------
 
 - name: Start docker compose
   ansible.builtin.shell: docker compose up -d
   args:
     chdir: /home/docker
-  become: true
-  become_method: su
-  become_user: docker

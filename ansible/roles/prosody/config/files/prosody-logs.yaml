@@ -1,7 +1,8 @@
 name: local/prosody-logs
 description: "Парсер Prosody"
 
-filter: "evt.Line.Label contains 'c2s' || evt.Line.Raw contains 'Failed authentication attempt'"
+filter: "evt.Line.Raw contains 'Failed authentication attempt'"
+
 onsuccess: next_stage
 
 nodes:

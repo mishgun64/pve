@@ -129,6 +129,32 @@
     owner: docker
     group: docker
     mode: '0400'
+#--------------------------Clone/update prosody community modules----------------------------------
+
+- name: Check if community-modules directory exists
+  ansible.builtin.stat:
+    path: /home/docker/community-modules
+  register: community_modules_dir
+
+- name: Clone prosody community modules
+  ansible.builtin.git:
+    repo: https://github.com/bjc/prosody-modules
+    dest: /home/docker/community-modules
+    depth: 1
+  become: true
+  become_method: su
+  become_user: docker
+  when: not community_modules_dir.stat.exists
+
+- name: Update prosody community modules
+  ansible.builtin.git:
+    repo: https://github.com/bjc/prosody-modules
+    dest: /home/docker/community-modules
+    update: true
+  become: true
+  become_method: su
+  become_user: docker
+  when: community_modules_dir.stat.exists
 
 #-----------------------Add mount point----------------------------------
 

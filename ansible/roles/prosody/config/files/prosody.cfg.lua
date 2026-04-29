@@ -1,3 +1,6 @@
+-- Community-модули ищутся в этой директории (монтируется в docker-compose)
+plugin_paths = { "/usr/lib/prosody/community-modules" }
+
 admins = { "admin@mishgun.com" }
 network_backend = "epoll"
 
@@ -21,12 +24,14 @@ modules_enabled = {
   "admin_shell";
 
   -- Мобильные клиенты
-  "smacks";           -- Возобновление сессии при обрыве (XEP-0198)
+  -- ВНИМАНИЕ: используются community-версии из plugin_paths (заменяют встроенные)
+  "smacks";           -- Возобновление сессии при обрыве (XEP-0198) [community: mod_smacks]
   "csi_simple";       -- Оптимизация трафика для фоновых клиентов (XEP-0352)
-  "cloud_notify";     -- Push-уведомления (XEP-0357)
+  "cloud_notify";     -- Push-уведомления (XEP-0357) [community: mod_cloud_notify]
 
   -- История сообщений
-  "mam";              -- Архив личных сообщений (XEP-0313)
+  -- ВНИМАНИЕ: используется community-версия из plugin_paths (заменяет встроенную)
+  "mam";              -- Архив личных сообщений (XEP-0313) [community: mod_mam]
 
   -- Передача файлов
   "http";             -- Нужен для http_file_share
@@ -34,6 +39,20 @@ modules_enabled = {
 
   -- Безопасность и стабильность
   "limits";           -- Защита от флуда
+  "log_auth";         -- Логирование неудачных попыток входа [community: mod_log_auth]
+                      -- Пишет в лог строки вида: "Failed authentication attempt (noauth)"
+                      -- CrowdSec парсит эти строки для блокировки брутфорса
+
+  -- Инвайты (community-модули)
+  "invites";          -- Генерация инвайт-ссылок (XEP-0401) [community: mod_invites]
+  "invites_adhoc";    -- Управление инвайтами через XMPP-клиент [community: mod_invites_adhoc]
+  "invites_register"; -- Регистрация по инвайт-ссылке [community: mod_invites_register]
+
+  -- vCard в конференциях
+  "vcard_muc";        -- Показывает vCard участников в MUC [community: mod_vcard_muc]
+
+  -- Ростер
+  "roster_all";       -- Автоматически добавляет всех пользователей домена в ростер [community: mod_roster_all]
 
   -- Мониторинг
   "prometheus";       -- Метрики для Grafana/Prometheus
@@ -51,6 +70,7 @@ modules_disabled = {
   "websocket";
 }
 
+-- Регистрация через обычную форму отключена — только по инвайтам
 allow_registration = false
 
 -- Федерация отключена
@@ -78,7 +98,8 @@ http_ports = { 5280 }
 http_interfaces = { "*" }
 http_file_share_size_limit = 20 * 1024 * 1024  -- 20 MB максимальный размер файла
 http_file_share_expires_after = "4w"            -- Файлы хранятся 4 недели
-http_file_share_base_url = "https://upload.mishgun.com"
+http_host = "upload.mishgun.com"
+http_external_url = "https://upload.mishgun.com"
 
 -- Защита от флуда
 limits = {
@@ -92,6 +113,10 @@ limits = {
 smacks_max_unacked_stanzas = 5
 smacks_hibernation_time = 300  -- 5 минут ожидания переподключения
 
+-- Инвайты: базовый URL для генерации ссылок
+-- Клиент сформирует ссылку вида: https://mishgun.com/invite/<token>
+invites_url = "https://mishgun.com/invite/{invite}"
+
 VirtualHost "mishgun.com"
   enabled = true
   c2s_ports = { 5222 }
@@ -102,7 +127,9 @@ VirtualHost "mishgun.com"
 
 Component "conference.mishgun.com" "muc"
   modules_enabled = {
-    "muc_mam";    -- История в конференциях
+    "muc_mam";      -- История в конференциях
+    "muc_listing";  -- Публичный список конференций (XEP-0423) [community: mod_muc_listing]
+                    -- Список доступен через HTTP: http://localhost:5280/muc_listing
   }
   muc_log_by_default = true
   max_history_messages = 1000
@@ -111,6 +138,5 @@ Component "conference.mishgun.com" "muc"
 -- Закрой этот эндпоинт на firewall или nginx, наружу не выставлять
 
 log = {
-  info = "*info";
-  error = "*error";
+    { levels = { "debug" }, to = "console" };
 }

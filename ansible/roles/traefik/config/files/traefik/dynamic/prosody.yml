@@ -7,14 +7,21 @@ http:
         - websecure
       rule: "Host(`upload.mishgun.com`)"
       service: prosody-http
-      tls: {}          # сертификат уже есть от wildcard.yml, просто включаем TLS
+      tls: {}
+
+  middlewares:
+    prosody-headers:
+      headers:
+        customRequestHeaders:
+          Host: "upload.mishgun.com"
 
   services:
     prosody-http:
       loadBalancer:
         servers:
           - url: "http://192.168.4.4:5280"
-            
+        passHostHeader: true
+
 tcp:
   routers:
     prosody-c2s:

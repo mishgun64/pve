@@ -1,3 +1,10 @@
+#------------------------------------------Start stack------------------------------------------
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+
 #------------------------------------------Generate timestamp------------------------------------------
 
 - name: Generate timestamp

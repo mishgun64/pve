@@ -131,26 +131,29 @@
     mode: '0400'
 #--------------------------Clone/update prosody community modules----------------------------------
 
+- name: Ensure mercurial is installed
+  ansible.builtin.apt:
+    name: mercurial
+    state: present
+
 - name: Check if community-modules directory exists
   ansible.builtin.stat:
-    path: /home/docker/community-modules
+    path: /home/docker/community-modules/.hg
   register: community_modules_dir
 
 - name: Clone prosody community modules
-  ansible.builtin.git:
-    repo: https://github.com/bjc/prosody-modules
-    dest: /home/docker/community-modules
-    depth: 1
+  ansible.builtin.shell: |
+    hg clone https://hg.prosody.im/prosody-modules/ /home/docker/community-modules
+  args:
+    creates: /home/docker/community-modules/.hg
   become: true
   become_method: su
   become_user: docker
   when: not community_modules_dir.stat.exists
 
 - name: Update prosody community modules
-  ansible.builtin.git:
-    repo: https://github.com/bjc/prosody-modules
-    dest: /home/docker/community-modules
-    update: true
+  ansible.builtin.shell: |
+    hg pull -u -R /home/docker/community-modules
   become: true
   become_method: su
   become_user: docker

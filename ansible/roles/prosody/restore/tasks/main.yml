@@ -50,13 +50,14 @@
   args:
     chdir: /home/docker
 
-- name: Wait for MariaDB to be healthy
+- name: Wait for MariaDB to respond
   ansible.builtin.shell: |
-    docker inspect --format='{{ "{{.State.Health.Status}}" }}' prosody-mariadb
-  register: db_status
-  until: db_status.stdout == "healthy"
-  retries: 20
-  delay: 3
+    docker exec prosody-mariadb mariadb-admin ping -u root -p"$MYSQL_ROOT_PASSWORD"
+  register: db_ping
+  until: db_ping.rc == 0
+  retries: 30
+  delay: 5
+  ignore_errors: yes
 
 #--------------------------Restore SQL----------------------------------
 

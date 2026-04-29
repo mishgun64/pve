@@ -1,10 +1,3 @@
-#------------------------------------------Stop stack safely------------------------------------------
-
-- name: Stop docker compose (clean shutdown)
-  ansible.builtin.shell: docker compose down -v
-  args:
-    chdir: /home/docker
-
 #------------------------------------------Generate timestamp------------------------------------------
 
 - name: Generate timestamp
@@ -20,21 +13,40 @@
     mode: '0755'
   delegate_to: localhost
 
-#------------------------------------------MYSQL DUMP------------------------------------------
+#------------------------------------------Detect MariaDB container name (FIX)------------------------------------------
+
+- name: Get MariaDB container name
+  ansible.builtin.shell: |
+    docker ps --format "{{.Names}}" | grep mariadb
+  register: mariadb_container
+  changed_when: false
+
+- name: Fail if MariaDB not running
+  ansible.builtin.fail:
+    msg: "MariaDB container not found or not running"
+  when: mariadb_container.stdout == ""
+
+#------------------------------------------MYSQL DUMP (MUST BE BEFORE STOP)------------------------------------------
 
 - name: Dump MariaDB (safe logical backup)
   ansible.builtin.shell: |
-    docker exec prosody-mariadb mysqldump \
+    docker exec {{ mariadb_container.stdout }} mysqldump \
       --all-databases \
       --single-transaction \
       --routines \
       --triggers \
       > /home/docker/mariadb_{{ backup_time }}.sql
-  become: true
 
-#------------------------------------------Archive only safe data------------------------------------------
+#------------------------------------------Stop stack AFTER dump------------------------------------------
 
-- name: Archive Prosody (NO raw mariadb-data anymore)
+- name: Stop docker compose
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+
+#------------------------------------------Archive------------------------------------------
+
+- name: Archive Prosody
   become: true
   ansible.builtin.archive:
     path:
@@ -53,7 +65,7 @@
 
 #------------------------------------------Fetch------------------------------------------
 
-- name: Fetch encrypted backup
+- name: Fetch backup
   ansible.builtin.fetch:
     src: "/home/docker/prosody_{{ backup_time }}.tar.gz.enc"
     dest: "/srv/backups/prosody/"

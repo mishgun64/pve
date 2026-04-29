@@ -35,14 +35,16 @@
 
 #------------------------------------------MYSQL DUMP (MUST BE BEFORE STOP)------------------------------------------
 
-- name: Dump MariaDB (safe logical backup)
+- name: Dump MariaDB
   ansible.builtin.shell: |
-    docker exec {{ mariadb_container.stdout }} mysqldump \
+    docker exec prosody-mariadb mariadb-dump \
       --all-databases \
       --single-transaction \
       --routines \
       --triggers \
-      > /home/docker/mariadb_{{ backup_time }}.sql
+    > /home/docker/mariadb_{{ backup_time }}.sql
+  args:
+    executable: /bin/bash
 
 #------------------------------------------Stop stack AFTER dump------------------------------------------
 

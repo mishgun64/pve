@@ -1,6 +1,5 @@
-filenames:
-  - /var/log/prosody/prosody.log
-  - /var/log/prosody/*.log
+source: docker
+container_name:
+  - prosody
 labels:
-  type: syslog
-  program: prosody
+  type: prosody-logs

@@ -126,33 +126,3 @@
   become_method: su
   become_user: docker
 
-#-----------------------Agent registration----------------------------------
-
-#- name: Add CrowdSec machine (prosody-agent)
-#  ansible.builtin.shell: docker exec crowdsec cscli machines add prosody-agent --auto --force -f - 2>&1
-#  register: machine_output
-#  delegate_to: traefik_lxc
-##  no_log: true
-#
-#- name: Debug raw output
-#  ansible.builtin.debug:
-#    msg: "{{ machine_output.stdout }}"
-#
-#- name: Parse credentials
-#  ansible.builtin.set_fact:
-#    crowdsec_login: "{{ machine_output.stdout | regex_search('login:\\s*(\\S+)', '\\1') | first }}"
-#    crowdsec_agent_key: "{{ machine_output.stdout | regex_search('password:\\s*(\\S+)', '\\1') | first }}"
-##  no_log: true
-#
-#- name: Parse credentials
-#  ansible.builtin.debug:
-#    msg:
-#      password: "{{ crowdsec_agent_key }}"
-#
-#- name: Update CrowdSec agent password
-#  ansible.builtin.lineinfile:
-#    path: /home/docker/crowdsec/config/local_api_credentials.yaml
-#    regexp: '^password:'
-#    line: "password: {{ crowdsec_agent_key }}"
-##  no_log: true
-

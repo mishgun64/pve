@@ -1,15 +1,12 @@
-# Сценарий CrowdSec: защита Prosody от брутфорса паролей
-# Расположение: /etc/crowdsec/scenarios/prosody-bf.yaml
-
 type: leaky
-name: user/prosody-bf
-description: "Брутфорс паролей на Prosody XMPP сервере"
-filter: "evt.Meta.service == 'xmpp' and evt.Meta.log_type in ['failed_auth', 'invalid_password', 'sasl_failure']"
-groupby: evt.Meta.source_ip
+name: local/prosody-bf
+description: "Детектирование перебора паролей Prosody"
+filter: "evt.Meta.log_type == 'prosody_failed_auth'"
+groupby: "evt.Meta.source_ip"
 capacity: 5
-leakspeed: "20s"
-blackhole: 2m
+leakspeed: 10s
+blackhole: 5m
 labels:
-  service: xmpp
-  type: bruteforce
+  service: prosody
+  type: brute-force
   remediation: true

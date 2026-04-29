@@ -17,9 +17,9 @@ entryPoints:
 
   websecure:
     address: ":443"
-    
-  xmpp:
-    address: ":5222"
+#
+#  xmpp:
+#    address: ":5222"
 
 certificatesResolvers:
   letsencrypt:

@@ -1,8 +1,15 @@
 -- Community-модули ищутся в этой директории (монтируется в docker-compose)
 plugin_paths = { "/usr/lib/prosody/community-modules" }
 
+c2s_ports = { 5222 }
+log_external_addresses = true
+
 admins = { "admin@mishgun.com" }
 network_backend = "epoll"
+
+authentication = "internal_hashed"
+allow_unencrypted_plain_auth = false
+c2s_require_encryption = true
 
 modules_enabled = {
   -- Базовые
@@ -22,17 +29,16 @@ modules_enabled = {
   "register";
   "admin_adhoc";
   "admin_shell";
+  "smacks";
+
+  "posix";
 
   -- Мобильные клиенты
   -- ВНИМАНИЕ: используются community-версии из plugin_paths (заменяют встроенные)
-  "smacks";           -- Возобновление сессии при обрыве (XEP-0198) [community: mod_smacks]
   "csi_simple";       -- Оптимизация трафика для фоновых клиентов (XEP-0352)
-  "cloud_notify";     -- Push-уведомления (XEP-0357) [community: mod_cloud_notify]
 
   -- История сообщений
   -- ВНИМАНИЕ: используется community-версия из plugin_paths (заменяет встроенную)
-  "mam";              -- Архив личных сообщений (XEP-0313) [community: mod_mam]
-
   -- Передача файлов
   "http";             -- Нужен для http_file_share
   "http_file_share";  -- Загрузка файлов (XEP-0363)
@@ -47,12 +53,8 @@ modules_enabled = {
   "invites";          -- Генерация инвайт-ссылок (XEP-0401) [community: mod_invites]
   "invites_adhoc";    -- Управление инвайтами через XMPP-клиент [community: mod_invites_adhoc]
   "invites_register"; -- Регистрация по инвайт-ссылке [community: mod_invites_register]
-
-  -- vCard в конференциях
-  "vcard_muc";        -- Показывает vCard участников в MUC [community: mod_vcard_muc]
-
   -- Ростер
-  "roster_all";       -- Автоматически добавляет всех пользователей домена в ростер [community: mod_roster_all]
+  "roster_allinall";       -- Автоматически добавляет всех пользователей домена в ростер [community: mod_roster_all]
 
   -- Мониторинг
   "prometheus";       -- Метрики для Grafana/Prometheus
@@ -75,7 +77,7 @@ allow_registration = false
 
 -- Федерация отключена
 s2s_ports = {}
-c2s_require_encryption = true
+
 
 storage = "sql"
 sql = {
@@ -96,7 +98,7 @@ default_archive_policy = true
 
 http_ports = { 5280 }
 http_interfaces = { "*" }
-http_file_share_size_limit = 20 * 1024 * 1024  -- 20 MB максимальный размер файла
+http_file_share_size_limit = 200 * 1024 * 1024  -- 20 MB максимальный размер файла
 http_file_share_expires_after = "4w"            -- Файлы хранятся 4 недели
 http_host = "upload.mishgun.com"
 http_external_url = "https://upload.mishgun.com"
@@ -119,11 +121,11 @@ invites_url = "https://mishgun.com/invite/{invite}"
 
 VirtualHost "mishgun.com"
   enabled = true
-  c2s_ports = { 5222 }
   ssl = {
     key = "/etc/prosody/certs/mishgun.com/privatekey.pem";
     certificate = "/etc/prosody/certs/mishgun.com/certificate.pem";
   }
+
 
 Component "conference.mishgun.com" "muc"
   modules_enabled = {
@@ -138,5 +140,5 @@ Component "conference.mishgun.com" "muc"
 -- Закрой этот эндпоинт на firewall или nginx, наружу не выставлять
 
 log = {
-    { levels = { "debug" }, to = "console" };
+  { levels = { "info", "warn", "error" }, to = "console" };
 }

@@ -1,44 +1,20 @@
-# Парсер CrowdSec для Prosody XMPP
-# Расположение: /home/docker/crowdsec/parsers/prosody-logs.yaml
+name: local/prosody-logs
+description: "Парсер Prosody"
 
-name: user/prosody-logs
-description: "Парсер логов Prosody XMPP сервера"
-filter: "evt.Parsed.program == 'prosody'"
+filter: "evt.Line.Label contains 'c2s' || evt.Line.Raw contains 'Failed authentication attempt'"
 onsuccess: next_stage
 
 nodes:
-  - filter: "evt.Parsed.message contains 'Failed authentication'"
-    grok:
-      pattern: "Failed authentication for user '%{USER:xmpp_user}' from IP address %{IP:src_ip}"
-      apply_on: message
-    statics:
-      - meta: log_type
-        value: "failed_auth"
-      - target: evt.Meta.source_ip
-        expression: evt.Parsed.src_ip
-      - meta: service
-        value: "xmpp"
+  - grok:
+      pattern: "Failed authentication attempt \\(.*\\) for user %{DATA:user} from IP: %{IP:source_ip}"
+      apply_on: Line.Raw
 
-  - filter: "evt.Parsed.message contains 'Invalid password'"
-    grok:
-      pattern: "Invalid password for user %{USER:xmpp_user}@%{HOSTNAME:xmpp_host} from %{IP:src_ip}"
-      apply_on: message
-    statics:
-      - meta: log_type
-        value: "invalid_password"
-      - target: evt.Meta.source_ip
-        expression: evt.Parsed.src_ip
-      - meta: service
-        value: "xmpp"
+statics:
+  - meta: log_type
+    value: prosody_failed_auth
 
-  - filter: "evt.Parsed.message contains 'SASL' and evt.Parsed.message contains 'failure'"
-    grok:
-      pattern: "SASL %{WORD:sasl_mechanism} failure for %{USER:xmpp_user}@%{HOSTNAME:xmpp_host} from %{IP:src_ip}"
-      apply_on: message
-    statics:
-      - meta: log_type
-        value: "sasl_failure"
-      - target: evt.Meta.source_ip
-        expression: evt.Parsed.src_ip
-      - meta: service
-        value: "xmpp"
+  - meta: source_ip
+    expression: "evt.Parsed.source_ip"
+
+  - meta: target_user
+    expression: "evt.Parsed.user"

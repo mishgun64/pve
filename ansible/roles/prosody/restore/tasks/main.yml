@@ -67,7 +67,7 @@
 - name: Import MariaDB dump
   ansible.builtin.shell: |
     docker exec -i prosody-mariadb \
-      sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD"' \
+      sh -c 'mariadb -u root -p"$MYSQL_ROOT_PASSWORD"' \
       < {{ found_sql.stdout }}
 
 - name: Cleanup SQL dump after restore

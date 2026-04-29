@@ -42,6 +42,12 @@
     remote_src: false
   when: backup_exists
 
+#--------------------------CLEANUP CRASH LOGS--------------------------
+
+- name: Remove corrupted tc.log to allow MariaDB start
+  ansible.builtin.file:
+    path: /home/docker/mariadb-data/tc.log
+    state: absent
 
 #--------------------------START DB FIRST----------------------------------
 

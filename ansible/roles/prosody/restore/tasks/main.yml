@@ -38,19 +38,25 @@
 #--------------------------START DB FIRST----------------------------------
 
 - name: Start MariaDB only
-  ansible.builtin.shell: docker compose up -d prosody-mariadb
+  ansible.builtin.shell: docker compose up -d mariadb
   args:
     chdir: /home/docker
 
-- name: Wait for MariaDB
+- name: Wait for MariaDB to be healthy
   ansible.builtin.shell: |
-    until docker exec prosody-mariadb mysqladmin ping --silent; do sleep 2; done
+    docker inspect --format='{{ "{{.State.Health.Status}}" }}' prosody-mariadb
+  register: db_status
+  until: db_status.stdout == "healthy"
+  retries: 20
+  delay: 3
 
 #--------------------------Restore SQL----------------------------------
 
 - name: Import MariaDB dump
   ansible.builtin.shell: |
-    docker exec -i prosody-mariadb mysql < /home/docker/mariadb_*.sql
+    docker exec -i prosody-mariadb \
+      sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD"' \
+      < /home/docker/mariadb_{{ backup_time }}.sql
 
 #--------------------------Start full stack----------------------------------
 
@@ -58,3 +64,38 @@
   ansible.builtin.shell: docker compose up -d
   args:
     chdir: /home/docker
+
+#-----------------------Add bouncer api key----------------------------------
+
+- name: Delete existing bouncer (ignore errors)
+  ansible.builtin.shell: docker exec crowdsec cscli bouncers delete prosody-firewall-bouncer
+  ignore_errors: true
+
+- name: Add bouncer
+  ansible.builtin.shell: docker exec crowdsec cscli bouncers add prosody-firewall-bouncer
+  register: bouncer_output
+
+- name: Extract bouncer key
+  ansible.builtin.set_fact:
+    crowdsec_bouncer_key: "{{ bouncer_output.stdout_lines[2] | trim }}"
+
+- name: Update api_key in crowdsec firewall bouncer config
+  ansible.builtin.lineinfile:
+    path: /etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml
+    regexp: '^api_key:'
+    line: "api_key: {{ crowdsec_bouncer_key }}"
+
+- name: Enroll CrowdSec console
+  ansible.builtin.command: >
+    docker exec crowdsec cscli console enroll
+    {{ lookup('pipe', 'sops -d  /var/lib/jenkins/jobs/pve/workspace/ansible/roles/traefik/config/files/enroll_secret.enc') | trim }}
+  no_log: true
+  ignore_errors: true
+
+- name: Restart containers
+  ansible.builtin.shell: docker compose restart
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

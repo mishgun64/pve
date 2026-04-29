@@ -36,15 +36,17 @@
 #------------------------------------------MYSQL DUMP (MUST BE BEFORE STOP)------------------------------------------
 
 - name: Dump MariaDB
+  vars:
+    # Достаем пароль из .env файла на стороне контроллера
+    raw_root_password: "{{ lookup('file', '../files/.env') | regex_search('MYSQL_ROOT_PASSWORD=(.*)', '\\1') | first }}"
   ansible.builtin.shell: |
-    docker exec prosody-mariadb mariadb-dump \
+    docker exec {{ mariadb_container.stdout }} \
+      mariadb-dump -u root -p'{{ raw_root_password }}' \
       --all-databases \
       --single-transaction \
       --routines \
       --triggers \
     > /home/docker/mariadb_{{ backup_time }}.sql
-  args:
-    executable: /bin/bash
 
 #------------------------------------------Stop stack AFTER dump------------------------------------------
 

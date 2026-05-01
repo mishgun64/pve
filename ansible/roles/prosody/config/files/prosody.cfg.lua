@@ -54,7 +54,10 @@ modules_enabled = {
   "invites";          -- Генерация инвайт-ссылок (XEP-0401) [community: mod_invites]
   "invites_adhoc";    -- Управление инвайтами через XMPP-клиент [community: mod_invites_adhoc]
   "invites_register"; -- Регистрация по инвайт-ссылке [community: mod_invites_register]
+  "invites_register_web";
   "invites_page";
+  "register_apps";
+  "http_libjs";
   "http_files";
   -- Ростер
   "roster_allinall";       -- Автоматически добавляет всех пользователей домена в ростер [community: mod_roster_all]

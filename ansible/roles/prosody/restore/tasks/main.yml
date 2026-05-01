@@ -109,6 +109,11 @@
     regexp: '^api_key:'
     line: "api_key: {{ crowdsec_bouncer_key }}"
 
+- name: Restart crowdsec firewall bouncer
+  ansible.builtin.service:
+    name: crowdsec-firewall-bouncer
+    state: restarted
+
 - name: Enroll CrowdSec console
   ansible.builtin.command: >
     docker exec crowdsec cscli console enroll

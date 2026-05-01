@@ -1,5 +1,3 @@
----
-
 http:
   routers:
     prosody-upload:
@@ -7,13 +5,18 @@ http:
         - websecure
       rule: "Host(`upload.mishgun.com`)"
       service: prosody-http
+      middlewares:
+        - crowdsec@file
       tls: {}
 
-  middlewares:
-    prosody-headers:
-      headers:
-        customRequestHeaders:
-          Host: "upload.mishgun.com"
+    prosody-web:
+      entryPoints:
+        - websecure
+      rule: "Host(`xmpp.mishgun.com`)"
+      service: prosody-http
+      middlewares:
+        - crowdsec@file
+      tls: {}
 
   services:
     prosody-http:
@@ -21,17 +24,3 @@ http:
         servers:
           - url: "http://192.168.4.4:5280"
         passHostHeader: true
-
-#tcp:
-#  routers:
-#    prosody-c2s:
-#      entryPoints:
-#        - xmpp
-#      rule: "HostSNI(`*`)"
-#      service: prosody-c2s
-#
-#  services:
-#    prosody-c2s:
-#      loadBalancer:
-#        servers:
-#          - address: "192.168.4.4:5222"

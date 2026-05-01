@@ -32,6 +32,7 @@ services:
       - ./certs:/etc/prosody/certs:ro
       - ./logs:/var/log/prosody
       - ./community-modules:/usr/lib/prosody/community-modules:ro
+      - ./static:/usr/share/prosody/static:ro
     ports:
       - "5222:5222" # c2s (клиент-сервер)
       - "5280:5280" # upload

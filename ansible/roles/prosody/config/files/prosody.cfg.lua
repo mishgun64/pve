@@ -6,6 +6,7 @@ log_external_addresses = true
 
 admins = { "admin@mishgun.com" }
 network_backend = "epoll"
+external_addresses = { "91.122.207.222" }
 
 authentication = "internal_hashed"
 allow_unencrypted_plain_auth = false
@@ -30,18 +31,18 @@ modules_enabled = {
   "admin_adhoc";
   "admin_shell";
   "smacks";
-
-  "posix";
+  "mam";
+  "cloud_notify";
+  "bookmarks";    -- Синхронизация закладок (XEP-0402)
 
   -- Мобильные клиенты
-  -- ВНИМАНИЕ: используются community-версии из plugin_paths (заменяют встроенные)
   "csi_simple";       -- Оптимизация трафика для фоновых клиентов (XEP-0352)
 
   -- История сообщений
   -- ВНИМАНИЕ: используется community-версия из plugin_paths (заменяет встроенную)
   -- Передача файлов
-  "http";             -- Нужен для http_file_share
-  "http_file_share";  -- Загрузка файлов (XEP-0363)
+  --"http";             -- Нужен для http_file_share
+  --"http_file_share";  -- Загрузка файлов (XEP-0363)
 
   -- Безопасность и стабильность
   "limits";           -- Защита от флуда
@@ -53,6 +54,8 @@ modules_enabled = {
   "invites";          -- Генерация инвайт-ссылок (XEP-0401) [community: mod_invites]
   "invites_adhoc";    -- Управление инвайтами через XMPP-клиент [community: mod_invites_adhoc]
   "invites_register"; -- Регистрация по инвайт-ссылке [community: mod_invites_register]
+  "invites_page";
+  "http_files";
   -- Ростер
   "roster_allinall";       -- Автоматически добавляет всех пользователей домена в ростер [community: mod_roster_all]
 
@@ -98,11 +101,12 @@ default_archive_policy = true
 
 http_ports = { 5280 }
 http_interfaces = { "*" }
-http_file_share_size_limit = 200 * 1024 * 1024  -- 20 MB максимальный размер файла
-http_file_share_expires_after = "4w"            -- Файлы хранятся 4 недели
-http_host = "upload.mishgun.com"
-http_external_url = "https://upload.mishgun.com"
-
+--http_file_share_size_limit = 200 * 1024 * 1024  -- 20 MB максимальный размер файла
+--http_file_share_expires_after = "4w"            -- Файлы хранятся 4 недели
+http_host = "xmpp.mishgun.com"
+http_external_url = "https://xmpp.mishgun.com"
+-- Статика (Bootstrap, jQuery для invites_page)
+http_files_dir = "/usr/share/prosody/static"
 -- Защита от флуда
 limits = {
   c2s = {
@@ -117,7 +121,11 @@ smacks_hibernation_time = 300  -- 5 минут ожидания переподк
 
 -- Инвайты: базовый URL для генерации ссылок
 -- Клиент сформирует ссылку вида: https://mishgun.com/invite/<token>
-invites_url = "https://mishgun.com/invite/{invite}"
+invites_url = "https://xmpp.mishgun.com/invite/{invite}"
+
+log = {
+  { levels = { "info", "warn", "error" }, to = "console" };
+}
 
 VirtualHost "mishgun.com"
   enabled = true
@@ -126,6 +134,9 @@ VirtualHost "mishgun.com"
     certificate = "/etc/prosody/certs/mishgun.com/certificate.pem";
   }
 
+Component "upload.mishgun.com" "http_file_share"
+  http_file_share_size_limit = 200 * 1024 * 1024
+  http_file_share_expires_after = "4y"
 
 Component "conference.mishgun.com" "muc"
   modules_enabled = {
@@ -139,6 +150,3 @@ Component "conference.mishgun.com" "muc"
 -- Метрики Prometheus (доступны на http://localhost:5280/metrics)
 -- Закрой этот эндпоинт на firewall или nginx, наружу не выставлять
 
-log = {
-  { levels = { "info", "warn", "error" }, to = "console" };
-}

@@ -76,6 +76,22 @@
     - /home/docker/crowdsec/parsers
     - /home/docker/crowdsec/scenarios
     - /home/docker/logs
+    - /home/docker/static/share/bootstrap4/css
+    - /home/docker/static/share/bootstrap4/js
+    - /home/docker/static/share/jquery
+    -
+- name: Download Bootstrap and jQuery for Prosody invites_page
+  get_url:
+    url: "{{ item.url }}"
+    dest: "{{ item.dest }}"
+    mode: '0644'
+  loop:
+    - url: https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css
+      dest: /home/docker/static/share/bootstrap4/css/bootstrap.min.css
+    - url: https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js
+      dest: /home/docker/static/share/bootstrap4/js/bootstrap.min.js
+    - url: https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js
+      dest: /home/docker/static/share/jquery/jquery.min.js
 
 - name: Copy prosody.cfg.lua
   copy:

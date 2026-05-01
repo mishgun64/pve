@@ -79,7 +79,7 @@
     - /home/docker/static/share/bootstrap4/css
     - /home/docker/static/share/bootstrap4/js
     - /home/docker/static/share/jquery
-    -
+
 - name: Download Bootstrap and jQuery for Prosody invites_page
   get_url:
     url: "{{ item.url }}"

@@ -44,3 +44,8 @@ variable "debian_template_id" {
   type        = number
   description = "VM ID шаблона debian-cloudinit-template"
 }
+
+variable "proxmox_password" {
+  type      = string
+  sensitive = true
+}

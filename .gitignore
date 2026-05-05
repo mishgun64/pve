@@ -7,3 +7,4 @@
 /ansible/roles/prosody/config/files/.env
 /ansible/roles/pvpgn/config/files/.env
 /ansible/roles/pvpgn/config/files/145.fw
+/terraform/secrets/pass

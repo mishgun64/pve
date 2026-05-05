@@ -86,7 +86,9 @@ pipeline {
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
-                    export TF_VAR_proxmox_password=$(sops -d ./terraform/secrets/pass)
+                    set +x
+                    export TF_VAR_proxmox_password=$(sops -d ./terraform/secrets/pass.enc)
+                    set -x
                     terraform -chdir=./terraform/ init -upgrade -var-file="prod.tfvars"
                     terraform -chdir=./terraform/ plan -var-file="prod.tfvars"
                     terraform -chdir=./terraform/ apply -var-file="prod.tfvars" -auto-approve

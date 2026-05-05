@@ -29,22 +29,30 @@
   ansible.builtin.set_fact:
     backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
 
+- name: Check acme.json exists
+  ansible.builtin.stat:
+    path: /home/docker/certs/traefik/acme.json
+  register: acme_json_stat
+
 - name: Encrypt acme.json
   ansible.builtin.shell: >
     sops -e --input-type json acme.json > acme_{{ backup_time }}.json.enc
   args:
     chdir: /home/docker/certs/traefik
+  when: acme_json_stat.stat.exists
 
 - name: Fetch encrypted acme.json
   ansible.builtin.fetch:
     src: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
     dest: "/srv/backups/"
     flat: true
+  when: acme_json_stat.stat.exists
 
 - name: Remove remote encrypted acme.json
   ansible.builtin.file:
     path: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
     state: absent
+  when: acme_json_stat.stat.exists
 
 - name: Find all acme.json backups (local)
   ansible.builtin.find:
@@ -53,13 +61,14 @@
     file_type: file
   register: all_backups
   delegate_to: localhost
+  when: acme_json_stat.stat.exists
 
 - name: Remove old acme.json backups (keep last 5)
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
   loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
-  when: all_backups.matched | int > 5
+  when: acme_json_stat.stat.exists and all_backups.matched | int > 5
   delegate_to: localhost
 
 #------------------------------------------ACME-DNS backup------------------------------------------
@@ -75,6 +84,18 @@
         - age:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
 
+- name: Check acme-dns data and db exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: acme_dns_stats
+  loop:
+    - /home/docker/acme-dns/data
+    - /home/docker/acme-dns/acme-dns.db
+
+- name: Set acme-dns backup flag
+  ansible.builtin.set_fact:
+    acme_dns_exists: "{{ acme_dns_stats.results | map(attribute='stat.exists') | list | all }}"
+
 - name: Archive acme-dns data directory and database file
   ansible.builtin.archive:
     path:
@@ -83,18 +104,21 @@
     dest: /home/docker/acme-dns_{{ backup_time }}.tar.gz
     format: gz
     remove: no
+  when: acme_dns_exists
 
 - name: Encrypt acme-dns archive with SOPS
   ansible.builtin.shell: >
     sops -e --input-type binary --output-type binary acme-dns_{{ backup_time }}.tar.gz > acme-dns_{{ backup_time }}.tar.gz.enc
   args:
     chdir: /home/docker
+  when: acme_dns_exists
 
 - name: Fetch encrypted acme-dns backup
   ansible.builtin.fetch:
     src: "/home/docker/acme-dns_{{ backup_time }}.tar.gz.enc"
     dest: "/srv/backups/"
     flat: true
+  when: acme_dns_exists
 
 - name: Remove remote encrypted acme-dns backup
   ansible.builtin.file:
@@ -103,6 +127,7 @@
   loop:
     - /home/docker/acme-dns_{{ backup_time }}.tar.gz.enc
     - /home/docker/acme-dns_{{ backup_time }}.tar.gz
+  when: acme_dns_exists
 
 - name: Find all acme-dns backups (local)
   ansible.builtin.find:
@@ -111,13 +136,14 @@
     file_type: file
   register: all_backups
   delegate_to: localhost
+  when: acme_dns_exists
 
 - name: Remove old acme-dns backups (keep last 5)
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
   loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
-  when: all_backups.matched | int > 5
+  when: acme_dns_exists and all_backups.matched | int > 5
   delegate_to: localhost
 
 #------------------------------------------Crowdsec backup------------------------------------------
@@ -138,35 +164,46 @@
         - age:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
 
+- name: Check crowdsec directory exists
+  ansible.builtin.stat:
+    path: /home/docker/crowdsec
+  register: crowdsec_stat
+
 - name: Create archive of CrowdSec directory
   ansible.builtin.archive:
     path: /home/docker/crowdsec
     dest: "{{ remote_archive }}"
     format: gz
+  when: crowdsec_stat.stat.exists
 
 - name: Encrypt crowdsec archive with SOPS
   ansible.builtin.shell: >
     sops -e --input-type binary --output-type binary {{ remote_archive }} > {{ remote_encrypted }}
   args:
     chdir: /home/docker
+  when: crowdsec_stat.stat.exists
 
 - name: Fetch encrypted crowdsec backup to local machine
   ansible.builtin.fetch:
     src: "{{ remote_encrypted }}"
     dest: /srv/backups/
     flat: true
+  when: crowdsec_stat.stat.exists
 
 - name: Remove remote unencrypted crowdsec archive
   ansible.builtin.file:
     path: "{{ remote_archive }}"
     state: absent
+  when: crowdsec_stat.stat.exists
 
 - name: Remove remote encrypted crowdsec archive
   ansible.builtin.file:
     path: "{{ remote_encrypted }}"
     state: absent
+  when: crowdsec_stat.stat.exists
 
 - name: Keep only last 5 CrowdSec backups (local)
   delegate_to: localhost
   ansible.builtin.shell: |
     ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | tail -n +6 | xargs -r rm -f
+  when: crowdsec_stat.stat.exists

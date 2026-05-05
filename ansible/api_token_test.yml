@@ -4,7 +4,7 @@
   hosts: pve
   remote_user: root
   gather_facts: false
-  vars:
-    ansible_password: "12345678"
+#  vars:
+#    ansible_password: "12345678"
   roles:
     - pve/get_api_token

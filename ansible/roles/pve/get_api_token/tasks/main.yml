@@ -1,54 +1,8 @@
 ---
 
-- name: Check terraform user
-  ansible.builtin.shell: pveum user list | grep terraform
-  register: tf_usr
-  failed_when: tf_usr.rc > 1
-
-- name: Add terraform user
-  ansible.builtin.shell: pveum user add terraform@pam
-  when: tf_usr.stdout == ""
-
-- name: Check terraform role
-  ansible.builtin.shell: pveum role list | grep Terraform
-  register: tf_role
-  failed_when: tf_role.rc > 1
-
-- name: Add terraform role
-  ansible.builtin.shell: >
-    pveum role add Terraform
-    -privs "Datastore.AllocateSpace
-    Datastore.AllocateTemplate
-    Datastore.Audit
-    Pool.Allocate
-    Pool.Audit
-    Sys.Audit
-    Sys.Console
-    Sys.Modify
-    VM.Allocate
-    VM.Audit
-    VM.Clone
-    VM.Config.CDROM
-    VM.Config.Cloudinit
-    VM.Config.CPU
-    VM.Config.Disk
-    VM.Config.HWType
-    VM.Config.Memory
-    VM.Config.Network
-    VM.Config.Options
-    VM.Migrate
-    VM.PowerMgmt
-    VM.GuestAgent.Audit
-    VM.GuestAgent.Unrestricted
-    SDN.Use"
-  when: tf_role.stdout == ""
-
-- name: Get token
-  ansible.builtin.shell: pveum user token add terraform@pam tf --privsep 0 | grep value | awk '{print $4}' | head -n2 | tail -n1
+- name: Get root@pam token
+  ansible.builtin.shell: pveum user token add root@pam tf --privsep 0 | grep value | awk '{print $4}' | head -n2 | tail -n1
   register: api_token
-
-- name: Add role terraform
-  ansible.builtin.shell: pveum aclmod / -user terraform@pam -role Terraform
 
 - name: Ensure terraform secrets directory exists
   ansible.builtin.file:

@@ -209,6 +209,11 @@
   ansible.builtin.set_fact:
     crowdsec_api_key: "{{ bouncer_output.stdout_lines[2] | trim }}"
 
+- name: Remove cs_secret if it's a directory
+  ansible.builtin.file:
+    path: /home/docker/traefik/cs_secret
+    state: absent
+
 - name: Write API key to file
   ansible.builtin.copy:
     content: "{{ crowdsec_api_key }}"

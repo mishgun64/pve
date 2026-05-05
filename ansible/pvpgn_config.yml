@@ -1,0 +1,10 @@
+---
+
+- name: PVPGN LXC config
+  hosts: pvpgn_lxc
+  remote_user: root
+  gather_facts: true
+  roles:
+    - common/basic
+    - common/docker
+    - pvpgn/config

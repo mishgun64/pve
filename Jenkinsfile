@@ -300,6 +300,22 @@ pipeline {
             }
         }
 
+        stage('pvpgn-config') {
+            when {
+                expression { env.EVENT == 'pvpgn-config' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - PVPGN-config"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pvpgn_config.yml
+                '''
+            }
+        }
+
         stage('cron-debug') {
             when {
                 expression { env.EVENT == 'cron-debug' }

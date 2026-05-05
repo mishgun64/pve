@@ -36,7 +36,7 @@ modules_enabled = {
   "bookmarks";    -- Синхронизация закладок (XEP-0402)
 
   -- Мобильные клиенты
-  "csi_simple";       -- Оптимизация трафика для фоновых клиентов (XEP-0352)
+  "csi_battery_saver";      -- Оптимизация трафика для фоновых клиентов (XEP-0352)
 
   -- История сообщений
   -- ВНИМАНИЕ: используется community-версия из plugin_paths (заменяет встроенную)
@@ -68,12 +68,14 @@ modules_enabled = {
   -- Администрирование
   "announce";         -- Рассылка от администратора всем пользователям
   "disco";
+  "default_bookmarks";
+  "s2s";
+  "push2";
+
+
 }
 
 modules_disabled = {
-  -- Федерация (S2S)
-  "dialback";
-  -- BOSH и WebSocket
   "bosh";
   "websocket";
 }
@@ -81,9 +83,10 @@ modules_disabled = {
 -- Регистрация через обычную форму отключена — только по инвайтам
 allow_registration = false
 
--- Федерация отключена
-s2s_ports = {}
-
+s2s_ports = { 5269 }
+s2s_require_encryption = true
+s2s_secure_auth = false
+s2s_direct_tls_ports = { 5270 }
 
 storage = "sql"
 sql = {
@@ -118,13 +121,30 @@ limits = {
   };
 }
 
--- Smacks (возобновление сессии)
-smacks_max_unacked_stanzas = 5
-smacks_hibernation_time = 300  -- 5 минут ожидания переподключения
+-- Smacks
+smacks_max_unacked_stanzas = 10
+smacks_hibernation_time = 86400  -- 24 часа
+smacks_max_queue_size = 2000
+push_max_errors = 16
+push_max_devices = 5
 
+-- push2
+push_notification_with_body = false
+push_notification_with_sender = false
+
+-- TCP keepalives
+tcp_keepalives = {
+  idle = 60;
+  interval = 10;
+  count = 6;
+}
 -- Инвайты: базовый URL для генерации ссылок
 -- Клиент сформирует ссылку вида: https://mishgun.com/invite/<token>
 invites_url = "https://xmpp.mishgun.com/invite/{invite}"
+
+default_bookmarks = {
+    { jid = "common@conference.mishgun.com", name = "Общий чат", autojoin = true };
+}
 
 log = {
   { levels = { "info", "warn", "error" }, to = "console" };
@@ -144,8 +164,6 @@ Component "upload.mishgun.com" "http_file_share"
 Component "conference.mishgun.com" "muc"
   modules_enabled = {
     "muc_mam";      -- История в конференциях
-    "muc_listing";  -- Публичный список конференций (XEP-0423) [community: mod_muc_listing]
-                    -- Список доступен через HTTP: http://localhost:5280/muc_listing
   }
   muc_log_by_default = true
   max_history_messages = 1000

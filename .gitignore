@@ -5,4 +5,5 @@
 /ansible/roles/traefik/config/files/enroll_secret
 /ansible/roles/prosody/config/files/144.fw
 /ansible/roles/prosody/config/files/.env
-/ansible/roles/openfire/config/files/prosody.cfg.lua
+/ansible/roles/pvpgn/config/files/.env
+/ansible/roles/pvpgn/config/files/145.fw

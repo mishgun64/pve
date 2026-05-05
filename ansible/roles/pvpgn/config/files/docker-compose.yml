@@ -1,0 +1,55 @@
+services:
+#  db:
+#    image: mysql:8.0
+#    container_name: pvpgn-mysql
+#    restart: unless-stopped
+#    environment:
+#      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+#      MYSQL_DATABASE: ${MYSQL_DATABASE:-pvpgn}
+#      MYSQL_USER: ${MYSQL_USER:-pvpgn}
+#      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pvpgnpassword}
+#    volumes:
+#      - mysql_data:/var/lib/mysql
+#    healthcheck:
+#      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    networks:
+#      - pvpgn-net
+
+  pvpgn:
+    image: wwmoraes/pvpgn-server:latest-mysql
+    container_name: pvpgn-server
+    restart: unless-stopped
+#    depends_on:
+#      db:
+#        condition: service_healthy
+    ports:
+      - "6112:6112/tcp"   # Battle.net (основной порт)
+      - "6112:6112/udp"   # Battle.net UDP
+    environment:
+#      PVPGN_DB_HOST: db
+#      PVPGN_DB_PORT: 3306
+#      PVPGN_DB_NAME: ${MYSQL_DATABASE:-pvpgn}
+#      PVPGN_DB_USER: ${MYSQL_USER:-pvpgn}
+#      PVPGN_DB_PASSWORD: ${MYSQL_PASSWORD:-pvpgnpassword}
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - pvpgn_conf:/usr/local/etc/pvpgn    # конфиги
+      - pvpgn_var:/usr/local/var/pvpgn      # логи, сохранения
+#    networks:
+#      - pvpgn-net
+
+#volumes:
+#  mysql_data:
+#  pvpgn_conf:
+#  pvpgn_var:
+#
+#networks:
+#  pvpgn-net:
+#    driver: bridge

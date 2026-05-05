@@ -94,7 +94,7 @@
 
 - name: Set acme-dns backup flag
   ansible.builtin.set_fact:
-    acme_dns_exists: "{{ acme_dns_stats.results | map(attribute='stat.exists') | list | all }}"
+    acme_dns_exists: "{{ acme_dns_stats.results | map(attribute='stat.exists') | select('equalto', true) | list | length == 2 }}"
 
 - name: Archive acme-dns data directory and database file
   ansible.builtin.archive:

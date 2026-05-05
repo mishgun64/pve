@@ -196,6 +196,11 @@ resource "proxmox_virtual_environment_container" "traefik" {
   features {
     nesting = true
   }
+
+  mount_point {
+    volume = "/srv/certs/"
+    path   = "/home/docker/certs"
+  }
 }
 
 #------------------------------------Prosody LXC------------------------------------
@@ -264,6 +269,11 @@ resource "proxmox_virtual_environment_container" "prosody" {
 
   features {
     nesting = true
+  }
+
+  mount_point {
+    volume = "/srv/certs/dumped-certs/"
+    path   = "/home/docker/certs"
   }
 }
 
@@ -385,7 +395,7 @@ resource "terraform_data" "traefik_trigger" {
       sleep 30
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
-      -d '{"event": "traefik"}'
+      -d '{"event": "traefik-config"}'
     EOT
   }
 }

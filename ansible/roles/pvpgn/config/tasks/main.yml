@@ -56,12 +56,13 @@
     group: 1001
     mode: '0644'
 
-- name: Sync support
-  synchronize:
+- name: Copy support files
+  copy:
     src: support/
     dest: /home/docker/pvpgn_var/files/
-    recursive: yes
-    delete: no
+    owner: 1001
+    group: 1001
+    mode: '0644'
 
 - name: Copy docker-compose.yml
   copy:

@@ -40,12 +40,28 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: docker
-    group: docker
+    owner: 1001
+    group: 1001
     mode: '0755'
   loop:
     - /home/docker/pvpgn_conf
-    - /home/docker/pvpgn_var
+    - /home/docker/pvpgn_var/files
+    - /home/docker/db
+
+- name: Copy bnetd.conf
+  copy:
+    src: bnetd.conf
+    dest: /home/docker/pvpgn_conf/bnetd.conf
+    owner: 1001
+    group: 1001
+    mode: '0644'
+
+- name: Sync support
+  synchronize:
+    src: support/
+    dest: /home/docker/pvpgn_var/files/
+    recursive: yes
+    delete: no
 
 - name: Copy docker-compose.yml
   copy:

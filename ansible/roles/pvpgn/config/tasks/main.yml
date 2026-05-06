@@ -46,6 +46,7 @@
   loop:
     - /home/docker/pvpgn_conf
     - /home/docker/pvpgn_var/files
+    - /home/docker/pvpgn_var/status
     - /home/docker/db
 
 - name: Copy bnetd.conf

@@ -1,3 +1,5 @@
+---
+
 #--------------------------Stop stack----------------------------------
 
 - name: Stop docker compose
@@ -88,6 +90,9 @@
   ansible.builtin.shell: docker compose up -d
   args:
     chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
 
 #-----------------------Add bouncer api key----------------------------------
 

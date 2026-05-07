@@ -1,0 +1,72 @@
+#------------------------------------------Check directory------------------------------------------
+
+- name: Check pvpgn_var exists
+  ansible.builtin.stat:
+    path: /home/docker/pvpgn_var
+  register: pvpgn_var_dir
+
+#------------------------------------------Generate timestamp------------------------------------------
+
+- name: Generate timestamp
+  ansible.builtin.set_fact:
+    backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
+  when: pvpgn_var_dir.stat.exists
+
+#------------------------------------------Create backup dir------------------------------------------
+
+- name: Create backup directory on control
+  ansible.builtin.file:
+    path: /srv/backups/pvpgn
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  when: pvpgn_var_dir.stat.exists
+
+#------------------------------------------Stop container------------------------------------------
+
+- name: Stop docker compose
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+  when: pvpgn_var_dir.stat.exists
+
+#------------------------------------------Archive------------------------------------------
+
+- name: Archive PVPGN
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/pvpgn_var
+    dest: "/home/docker/pvpgn_{{ backup_time }}.tar.gz"
+    format: gz
+  when: pvpgn_var_dir.stat.exists
+
+#------------------------------------------Start container------------------------------------------
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  when: pvpgn_var_dir.stat.exists
+
+#------------------------------------------Fetch------------------------------------------
+
+- name: Fetch backup
+  ansible.builtin.fetch:
+    src: "/home/docker/pvpgn_{{ backup_time }}.tar.gz"
+    dest: "/srv/backups/pvpgn/"
+    flat: true
+  when: pvpgn_var_dir.stat.exists
+
+#------------------------------------------Cleanup------------------------------------------
+
+- name: Cleanup remote files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/home/docker/pvpgn_{{ backup_time }}.tar.gz"
+  when: pvpgn_var_dir.stat.exists

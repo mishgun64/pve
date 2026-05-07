@@ -5,8 +5,4 @@
   remote_user: root
   gather_facts: true
   roles:
-    - common/basic
-    - common/docker
     - pvpgn/backup
-    - pvpgn/config
-    - pvpgn/restore

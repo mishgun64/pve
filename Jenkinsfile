@@ -319,6 +319,38 @@ pipeline {
             }
         }
 
+        stage('pvpgn-config') {
+            when {
+                expression { env.EVENT == 'pvpgn-backup' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - PVPGN-backup"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pvpgn_backup.yml
+                '''
+            }
+        }
+
+        stage('pvpgn-restore') {
+            when {
+                expression { env.EVENT == 'pvpgn-restore' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - PVPGN-restore"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pvpgn_restore.yml
+                '''
+            }
+        }
+
         stage('cron-debug') {
             when {
                 expression { env.EVENT == 'cron-debug' }

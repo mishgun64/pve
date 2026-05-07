@@ -1,3 +1,5 @@
+---
+
 #------------------------------------------Start stack------------------------------------------
 
 - name: Start docker compose
@@ -96,3 +98,6 @@
   ansible.builtin.shell: docker compose up -d
   args:
     chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker

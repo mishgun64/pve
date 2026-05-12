@@ -1,0 +1,25 @@
+---
+
+http:
+  routers:
+    nextcloud:
+      rule: "Host(`cloud.mishgun.com`)"
+      entryPoints: websecure
+      tls: {}
+      service: nextcloud
+      middlewares:
+        - crowdsec@file
+        - nextcloud-redirectregex
+
+  middlewares:
+    nextcloud-redirectregex:
+      redirectRegex:
+        permanent: true
+        regex: "https://(.*)/.well-known/(?:card|cal)dav"
+        replacement: "https://${1}/remote.php/dav"
+
+  services:
+    nextcloud:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.5:8080"

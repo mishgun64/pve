@@ -56,7 +56,7 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Moscow
-      COLLECTIONS: crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/base-http-scenarios crowdsecurity/linux
+      COLLECTIONS: crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/base-http-scenarios crowdsecurity/linux crowdsecurity/nextcloud
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
       - ./crowdsec/config:/etc/crowdsec/

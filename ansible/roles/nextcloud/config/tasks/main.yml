@@ -96,13 +96,13 @@
     group: docker
     mode: '0644'
 
-- name: Decrypt and write .env file
-  copy:
-    content: "{{ lookup('pipe', 'sops -d --input-type dotenv --output-type dotenv /var/lib/jenkins/jobs/pve/workspace/ansible/roles/nextcloud/config/files/.env.enc') }}"
+- name: Decrypt .env and write to VM
+  ansible.builtin.copy:
+    content: "{{ lookup('pipe', 'sops -d --output-type dotenv ' + role_path + '/files/.env.enc') }}"
     dest: /home/docker/.env
     owner: docker
     group: docker
-    mode: '0400'
+    mode: "0600"
 
 #-----------------------Run docker compose stack----------------------------------
 

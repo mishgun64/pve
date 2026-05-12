@@ -319,7 +319,7 @@ pipeline {
             }
         }
 
-        stage('pvpgn-config') {
+        stage('pvpgn-backup') {
             when {
                 expression { env.EVENT == 'pvpgn-backup' }
             }
@@ -347,6 +347,22 @@ pipeline {
 
                 sh '''
                     ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/pvpgn_restore.yml
+                '''
+            }
+        }
+
+        stage('nextcloud-config') {
+            when {
+                expression { env.EVENT == 'nextcloud-config' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - NextCloud-config"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/nextcloud_config.yml
                 '''
             }
         }

@@ -21,7 +21,7 @@ services:
     image: redis:alpine
     container_name: nextcloud-redis
     restart: unless-stopped
-    command: redis-server --save "" --appendonly no
+    command: redis-server --save "" --appendonly no --requirepass ${REDIS_PASSWORD}
     environment:
       TZ: ${TZ}
     security_opt:
@@ -43,6 +43,7 @@ services:
       REDIS_HOST: redis
       PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT}
       PHP_UPLOAD_LIMIT: ${PHP_UPLOAD_LIMIT}
+      REDIS_HOST_PASSWORD: ${REDIS_PASSWORD}
       PUID: ${PUID}
       PGID: ${PGID}
       TZ: ${TZ}

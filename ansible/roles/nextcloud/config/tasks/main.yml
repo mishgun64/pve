@@ -8,6 +8,18 @@
     password: '$6$xMQrFaO1KeRvXQoD$HxbbsynFCtHgmZGgCdQC6m4oKTs4/9rrRQjE9cCF2MlL8hB6QD9rFPft0oNcVFXznpooF5XibRZYIp0iXOyMD1'
     # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
 
+- name: Configure sysctl for Docker/MariaDB/Redis
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: true
+    reload: true
+  loop:
+    - { name: "kernel.io_uring_disabled", value: "0" }
+    - { name: "vm.overcommit_memory", value: "1" }
+  delegate_to: pve
+
 #--------------------------Firewall rules----------------------------------
 
 - name: Decrypt locally

@@ -231,7 +231,7 @@
 
 - name: Recreate containers
   community.docker.docker_compose_v2:
-    project_src: /home/docker/traefik
+    project_src: /home/docker/
     state: present
     recreate: always
 

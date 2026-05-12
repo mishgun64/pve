@@ -106,6 +106,9 @@ services:
     volumes:
       - ./emby_config:/config # Configuration directory
       - /media/library:/media:ro # Media directory
+    dns:
+      - 9.9.9.9
+      - 149.112.112.112
     ports:
       - "8097:8096" # HTTP port
 

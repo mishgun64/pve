@@ -8,6 +8,8 @@ local_hosts:
       ansible_host: 192.168.1.72
     media_vm:
       ansible_host: 192.168.2.4
+    nextcloud_vm:
+      ansible_host: 192.168.2.5
     wg_lxc:
       ansible_host: 192.168.2.6
     traefik_lxc:

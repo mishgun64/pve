@@ -1,0 +1,12 @@
+---
+
+- name: NextCloud VM config
+  hosts: nextcloud_vm
+  remote_user: root
+  gather_facts: true
+  roles:
+    - common/basic
+    - common/docker
+#    - nextcloud/backup
+    - nextcloud/config
+#    - nextcloud/restore

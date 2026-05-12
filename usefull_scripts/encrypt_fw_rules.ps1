@@ -5,6 +5,7 @@ $files = @(
     "../ansible/roles/traefik/config/files/143.fw"
     "../ansible/roles/prosody/config/files/144.fw"
     "../ansible/roles/pvpgn/config/files/145.fw"
+    "../ansible/roles/nextcloud/config/files/125.fw"
 )
 
 foreach ($file in $files) {

@@ -74,6 +74,82 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
   serial_device {}
 }
 
+#------------------------------------Media VM------------------------------------
+
+resource "proxmox_virtual_environment_vm" "nextcloud_vm" {
+  vm_id     = 125
+  name      = "nextcloud"
+  node_name = var.target_node_name
+
+  agent {
+    enabled = true
+  }
+
+  clone {
+    vm_id = var.debian_template_id
+  }
+
+  cpu {
+    cores   = 4
+    sockets = 1
+    type    = "host"
+  }
+
+  memory {
+    dedicated = 4096
+  }
+
+  boot_order = ["scsi0"]
+
+  scsi_hardware = "virtio-scsi-single"
+
+  started             = true
+  on_boot             = true
+  reboot_after_update = true
+
+  startup {
+    order    = "1"
+    up_delay = "10"
+  }
+
+  initialization {
+    datastore_id = "local-lvm"
+
+    user_account {
+      username = "root"
+      keys     = [var.control_ssh_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "192.168.2.5/24"
+        gateway = "192.168.2.1"
+      }
+    }
+
+    dns {
+      servers = ["192.168.2.1"]
+    }
+
+  }
+
+  disk {
+    interface    = "scsi0"
+    datastore_id = "local-lvm"
+    size         = 30
+    file_format  = "raw"
+  }
+
+  network_device {
+    bridge      = "vmbr0"
+    model       = "virtio"
+    mac_address = "BC:24:11:F1:AB:D9"
+    firewall    = true
+  }
+
+  serial_device {}
+}
+
 #------------------------------------Wireguard LXC------------------------------------
 
 resource "proxmox_virtual_environment_container" "wireguard" {
@@ -360,6 +436,24 @@ resource "terraform_data" "media_vm_trigger" {
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
       -d '{"event": "media_vm"}'
+    EOT
+  }
+}
+
+#------------------------------------NextCloud_VM webhook trigger------------------------------------
+
+resource "terraform_data" "nextcloud_vm_trigger" {
+  depends_on = [proxmox_virtual_environment_vm.nextcloud_vm]
+    lifecycle {
+      replace_triggered_by = [proxmox_virtual_environment_vm.nextcloud_vm]
+    }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 30
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"event": "nextcloud-config"}'
     EOT
   }
 }

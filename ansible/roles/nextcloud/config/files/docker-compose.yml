@@ -1,0 +1,62 @@
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: nextcloud-db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      TZ: ${TZ}
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./db:/var/lib/mysql
+    networks:
+      - nextcloud-net
+
+  redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    environment:
+      TZ: ${TZ}
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - nextcloud-net
+
+  nextcloud:
+    image: nextcloud:31-apache
+    container_name: nextcloud
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      MYSQL_HOST: mariadb
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT}
+      PHP_UPLOAD_LIMIT: ${PHP_UPLOAD_LIMIT}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./nextcloud:/var/www/html
+      - ./data:/var/www/html/data
+    depends_on:
+      - mariadb
+      - redis
+    networks:
+      - nextcloud-net
+
+networks:
+  nextcloud-net:
+    driver: bridge

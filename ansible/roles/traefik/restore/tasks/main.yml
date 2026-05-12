@@ -225,7 +225,7 @@
 - name: Enroll CrowdSec console
   ansible.builtin.command: >
     docker exec crowdsec cscli console enroll
-    {{ lookup('pipe', 'sops -d ' + role_path + '/files/enroll_secret.enc') | trim }}
+    {{ lookup('pipe', 'sops -d ' + role_path | replace('restore', 'config') + '/files/enroll_secret.enc') | trim }}
   no_log: true
   ignore_errors: true
 

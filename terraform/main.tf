@@ -14,7 +14,7 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
   }
 
   cpu {
-    cores   = 4
+    cores   = 8
     sockets = 1
     type    = "host"
   }

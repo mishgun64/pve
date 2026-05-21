@@ -139,15 +139,15 @@
 
 #-----------------------Autobackup----------------------------------
 
-#- name: Add cron task for PVPGN backup
-#  ansible.builtin.cron:
-#    name: "Initialize PVPGN backup"
-#    hour: "5"
-#    minute: "0"
-#    job: >-
-#      curl -X POST
-#      "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
-#      -H "Content-Type: application/json"
-#      -d '{"event":"nexcloud-backup","node":"pve1","host":"pve1.local"}'
-#      >> /var/log/traefik-backup-webhook.log 2>&1
-#    state: "{{ state | default('present') }}"
+- name: Add cron task for Nextcloud backup
+  ansible.builtin.cron:
+    name: "Initialize Nextcloud backup"
+    hour: "5"
+    minute: "10"
+    job: >-
+      curl -X POST
+      "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+      -H "Content-Type: application/json"
+      -d '{"event":"nexcloud-backup","node":"pve1","host":"pve1.local"}'
+      >> /var/log/nextcloud-backup-webhook.log 2>&1
+    state: "{{ state | default('present') }}"

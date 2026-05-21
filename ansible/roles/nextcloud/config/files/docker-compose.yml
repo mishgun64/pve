@@ -30,7 +30,7 @@ services:
       - nextcloud-net
 
   nextcloud:
-    image: nextcloud:31-apache
+    image: nextcloud:latest
     container_name: nextcloud
     restart: unless-stopped
     ports:
@@ -44,11 +44,25 @@ services:
       PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT}
       PHP_UPLOAD_LIMIT: ${PHP_UPLOAD_LIMIT}
       REDIS_HOST_PASSWORD: ${REDIS_PASSWORD}
-      PUID: ${PUID}
-      PGID: ${PGID}
       TZ: ${TZ}
     security_opt:
       - no-new-privileges:true
+    volumes:
+      - ./nextcloud:/var/www/html
+      - /mnt/data:/var/www/html/data
+    depends_on:
+      - mariadb
+      - redis
+    networks:
+      - nextcloud-net
+
+  cron:
+    image: nextcloud:latest
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    entrypoint: /cron.sh
+    environment:
+      TZ: ${TZ}
     volumes:
       - ./nextcloud:/var/www/html
       - /mnt/data:/var/www/html/data

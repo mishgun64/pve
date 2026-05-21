@@ -1,0 +1,104 @@
+---
+
+#------------------------------------------Start stack------------------------------------------
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker
+
+#------------------------------------------Generate timestamp------------------------------------------
+
+- name: Generate timestamp
+  ansible.builtin.set_fact:
+    backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
+
+#------------------------------------------Create backup dir------------------------------------------
+
+- name: Create backup directory on control
+  ansible.builtin.file:
+    path: /srv/backups/nextcloud
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+
+#------------------------------------------Detect MariaDB container name (FIX)------------------------------------------
+
+- name: Get MariaDB container name
+  ansible.builtin.shell: |
+    docker ps --format "{{ '{{.Names}}' }}" | grep mariadb
+  register: mariadb_container
+  changed_when: false
+
+- name: Fail if MariaDB not running
+  ansible.builtin.fail:
+    msg: "MariaDB container not found or not running"
+  when: mariadb_container.stdout == ""
+
+#------------------------------------------MYSQL DUMP (MUST BE BEFORE STOP)------------------------------------------
+
+- name: Dump MariaDB
+  ansible.builtin.shell: |
+    docker exec {{ mariadb_container.stdout }} \
+      sh -c 'mariadb-dump -u root -p"$MYSQL_ROOT_PASSWORD" \
+      --all-databases \
+      --single-transaction \
+      --routines \
+      --triggers' \
+    > /home/docker/mariadb_{{ backup_time }}.sql
+
+#------------------------------------------Stop stack AFTER dump------------------------------------------
+
+- name: Stop docker compose
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+
+#------------------------------------------Archive------------------------------------------
+
+- name: Archive Nextcloud and DB
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/nextcloud
+      - /home/docker/mariadb_{{ backup_time }}.sql
+    dest: "/home/docker/nextcloud_{{ backup_time }}.tar.gz"
+    format: gz
+
+#------------------------------------------Encrypt------------------------------------------
+
+- name: Encrypt archive
+  ansible.builtin.shell: >
+    sops -e --input-type binary --output-type binary nextcloud_{{ backup_time }}.tar.gz > nextcloud_{{ backup_time }}.tar.gz.enc
+  args:
+    chdir: /home/docker
+
+#------------------------------------------Fetch------------------------------------------
+
+- name: Fetch backup
+  ansible.builtin.fetch:
+    src: "/home/docker/nextcloud_{{ backup_time }}.tar.gz.enc"
+    dest: "/srv/backups/nextcloud/"
+    flat: true
+
+#------------------------------------------Cleanup------------------------------------------
+
+- name: Cleanup remote files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/home/docker/nextcloud_{{ backup_time }}.tar.gz"
+    - "/home/docker/nextcloud_{{ backup_time }}.tar.gz.enc"
+    - "/home/docker/mariadb_{{ backup_time }}.sql"
+
+#------------------------------------------Start stack------------------------------------------
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_user: docker

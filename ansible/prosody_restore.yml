@@ -1,6 +1,6 @@
 ---
 
-- name: prosody LXC config
+- name: prosody LXC restore
   hosts: prosody_lxc
   remote_user: root
   gather_facts: true

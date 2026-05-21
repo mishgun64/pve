@@ -74,7 +74,7 @@ resource "proxmox_virtual_environment_vm" "media_vm" {
   serial_device {}
 }
 
-#------------------------------------Media VM------------------------------------
+#------------------------------------Nextcloud VM------------------------------------
 
 resource "proxmox_virtual_environment_vm" "nextcloud_vm" {
   vm_id     = 125

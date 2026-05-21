@@ -52,9 +52,9 @@
   ansible.builtin.file:
     path: /mnt/data
     state: directory
-    owner: root
-    group: root
-    mode: "0755"
+    owner: 33
+    group: 33
+    mode: "0750"
 
 - name: Check if filesystem exists on /dev/vda
   ansible.builtin.command: blkid /dev/vda
@@ -84,7 +84,7 @@
     state: directory
     owner: 1001
     group: 1001
-    mode: '0755'
+    mode: '0750'
   loop:
     - /home/docker/db
 
@@ -92,9 +92,9 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: www-data
-    group: www-data
-    mode: '0755'
+    owner: 33
+    group: 33
+    mode: '0750'
   loop:
     - /home/docker/nextcloud
 
@@ -104,6 +104,12 @@
     dest: /home/docker/docker-compose.yml
     owner: docker
     group: docker
+    mode: '0644'
+
+- name: Copy .sops.yaml
+  copy:
+    src: .sops.yaml
+    dest: /home/docker/.sops.yaml
     mode: '0644'
 
 - name: Decrypt .env and write to VM

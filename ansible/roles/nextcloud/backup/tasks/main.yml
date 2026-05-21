@@ -28,13 +28,15 @@
 
 - name: Get MariaDB container name
   ansible.builtin.shell: |
-    docker ps --format "{{ '{{.Names}}' }}" | grep mariadb
+    docker compose ps --format '{% raw %}{{.Name}}{% endraw %}' mariadb
+  args:
+    chdir: /home/docker
   register: mariadb_container
   changed_when: false
 
 - name: Fail if MariaDB not running
   ansible.builtin.fail:
-    msg: "MariaDB container not found or not running"
+    msg: "MariaDB container not found: {{ mariadb_container.stdout }}"
   when: mariadb_container.stdout == ""
 
 #------------------------------------------MYSQL DUMP (MUST BE BEFORE STOP)------------------------------------------

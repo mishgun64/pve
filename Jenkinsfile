@@ -367,6 +367,22 @@ pipeline {
             }
         }
 
+        stage('nextcloud-backup') {
+            when {
+                expression { env.EVENT == 'nextcloud-backup' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - NextCloud-backup"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/nextcloud_backup.yml
+                '''
+            }
+        }
+
         stage('cron-debug') {
             when {
                 expression { env.EVENT == 'cron-debug' }

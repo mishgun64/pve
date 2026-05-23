@@ -1,19 +1,4 @@
 ---
-# =============================================================
-#  RetroArch Sync — полная установка на NAS/сервер
-#
-#  Что делает этот плейбук:
-#    1. Устанавливает davfs2 и монтирует Nextcloud WebDAV
-#    2. Добавляет монтирование в /etc/fstab (персистентно)
-#    3. Скачивает retroarch-sync.sh с GitHub
-#    4. Создаёт systemd-сервис для автоматического запуска
-#    5. Настраивает ротацию логов
-#
-#  Использование:
-#    ansible-playbook -i inventory.ini playbook.yml
-#    ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass  (если пароль в vault)
-# =============================================================
-
 # ----------------------------------------------------------
 #  1. Зависимости
 # ----------------------------------------------------------
@@ -120,12 +105,14 @@
     owner: "{{ sync_user }}"
     group: "{{ sync_user }}"
     mode: "0750"
-    force: false   # не перезаписывать если уже есть (не сбросить правки)
+    force: false
 
 # ----------------------------------------------------------
 #  7. Подставить переменные в скрипт
+#     Одиночные строки — lineinfile
+#     Многострочные массивы — replace с (?s) (dot matches newline)
 # ----------------------------------------------------------
-- name: Настроить HOST (IP Apple TV)
+- name: Настроить HOST
   ansible.builtin.lineinfile:
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
     regexp: '^HOST='
@@ -137,7 +124,7 @@
     regexp: '^PORT='
     line: 'PORT="{{ appletv_port }}"'
 
-- name: Настроить LOCAL_BASE_DIR (папка Nextcloud через WebDAV)
+- name: Настроить LOCAL_BASE_DIR
   ansible.builtin.lineinfile:
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
     regexp: '^LOCAL_BASE_DIR='
@@ -149,26 +136,23 @@
     regexp: '^SYNC_LOOP_INTERVAL='
     line: 'SYNC_LOOP_INTERVAL="{{ sync_loop_interval }}"'
 
-- name: Настроить TWOWAY_SYNC_PATHS
-  ansible.builtin.lineinfile:
+- name: Настроить TWOWAY_SYNC_PATHS (multiline)
+  ansible.builtin.replace:
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
-    regexp: '^TWOWAY_SYNC_PATHS='
-    line: >-
-      TWOWAY_SYNC_PATHS=({{ twoway_sync_paths | map('regex_replace', '^(.*)$', '"\1"') | join(' ') }})
+    regexp: '(?s)TWOWAY_SYNC_PATHS=\(.*?\)'
+    replace: "TWOWAY_SYNC_PATHS=({{ twoway_sync_paths | map('regex_replace', '^(.*)$', '\"\\1\"') | join(' ') }})"
 
-- name: Настроить BACKUP_ONLY_PATHS
-  ansible.builtin.lineinfile:
+- name: Настроить BACKUP_ONLY_PATHS (multiline)
+  ansible.builtin.replace:
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
-    regexp: '^BACKUP_ONLY_PATHS='
-    line: >-
-      BACKUP_ONLY_PATHS=({{ backup_only_paths | map('regex_replace', '^(.*)$', '"\1"') | join(' ') }})
+    regexp: '(?s)BACKUP_ONLY_PATHS=\(.*?\)'
+    replace: "BACKUP_ONLY_PATHS=({{ backup_only_paths | map('regex_replace', '^(.*)$', '\"\\1\"') | join(' ') }})"
 
-- name: Настроить EXCLUDE_PATHS
-  ansible.builtin.lineinfile:
+- name: Настроить EXCLUDE_PATHS (multiline)
+  ansible.builtin.replace:
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
-    regexp: '^EXCLUDE_PATHS='
-    line: >-
-      EXCLUDE_PATHS=({{ exclude_paths | map('regex_replace', '^(.*)$', '"\1"') | join(' ') }})
+    regexp: '(?s)EXCLUDE_PATHS=\(.*?\)'
+    replace: "EXCLUDE_PATHS=({{ exclude_paths | map('regex_replace', '^(.*)$', '\"\\1\"') | join(' ') }})"
 
 # ----------------------------------------------------------
 #  8. Systemd сервис
@@ -182,7 +166,6 @@
       Description=RetroArch Sync — Apple TV <-> NAS via Nextcloud
       After=network-online.target
       Wants=network-online.target
-      # Ждём монтирования WebDAV перед запуском
       After={{ webdav_mount_point | replace('/', '-') | regex_replace('^-', '') }}.mount
 
       [Service]

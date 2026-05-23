@@ -70,7 +70,6 @@
 - name: Загрузить секреты из зашифрованного SOPS файла
   ansible.builtin.set_fact:
     _secrets: "{{ lookup('pipe', 'sops -d --input-type yaml --output-type yaml ' ~ role_path ~ '/files/secrets.yml.enc') | from_yaml }}"
-  no_log: true
 
 - name: Убедиться что директория /etc/davfs2 существует
   ansible.builtin.file:
@@ -97,7 +96,7 @@
     path: /etc/fstab
     regexp: "^.*{{ webdav_mount_point }}.*"
     line: >-
-      {{ nextcloud_url }}/remote.php/dav/files/{{ nextcloud_user }}/{{ nextcloud_roms_path }}
+      {{ nextcloud_url }}/remote.php/dav/files/{{ _secrets.nextcloud_user }}/{{ nextcloud_roms_path }}
       {{ webdav_mount_point }}
       davfs
       _netdev,uid={{ sync_user }},gid={{ sync_user }},rw,noauto,x-systemd.automount,x-systemd.requires=network-online.target

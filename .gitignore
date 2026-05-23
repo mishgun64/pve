@@ -10,3 +10,4 @@
 /terraform/secrets/pass
 /ansible/roles/nextcloud/config/files/125.fw
 /ansible/roles/nextcloud/config/files/.env
+/ansible/roles/retroarch_sync/files/secret.yml

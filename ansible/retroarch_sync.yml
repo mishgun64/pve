@@ -1,0 +1,8 @@
+---
+
+- name: Apple TV RetroArch sync script config
+  hosts: nextcloud_vm
+  remote_user: root
+  gather_facts: true
+  roles:
+    - retroarch_sync

@@ -1,0 +1,241 @@
+---
+# =============================================================
+#  RetroArch Sync — полная установка на NAS/сервер
+#
+#  Что делает этот плейбук:
+#    1. Устанавливает davfs2 и монтирует Nextcloud WebDAV
+#    2. Добавляет монтирование в /etc/fstab (персистентно)
+#    3. Скачивает retroarch-sync.sh с GitHub
+#    4. Создаёт systemd-сервис для автоматического запуска
+#    5. Настраивает ротацию логов
+#
+#  Использование:
+#    ansible-playbook -i inventory.ini playbook.yml
+#    ansible-playbook -i inventory.ini playbook.yml --ask-vault-pass  (если пароль в vault)
+# =============================================================
+
+# ----------------------------------------------------------
+#  1. Зависимости
+# ----------------------------------------------------------
+- name: Установить davfs2, git, curl
+  ansible.builtin.apt:
+    name:
+      - davfs2
+      - git
+      - curl
+    state: present
+    update_cache: true
+
+# ----------------------------------------------------------
+#  2. Системный пользователь для сервиса
+# ----------------------------------------------------------
+- name: Создать системного пользователя {{ sync_user }}
+  ansible.builtin.user:
+    name: "{{ sync_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ sync_install_dir }}"
+    create_home: false
+
+# ----------------------------------------------------------
+#  3. Директории
+# ----------------------------------------------------------
+- name: Создать директорию монтирования WebDAV
+  ansible.builtin.file:
+    path: "{{ webdav_mount_point }}"
+    state: directory
+    owner: "{{ sync_user }}"
+    group: "{{ sync_user }}"
+    mode: "0750"
+
+- name: Создать директорию установки скрипта
+  ansible.builtin.file:
+    path: "{{ sync_install_dir }}"
+    state: directory
+    owner: "{{ sync_user }}"
+    group: "{{ sync_user }}"
+    mode: "0750"
+
+- name: Создать директорию логов
+  ansible.builtin.file:
+    path: "{{ sync_log_dir }}"
+    state: directory
+    owner: "{{ sync_user }}"
+    group: "{{ sync_user }}"
+    mode: "0750"
+
+# ----------------------------------------------------------
+#  4. Учётные данные WebDAV (davfs2 secrets) — из SOPS+age
+# ----------------------------------------------------------
+- name: Загрузить секреты из зашифрованного SOPS файла
+  ansible.builtin.set_fact:
+    _secrets: "{{ lookup('pipe', 'sops -d --output-type yaml ' ~ role_path ~ '/files/secrets.yml.enc') | from_yaml }}"
+  no_log: true
+
+- name: Убедиться что директория /etc/davfs2 существует
+  ansible.builtin.file:
+    path: /etc/davfs2
+    state: directory
+    mode: "0700"
+
+- name: Записать credentials в /etc/davfs2/secrets
+  ansible.builtin.lineinfile:
+    path: /etc/davfs2/secrets
+    create: true
+    mode: "0600"
+    regexp: "^{{ nextcloud_url }}/remote.php/dav/files/{{ _secrets.nextcloud_user }}/{{ nextcloud_roms_path }}"
+    line: >-
+      {{ nextcloud_url }}/remote.php/dav/files/{{ _secrets.nextcloud_user }}/{{ nextcloud_roms_path }}
+      {{ _secrets.nextcloud_user }}
+      {{ _secrets.nextcloud_password }}
+
+# ----------------------------------------------------------
+#  5. Монтирование WebDAV через /etc/fstab
+# ----------------------------------------------------------
+- name: Добавить запись в /etc/fstab для WebDAV
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^.*{{ webdav_mount_point }}.*"
+    line: >-
+      {{ nextcloud_url }}/remote.php/dav/files/{{ nextcloud_user }}/{{ nextcloud_roms_path }}
+      {{ webdav_mount_point }}
+      davfs
+      _netdev,uid={{ sync_user }},gid={{ sync_user }},rw,noauto,x-systemd.automount,x-systemd.requires=network-online.target
+      0 0
+
+- name: Примонтировать WebDAV (если ещё не смонтирован)
+  ansible.builtin.command: mount "{{ webdav_mount_point }}"
+  register: mount_result
+  failed_when:
+    - mount_result.rc != 0
+    - "'already mounted' not in mount_result.stderr"
+  changed_when: mount_result.rc == 0
+
+# ----------------------------------------------------------
+#  6. Скачать retroarch-sync.sh с GitHub
+# ----------------------------------------------------------
+- name: Скачать retroarch-sync.sh
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/blaz0r/AppleTV-RetroArch-Sync/main/retroarch-sync.sh"
+    dest: "{{ sync_install_dir }}/retroarch-sync.sh"
+    owner: "{{ sync_user }}"
+    group: "{{ sync_user }}"
+    mode: "0750"
+    force: false   # не перезаписывать если уже есть (не сбросить правки)
+
+# ----------------------------------------------------------
+#  7. Подставить переменные в скрипт
+# ----------------------------------------------------------
+- name: Настроить HOST (IP Apple TV)
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^HOST='
+    line: 'HOST="{{ appletv_host }}"'
+
+- name: Настроить PORT
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^PORT='
+    line: 'PORT="{{ appletv_port }}"'
+
+- name: Настроить LOCAL_BASE_DIR (папка Nextcloud через WebDAV)
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^LOCAL_BASE_DIR='
+    line: 'LOCAL_BASE_DIR="{{ webdav_mount_point }}"'
+
+- name: Настроить SYNC_LOOP_INTERVAL
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^SYNC_LOOP_INTERVAL='
+    line: 'SYNC_LOOP_INTERVAL="{{ sync_loop_interval }}"'
+
+- name: Настроить TWOWAY_SYNC_PATHS
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^TWOWAY_SYNC_PATHS='
+    line: >-
+      TWOWAY_SYNC_PATHS=({{ twoway_sync_paths | map('regex_replace', '^(.*)$', '"\1"') | join(' ') }})
+
+- name: Настроить BACKUP_ONLY_PATHS
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^BACKUP_ONLY_PATHS='
+    line: >-
+      BACKUP_ONLY_PATHS=({{ backup_only_paths | map('regex_replace', '^(.*)$', '"\1"') | join(' ') }})
+
+- name: Настроить EXCLUDE_PATHS
+  ansible.builtin.lineinfile:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: '^EXCLUDE_PATHS='
+    line: >-
+      EXCLUDE_PATHS=({{ exclude_paths | map('regex_replace', '^(.*)$', '"\1"') | join(' ') }})
+
+# ----------------------------------------------------------
+#  8. Systemd сервис
+# ----------------------------------------------------------
+- name: Создать systemd unit файл
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/retroarch-sync.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=RetroArch Sync — Apple TV <-> NAS via Nextcloud
+      After=network-online.target
+      Wants=network-online.target
+      # Ждём монтирования WebDAV перед запуском
+      After={{ webdav_mount_point | replace('/', '-') | regex_replace('^-', '') }}.mount
+
+      [Service]
+      Type=simple
+      User={{ sync_user }}
+      Group={{ sync_user }}
+      WorkingDirectory={{ sync_install_dir }}
+      ExecStart=/bin/bash {{ sync_install_dir }}/retroarch-sync.sh
+      Restart=on-failure
+      RestartSec=60s
+      StandardOutput=append:{{ sync_log_dir }}/retroarch-sync.log
+      StandardError=append:{{ sync_log_dir }}/retroarch-sync.log
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Перезагрузить systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Включить и запустить сервис retroarch-sync
+  ansible.builtin.systemd:
+    name: retroarch-sync
+    enabled: true
+    state: started
+
+# ----------------------------------------------------------
+#  9. Ротация логов
+# ----------------------------------------------------------
+- name: Настроить logrotate для retroarch-sync
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/retroarch-sync
+    mode: "0644"
+    content: |
+      {{ sync_log_dir }}/retroarch-sync.log {
+          weekly
+          rotate 4
+          compress
+          missingok
+          notifempty
+          copytruncate
+      }
+
+# ----------------------------------------------------------
+#  10. Итоговый вывод
+# ----------------------------------------------------------
+- name: Статус сервиса
+  ansible.builtin.command: systemctl status retroarch-sync --no-pager
+  register: service_status
+  changed_when: false
+  failed_when: false
+
+- name: Показать статус
+  ansible.builtin.debug:
+    msg: "{{ service_status.stdout_lines }}"

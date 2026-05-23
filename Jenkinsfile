@@ -383,6 +383,22 @@ pipeline {
             }
         }
 
+        stage('retroarch-sync') {
+            when {
+                expression { env.EVENT == 'retroarch-sync' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - RetroArch-Sync"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/retroarch_sync.yml
+                '''
+            }
+        }
+
         stage('cron-debug') {
             when {
                 expression { env.EVENT == 'cron-debug' }

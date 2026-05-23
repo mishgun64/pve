@@ -129,7 +129,7 @@
   ansible.builtin.lineinfile:
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
     regexp: '^LOCAL_BASE_DIR='
-    line: 'LOCAL_BASE_DIR="{{ webdav_mount_point }}"'
+    line: 'LOCAL_BASE_DIR="{{ webdav_mount_point }}/"'  # ← слеш в конце
 
 - name: Настроить SYNC_LOOP_INTERVAL
   ansible.builtin.lineinfile:

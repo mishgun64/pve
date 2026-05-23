@@ -2,12 +2,12 @@
 #  Настройки Nextcloud
 # ============================================================
 nextcloud_url: "https://cloud.mishgun.com"   # URL вашего Nextcloud
-nextcloud_roms_path: "RetroArch/roms"                       # Папка внутри Nextcloud (Files/ROMs)
+nextcloud_roms_path: "RetroArch"                       # Папка внутри Nextcloud (Files/ROMs)
 
 # ============================================================
 #  Настройки монтирования WebDAV
 # ============================================================
-webdav_mount_point: "/mnt/nextcloud-roms/"         # Куда монтировать на сервере
+webdav_mount_point: "/mnt/retroarch/"         # Куда монтировать на сервере
 
 # ============================================================
 #  Настройки RetroArch / Apple TV
@@ -24,3 +24,23 @@ sync_user: "retroarch-sync"                       # Системный поль�
 
 # Интервал синхронизации в секундах
 sync_loop_interval: "300"
+
+twoway_sync_paths:
+  - "downloads"
+  - "saves"
+  - "states"
+
+backup_only_paths:
+  - "config"
+
+exclude_paths:
+  - "playlists"
+  - "assets"
+  - "thumbnails"
+  - "shaders"
+  - "info"
+  - "cht"
+  - "autoconfig"
+  - "overlays"
+  - "database"
+  - "logs"

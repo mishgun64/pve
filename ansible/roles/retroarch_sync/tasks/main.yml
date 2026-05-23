@@ -105,7 +105,7 @@
     owner: "{{ sync_user }}"
     group: "{{ sync_user }}"
     mode: "0750"
-    force: false
+    force: true
 
 # ----------------------------------------------------------
 #  7. Подставить переменные в скрипт
@@ -135,24 +135,6 @@
     path: "{{ sync_install_dir }}/retroarch-sync.sh"
     regexp: '^SYNC_LOOP_INTERVAL='
     line: 'SYNC_LOOP_INTERVAL="{{ sync_loop_interval }}"'
-
-- name: Настроить TWOWAY_SYNC_PATHS (multiline)
-  ansible.builtin.replace:
-    path: "{{ sync_install_dir }}/retroarch-sync.sh"
-    regexp: '(?s)TWOWAY_SYNC_PATHS=\(.*?\)'
-    replace: "TWOWAY_SYNC_PATHS=({{ twoway_sync_paths | map('regex_replace', '^(.*)$', '\"\\1\"') | join(' ') }})"
-
-- name: Настроить BACKUP_ONLY_PATHS (multiline)
-  ansible.builtin.replace:
-    path: "{{ sync_install_dir }}/retroarch-sync.sh"
-    regexp: '(?s)BACKUP_ONLY_PATHS=\(.*?\)'
-    replace: "BACKUP_ONLY_PATHS=({{ backup_only_paths | map('regex_replace', '^(.*)$', '\"\\1\"') | join(' ') }})"
-
-- name: Настроить EXCLUDE_PATHS (multiline)
-  ansible.builtin.replace:
-    path: "{{ sync_install_dir }}/retroarch-sync.sh"
-    regexp: '(?s)EXCLUDE_PATHS=\(.*?\)'
-    replace: "EXCLUDE_PATHS=({{ exclude_paths | map('regex_replace', '^(.*)$', '\"\\1\"') | join(' ') }})"
 
 # ----------------------------------------------------------
 #  8. Systemd сервис

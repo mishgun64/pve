@@ -69,7 +69,7 @@
 # ----------------------------------------------------------
 - name: Загрузить секреты из зашифрованного SOPS файла
   ansible.builtin.set_fact:
-    _secrets: "{{ lookup('pipe', 'sops -d --output-type yaml ' ~ role_path ~ '/files/secrets.yml.enc') | from_yaml }}"
+    _secrets: "{{ lookup('pipe', 'sops -d --input-type yaml --output-type yaml ' ~ role_path ~ '/files/secrets.yml.enc') | from_yaml }}"
   no_log: true
 
 - name: Убедиться что директория /etc/davfs2 существует

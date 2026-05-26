@@ -209,9 +209,14 @@
   register: upload_patch_result
   changed_when: "'Patched' in upload_patch_result.stdout"
 
-- name: Показать результат патча upload_file
-  ansible.builtin.debug:
-    msg: "{{ upload_patch_result.stdout }}"
+- name: Фильтровать .part файлы в list_remote_dir
+  ansible.builtin.shell: |
+    sed -i "s/select(.name|endswith(\".old\")|not)/select((.name | endswith(\".old\") | not) and (.name | endswith(\".part\") | not))/" \
+      "{{ sync_install_dir }}/retroarch-sync.sh"
+  args:
+    executable: /bin/bash
+  register: part_filter_result
+  changed_when: part_filter_result.rc == 0
 
 # ----------------------------------------------------------
 #  8. Systemd сервис

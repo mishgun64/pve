@@ -180,6 +180,46 @@
       " "$input"
       }
 
+- name: Fix upload_file to escape local_path for curl
+  ansible.builtin.shell: |
+    python3 -c "
+    with open('{{ script_path }}', 'r') as f:
+        content = f.read()
+
+    old = '      -F \"files[]=@\${local_path};filename=\${part_name}\"'
+    new = '      -F \"files[]=@\${local_path//,/\\\\,};filename=\${part_name}\"'
+
+    # Правильный фикс — через --form-string или экранирование пути
+    old2 = '''    if curl -sS --fail \\
+      --connect-timeout \"\$CURL_CONNECT_TIMEOUT\" \\
+      --max-time \"\$CURL_MAX_TIME\" \\
+      -X POST \\
+      -F \"path=\${remote_dir}/\" \\
+      -F \"files[]=@\${local_path};filename=\${part_name}\" \\
+      \"\${UPLOAD_ENDPOINT}\"; then'''
+
+    new2 = '''    local escaped_local_path
+    escaped_local_path=\"\$(printf '%s' \"\${local_path}\" | sed 's/,/\\\\\\\\,/g; s/\\[/\\\\\\\\[/g; s/\\]/\\\\\\\\]/g')\"
+    if curl -sS --fail \\
+      --connect-timeout \"\$CURL_CONNECT_TIMEOUT\" \\
+      --max-time \"\$CURL_MAX_TIME\" \\
+      -X POST \\
+      -F \"path=\${remote_dir}/\" \\
+      -F \"files[]=@\${escaped_local_path};filename=\${part_name}\" \\
+      \"\${UPLOAD_ENDPOINT}\"; then'''
+
+    if old2 in content:
+        content = content.replace(old2, new2)
+        print('Patched upload_file')
+    else:
+        print('ERROR: pattern not found')
+
+    with open('{{ script_path }}', 'w') as f:
+        f.write(content)
+    "
+  args:
+    executable: /bin/bash
+
 # ----------------------------------------------------------
 #  8. Systemd сервис
 # ----------------------------------------------------------

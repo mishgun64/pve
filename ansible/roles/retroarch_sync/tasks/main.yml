@@ -180,45 +180,38 @@
       " "$input"
       }
 
-- name: Fix upload_file to escape local_path for curl
+- name: Fix upload_file — отключить glob в curl (CURL_GLOBOFF)
   ansible.builtin.shell: |
-    python3 -c "
-    with open('{{ script_path }}', 'r') as f:
+    python3 << 'PYEOF'
+    import sys
+
+    script = "{{ sync_install_dir }}/retroarch-sync.sh"
+
+    with open(script, 'r') as f:
         content = f.read()
 
-    old = '      -F \"files[]=@\${local_path};filename=\${part_name}\"'
-    new = '      -F \"files[]=@\${local_path//,/\\\\,};filename=\${part_name}\"'
+    # curl интерпретирует [ ] как glob-паттерн в -F @path.
+    # Флаг -g (--globoff) отключает это поведение.
+    old = '    if curl -sS --fail \\\n      --connect-timeout "$CURL_CONNECT_TIMEOUT" \\\n      --max-time "$CURL_MAX_TIME" \\\n      -X POST \\\n      -F "path=${remote_dir}/" \\\n      -F "files[]=@${local_path};filename=${part_name}" \\\n      "${UPLOAD_ENDPOINT}"; then'
 
-    # Правильный фикс — через --form-string или экранирование пути
-    old2 = '''    if curl -sS --fail \\
-      --connect-timeout \"\$CURL_CONNECT_TIMEOUT\" \\
-      --max-time \"\$CURL_MAX_TIME\" \\
-      -X POST \\
-      -F \"path=\${remote_dir}/\" \\
-      -F \"files[]=@\${local_path};filename=\${part_name}\" \\
-      \"\${UPLOAD_ENDPOINT}\"; then'''
+    new = '    if curl -sS --fail -g \\\n      --connect-timeout "$CURL_CONNECT_TIMEOUT" \\\n      --max-time "$CURL_MAX_TIME" \\\n      -X POST \\\n      -F "path=${remote_dir}/" \\\n      -F "files[]=@${local_path};filename=${part_name}" \\\n      "${UPLOAD_ENDPOINT}"; then'
 
-    new2 = '''    local escaped_local_path
-    escaped_local_path=\"\$(printf '%s' \"\${local_path}\" | sed 's/,/\\\\\\\\,/g; s/\\[/\\\\\\\\[/g; s/\\]/\\\\\\\\]/g')\"
-    if curl -sS --fail \\
-      --connect-timeout \"\$CURL_CONNECT_TIMEOUT\" \\
-      --max-time \"\$CURL_MAX_TIME\" \\
-      -X POST \\
-      -F \"path=\${remote_dir}/\" \\
-      -F \"files[]=@\${escaped_local_path};filename=\${part_name}\" \\
-      \"\${UPLOAD_ENDPOINT}\"; then'''
-
-    if old2 in content:
-        content = content.replace(old2, new2)
-        print('Patched upload_file')
+    if old in content:
+        content = content.replace(old, new)
+        with open(script, 'w') as f:
+            f.write(content)
+        print('Patched: добавлен флаг -g (--globoff) в curl upload')
     else:
-        print('ERROR: pattern not found')
-
-    with open('{{ script_path }}', 'w') as f:
-        f.write(content)
-    "
+        print('SKIP: паттерн не найден — уже пропатчен или изменился')
+    PYEOF
   args:
     executable: /bin/bash
+  register: upload_patch_result
+  changed_when: "'Patched' in upload_patch_result.stdout"
+
+- name: Показать результат патча upload_file
+  ansible.builtin.debug:
+    msg: "{{ upload_patch_result.stdout }}"
 
 # ----------------------------------------------------------
 #  8. Systemd сервис

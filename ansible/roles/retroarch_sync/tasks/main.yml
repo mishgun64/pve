@@ -163,6 +163,23 @@
       {% for p in exclude_paths %}  "{{ p }}"
       {% endfor %}\2
 
+- name: Replace urlencode_path function in retroarch-sync.sh
+  ansible.builtin.replace:
+    path: "{{ sync_install_dir }}/retroarch-sync.sh"
+    regexp: >-
+      function urlencode_path\(\) \{[\s\S]*?^}
+    replace: |
+      function urlencode_path() {
+        local input="$1"
+        python3 -c "
+      import urllib.parse, sys
+      path = sys.argv[1]
+      parts = path.split('/')
+      encoded = '%2F'.join(urllib.parse.quote(p, safe='') for p in parts)
+      print(encoded)
+      " "$input"
+      }
+
 # ----------------------------------------------------------
 #  8. Systemd сервис
 # ----------------------------------------------------------

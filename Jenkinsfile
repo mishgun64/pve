@@ -383,6 +383,22 @@ pipeline {
             }
         }
 
+        stage('nextcloud-restore') {
+            when {
+                expression { env.EVENT == 'nextcloud-restore' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - NextCloud-restore"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/nextcloud_restore.yml
+                '''
+            }
+        }
+
         stage('retroarch-sync') {
             when {
                 expression { env.EVENT == 'retroarch-sync' }

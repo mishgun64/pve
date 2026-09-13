@@ -1,0 +1,72 @@
+---
+
+#--------------------------User settings----------------------------------
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$.N4dzkYE2rB1JFVX$dYVcr029SVux1Tfue5UI2Ek3TvqDIkj9xZTCJzrkTFNd4U272e9JG3kTNL7Gk6gdUgvEw4ifpgS9rAU0v.Pi8/'
+    # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
+
+- name: Set shell for docker user
+  user:
+    name: docker
+    shell: /bin/bash
+
+#--------------------------Firewall rules----------------------------------
+
+- name: Decrypt locally
+  ansible.builtin.set_fact:
+    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/valheim/config/files/146.fw.enc') }}"
+  delegate_to: localhost
+  no_log: true
+
+- name: Write to pmxcfs
+  ansible.builtin.shell: cat > /etc/pve/firewall/146.fw
+  args:
+    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
+  become: true
+  delegate_to: pve
+  no_log: true
+
+
+- name: Convert to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/146.fw
+  delegate_to: pve
+
+#--------------------------Copy Valheim config files----------------------------------
+
+- name: Create required directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: 1001
+    group: 1001
+    mode: '0755'
+  loop:
+    - /home/docker/config
+    - /home/docker/data
+
+- name: Copy docker-compose.yml
+  copy:
+    src: docker-compose.yml
+    dest: /home/docker/docker-compose.yml
+    owner: docker
+    group: docker
+    mode: '0644'
+
+#-----------------------Autobackup----------------------------------
+
+- name: Add cron task for valheim backup
+  ansible.builtin.cron:
+    name: "Initialize Valheim backup"
+    hour: "5"
+    minute: "55"
+    job: >-
+      curl -X POST
+      "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+      -H "Content-Type: application/json"
+      -d '{"event":"valheim-backup","node":"pve1","host":"pve1.local"}'
+      >> /var/log/valheim-backup-webhook.log 2>&1
+    state: "{{ state | default('present') }}"

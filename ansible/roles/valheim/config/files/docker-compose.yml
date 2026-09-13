@@ -1,0 +1,25 @@
+services:
+  valheim:
+    image: lloesche/valheim-server
+    container_name: valheim-server
+    restart: unless-stopped
+    cap_add:
+      - sys_nice
+    stop_grace_period: 2m
+    ports:
+      - "2456-2457:2456-2457/udp"
+    volumes:
+      - ./config:/config
+      - ./data:/opt/valheim
+    environment:
+      - SERVER_NAME=Red Moon Inn
+      - WORLD_NAME=Вальхалла-Прайм
+      - SERVER_PASS=jopa5
+      - SERVER_PUBLIC=true
+      - TZ=Europe/Moscow
+      - BACKUPS=true
+      - BACKUPS_CRON=0 * * * *
+      - BACKUPS_MAX_AGE=2
+      - UPDATE_CRON=*/15 * * * *
+      - UPDATE_IF_IDLE=true
+      - RESTART_CRON=0 5 * * *

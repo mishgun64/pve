@@ -415,6 +415,54 @@ pipeline {
             }
         }
 
+        stage('valheim-config') {
+            when {
+                expression { env.EVENT == 'valheim-config' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Valheim-config"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/valheim_config.yml
+                '''
+            }
+        }
+
+        stage('valheim-backup') {
+            when {
+                expression { env.EVENT == 'valheim-backup' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Valheim-backup"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/valheim_backup.yml
+                '''
+            }
+        }
+
+        stage('valheim-restore') {
+            when {
+                expression { env.EVENT == 'valheim-restore' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Valheim-restore"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/valheim_restore.yml
+                '''
+            }
+        }
+
         stage('cron-debug') {
             when {
                 expression { env.EVENT == 'cron-debug' }

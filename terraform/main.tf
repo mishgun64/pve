@@ -422,6 +422,73 @@ resource "proxmox_virtual_environment_container" "pvpgn" {
   }
 }
 
+#------------------------------------Valheim LXC------------------------------------
+
+resource "proxmox_virtual_environment_container" "valheim" {
+  node_name = var.target_node_name
+  vm_id     = 146
+
+  unprivileged  = true
+  started       = true
+  start_on_boot = true
+
+  initialization {
+    hostname = "valheim"
+
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "192.168.4.6/24"
+        gateway = "192.168.4.1"
+      }
+    }
+    ip_config {
+      ipv4 {
+        address = "192.168.2.9/24"
+      }
+    }
+  }
+
+  operating_system {
+    template_file_id = var.lxc_ostemplate
+    type             = "debian"
+  }
+
+  cpu {
+    cores = 4
+  }
+
+  memory {
+    dedicated = 8192
+    swap      = 0
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 20
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr1"
+    mac_address = "BC:24:11:DB:27:46"
+    firewall    = true
+  }
+
+  network_interface {
+    name        = "eth1"
+    bridge      = "vmbr0"
+    mac_address = "BC:24:11:DB:27:47"
+    firewall    = true
+  }
+
+  features {
+    nesting = true
+  }
+}
 #------------------------------------Media_VM webhook trigger------------------------------------
 
 resource "terraform_data" "media_vm_trigger" {
@@ -526,6 +593,24 @@ resource "terraform_data" "pvpgn_trigger" {
       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
       -H "Content-Type: application/json" \
       -d '{"event": "pvpgn-config"}'
+    EOT
+  }
+}
+
+#------------------------------------Valheim webhook trigger------------------------------------
+
+resource "terraform_data" "valheim_trigger" {
+  depends_on = [proxmox_virtual_environment_container.valheim]
+    lifecycle {
+      replace_triggered_by = [proxmox_virtual_environment_container.valheim]
+    }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 30
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"event": "valheim-config"}'
     EOT
   }
 }

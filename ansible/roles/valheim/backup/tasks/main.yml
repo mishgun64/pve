@@ -1,0 +1,87 @@
+---
+
+#-----------------------------------------User settings---------------------------------------------
+
+- name: Set shell for docker user
+  user:
+    name: docker
+    shell: /bin/bash
+
+#------------------------------------------Check directory------------------------------------------
+
+- name: Check config directory
+  ansible.builtin.stat:
+    path: /home/docker/config
+  register: valheim_config_dir
+
+- name: Check data directory
+  ansible.builtin.stat:
+    path: /home/docker/data
+  register: valheim_data_dir
+
+#------------------------------------------Generate timestamp------------------------------------------
+
+- name: Generate timestamp
+  ansible.builtin.set_fact:
+    backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+
+#------------------------------------------Create backup dir------------------------------------------
+
+- name: Create backup directory on control
+  ansible.builtin.file:
+    path: /srv/backups/valheim
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+
+#------------------------------------------Stop container------------------------------------------
+
+- name: Stop docker compose
+  ansible.builtin.shell: docker compose down
+  args:
+    chdir: /home/docker
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+
+#------------------------------------------Archive------------------------------------------
+
+- name: Archive Valheim data
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/config
+      - /home/docker/data
+    dest: "/home/docker/valheim_{{ backup_time }}.tar.gz"
+    format: gz
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+
+#------------------------------------------Start container------------------------------------------
+
+- name: Start docker compose
+  ansible.builtin.shell: docker compose up -d
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+
+#------------------------------------------Fetch------------------------------------------
+
+- name: Fetch backup
+  ansible.builtin.fetch:
+    src: "/home/docker/valheim_{{ backup_time }}.tar.gz"
+    dest: "/srv/backups/valheim/"
+    flat: true
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+
+#------------------------------------------Cleanup------------------------------------------
+
+- name: Cleanup remote files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/home/docker/valheim_{{ backup_time }}.tar.gz"
+  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists

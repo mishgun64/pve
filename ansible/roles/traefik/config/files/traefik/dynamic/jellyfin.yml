@@ -1,0 +1,17 @@
+---
+
+http:
+  routers:
+    jellyfin:
+      rule: "Host(`jellyfin.mishgun.com`)"
+      entryPoints: websecure
+      tls: {}
+      service: jellyfin
+      middlewares:
+        - crowdsec@file
+
+  services:
+    jellyfin:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.4:8096"

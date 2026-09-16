@@ -1,5 +1,4 @@
 ---
-
 #-----------------------------------------User settings---------------------------------------------
 
 - name: Set shell for docker user
@@ -14,17 +13,12 @@
     path: /home/docker/config
   register: valheim_config_dir
 
-- name: Check data directory
-  ansible.builtin.stat:
-    path: /home/docker/data
-  register: valheim_data_dir
-
 #------------------------------------------Generate timestamp------------------------------------------
 
 - name: Generate timestamp
   ansible.builtin.set_fact:
     backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists
 
 #------------------------------------------Create backup dir------------------------------------------
 
@@ -34,7 +28,7 @@
     state: directory
     mode: '0755'
   delegate_to: localhost
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists
 
 #------------------------------------------Stop container------------------------------------------
 
@@ -42,19 +36,17 @@
   ansible.builtin.shell: docker compose down
   args:
     chdir: /home/docker
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists
 
 #------------------------------------------Archive------------------------------------------
 
-- name: Archive Valheim data
+- name: Archive Valheim config
   become: true
   ansible.builtin.archive:
-    path:
-      - /home/docker/config
-      - /home/docker/data
+    path: /home/docker/config
     dest: "/home/docker/valheim_{{ backup_time }}.tar.gz"
     format: gz
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists
 
 #------------------------------------------Start container------------------------------------------
 
@@ -65,7 +57,7 @@
   become: true
   become_method: su
   become_user: docker
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists
 
 #------------------------------------------Fetch------------------------------------------
 
@@ -74,7 +66,7 @@
     src: "/home/docker/valheim_{{ backup_time }}.tar.gz"
     dest: "/srv/backups/valheim/"
     flat: true
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists
 
 #------------------------------------------Cleanup------------------------------------------
 
@@ -84,4 +76,4 @@
     state: absent
   loop:
     - "/home/docker/valheim_{{ backup_time }}.tar.gz"
-  when: valheim_config_dir.stat.exists and valheim_data_dir.stat.exists
+  when: valheim_config_dir.stat.exists

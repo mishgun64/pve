@@ -441,7 +441,7 @@ resource "proxmox_virtual_environment_container" "valheim" {
 
     ip_config {
       ipv4 {
-        address = "192.168.4.6/24"
+        address = "192.168.4.6/24" 
         gateway = "192.168.4.1"
       }
     }

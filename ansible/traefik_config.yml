@@ -1,12 +1,13 @@
 ---
 
-- name: Traefik LXC config
-  hosts: traefik_lxc
+- name: Traefik VM config
+  hosts: traefik_vm
   remote_user: root
   gather_facts: true
   roles:
     - common/basic
     - common/docker
-    - traefik/backup
+    - common/monitoring
+#    - traefik/backup
     - traefik/config
-    - traefik/restore
+#    - traefik/restore

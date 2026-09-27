@@ -1,12 +1,13 @@
 ---
 
-- name: prosody LXC config
-  hosts: prosody_lxc
+- name: Prosody VM config
+  hosts: prosody_vm
   remote_user: root
   gather_facts: true
   roles:
     - common/basic
     - common/docker
-#    - prosody/backup
+    - common/monitoring
+    #    - prosody/backup
     - prosody/config
-    - prosody/restore
+#    - prosody/restore

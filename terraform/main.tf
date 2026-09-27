@@ -614,3 +614,90 @@ resource "terraform_data" "valheim_trigger" {
     EOT
   }
 }
+
+#------------------------------------Monitoring LXC (Prometheus + Alertmanager + Grafana)------------------------------------
+
+resource "proxmox_virtual_environment_container" "monitoring" {
+  node_name = var.target_node_name
+  vm_id     = 147
+
+  unprivileged   = true
+  started        = true
+  start_on_boot  = true
+
+  initialization {
+    hostname = "monitoring"
+
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "192.168.4.7/24"
+        gateway = "192.168.4.1"
+      }
+    }
+
+    ip_config {
+      ipv4 {
+        address = "192.168.2.10/24"
+      }
+    }
+  }
+
+  operating_system {
+    template_file_id = var.lxc_ostemplate
+    type             = "debian"
+  }
+
+  cpu {
+    cores = 1
+  }
+
+  memory {
+    dedicated = 2048
+    swap      = 0
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 15
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr1"
+    mac_address = "BC:24:11:DB:27:48"
+    firewall    = true
+  }
+
+  network_interface {
+    name        = "eth1"
+    bridge      = "vmbr0"
+    mac_address = "BC:24:11:DB:27:49"
+    firewall    = true
+  }
+
+  features {
+    nesting = true
+  }
+}
+
+#------------------------------------Monitoring webhook trigger------------------------------------
+
+resource "terraform_data" "monitoring_trigger" {
+  depends_on = [proxmox_virtual_environment_container.monitoring]
+    lifecycle {
+      replace_triggered_by = [proxmox_virtual_environment_container.monitoring]
+    }
+
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 30
+      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+      -H "Content-Type: application/json" \
+      -d '{"event": "monitoring-config"}'
+    EOT
+  }
+}

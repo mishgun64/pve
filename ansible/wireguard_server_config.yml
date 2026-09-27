@@ -5,6 +5,7 @@
   remote_user: root
   gather_facts: true
   roles:
-    - common/basic
-    - common/docker
-    - wireguard
+      - common/basic
+      - common/docker
+      - common/monitoring
+      - wireguard

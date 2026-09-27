@@ -1,7 +1,7 @@
 [global]
 keyboard = "en-us"
 country = "ru"
-fqdn = "pve.karazhan.local"
+fqdn = "pve.mishgun.com"
 mailto = "heimcbk201@gmail.com"
 timezone = "Europe/Moscow"
 root-password = "12345678"

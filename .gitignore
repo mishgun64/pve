@@ -12,3 +12,4 @@
 /ansible/roles/nextcloud/config/files/.env
 /ansible/roles/retroarch_sync/files/secrets.yml
 /improved_pve/
+/ansible/roles/valheim/config/files/146.fw

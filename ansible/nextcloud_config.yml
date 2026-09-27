@@ -7,6 +7,7 @@
   roles:
     - common/basic
     - common/docker
+    - common/monitoring
 #    - nextcloud/backup
     - nextcloud/config
 #    - nextcloud/restore

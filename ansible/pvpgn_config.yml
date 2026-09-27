@@ -1,12 +1,13 @@
 ---
 
-- name: PVPGN LXC config
-  hosts: pvpgn_lxc
+- name: PVPGN VM config
+  hosts: pvpgn_vm
   remote_user: root
   gather_facts: true
   roles:
     - common/basic
     - common/docker
-    - pvpgn/backup
+    - common/monitoring
+    #    - pvpgn/backup
     - pvpgn/config
-    - pvpgn/restore
+#    - pvpgn/restore

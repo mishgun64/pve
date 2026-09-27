@@ -1,0 +1,30 @@
+---
+- name: Install Node Exporter
+  block:
+    - name: Install Node Exporter (Debian/Ubuntu)
+      apt:
+        name: node_exporter
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Node Exporter (RedHat/CentOS)
+      yum:
+        name: node_exporter
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Ensure Node Exporter is started and enabled
+      service:
+        name: node_exporter
+        state: started
+        enabled: yes
+      ignore_errors: yes
+
+  when: node_exporter_enabled
+
+- name: Configure Node Exporter (Optional - if custom port is needed)
+  # Если порт по умолчанию 9100 подходит, этот блок можно упростить
+  # Но на будущее удобно иметь возможность менять порт через vars
+  debug:
+    msg: "Node Exporter is running on port {{ node_exporter_port }}"

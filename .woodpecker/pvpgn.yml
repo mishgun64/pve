@@ -1,0 +1,18 @@
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - ansible/pvpgn_config.yml
+        - ansible/roles/pvpgn/config/**
+
+steps:
+  deploy:
+    image: alpine/ansible:latest
+
+    commands:
+      - mkdir -p ~/.ssh
+      - cp /run/secrets/ssh_key ~/.ssh/id_ed25519
+      - chmod 600 ~/.ssh/id_ed25519
+      - export ANSIBLE_CONFIG=ansible/ansible.cfg
+      - ansible-playbook -i ansible/hosts_prod ansible/pvpgn_config.yml

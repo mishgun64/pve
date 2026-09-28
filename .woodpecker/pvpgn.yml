@@ -17,10 +17,12 @@ steps:
         from_secret: ssh_key
 
     commands:
-commands:
-  - mkdir -p ~/.ssh
-  - printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-  - chmod 600 ~/.ssh/id_ed25519
-  - export ANSIBLE_CONFIG=ansible/ansible.cfg
-  - ansible-inventory -i ansible/hosts_prod --graph
-  - ansible-playbook -i ansible/hosts_prod ansible/pvpgn_config.yml
+      - mkdir -p ~/.ssh
+      - printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+      - chmod 600 ~/.ssh/id_ed25519
+      - export ANSIBLE_CONFIG=ansible/ansible.cfg
+      - pwd
+      - ls -la
+      - ansible --version
+      - ansible-inventory -i ansible/hosts_prod --graph
+      - ansible-playbook -i ansible/hosts_prod ansible/pvpgn_config.yml

@@ -1,7 +1,7 @@
 ---
 
-- name: PVPGN VM config
-  hosts: pvpgn_vm
+- name: PVPGN lxc config
+  hosts: pvpgn_lxc
   remote_user: root
   gather_facts: true
   roles:

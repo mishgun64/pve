@@ -1,4 +1,4 @@
-1|local_hosts:
+local_hosts:
   hosts:
     pve:
       ansible_host: 192.168.2.2

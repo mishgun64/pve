@@ -6,6 +6,8 @@ when:
         - ansible/pvpgn_config.yml
         - ansible/roles/pvpgn/config/**
 
+  - event: manual
+
 steps:
   deploy:
     image: alpine/ansible:latest

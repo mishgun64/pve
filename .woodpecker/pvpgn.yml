@@ -19,10 +19,10 @@ steps:
     commands:
       - apk add --no-cache sops
       - sops --version
-      - sops -d ansible/roles/pvpgn/config/files/145.fw.enc
       - mkdir -p ~/.ssh
       - printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
       - chmod 600 ~/.ssh/id_ed25519
+      - sops -d ansible/roles/pvpgn/config/files/145.fw.enc
       - export ANSIBLE_CONFIG=ansible/ansible.cfg
       - ansible-inventory -i ansible/hosts_prod --graph
       - ansible-playbook -i ansible/hosts_prod ansible/pvpgn_config.yml

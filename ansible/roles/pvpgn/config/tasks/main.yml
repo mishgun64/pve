@@ -15,34 +15,22 @@
 
 #--------------------------Firewall rules----------------------------------
 
-#- name: Decrypt locally
-#  ansible.builtin.set_fact:
-#    fw_content: "{{ lookup('pipe', 'sops -d ansible/roles/pvpgn/config/files/145.fw.enc') }}"
-#  delegate_to: localhost
-#  no_log: true
-- name: Test SOPS
+- name: Decrypt locally
   ansible.builtin.command:
-    cmd: sops -d ansible/roles/pvpgn/config/files/145.fw.enc
+    cmd: sops -d {{ playbook_dir }}/roles/pvpgn/config/files/145.fw.enc
   delegate_to: localhost
-  register: sops_test
-
-- name: Show SOPS result
-  ansible.builtin.debug:
-    var: sops_test
+  register: fw_decrypted
+  changed_when: false
+  no_log: true
 
 - name: Write to pmxcfs
-  ansible.builtin.shell: cat > /etc/pve/firewall/145.fw
-  args:
-    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
+  ansible.builtin.copy:
+    content: "{{ fw_decrypted.stdout | replace('\r\n', '\n') }}"
+    dest: /etc/pve/firewall/145.fw
+    mode: "0644"
   become: true
   delegate_to: pve
   no_log: true
-
-
-- name: Convert to ASCII
-  ansible.builtin.shell: >
-    sed -i 's/\r//' /etc/pve/firewall/145.fw
-  delegate_to: pve
 
 #--------------------------Copy PVPGN config files----------------------------------
 

@@ -15,11 +15,20 @@
 
 #--------------------------Firewall rules----------------------------------
 
-- name: Decrypt locally
-  ansible.builtin.set_fact:
-    fw_content: "{{ lookup('pipe', 'sops -d ansible/roles/pvpgn/config/files/145.fw.enc') }}"
+#- name: Decrypt locally
+#  ansible.builtin.set_fact:
+#    fw_content: "{{ lookup('pipe', 'sops -d ansible/roles/pvpgn/config/files/145.fw.enc') }}"
+#  delegate_to: localhost
+#  no_log: true
+- name: Test SOPS
+  ansible.builtin.command:
+    cmd: sops -d ansible/roles/pvpgn/config/files/145.fw.enc
   delegate_to: localhost
-  no_log: true
+  register: sops_test
+
+- name: Show SOPS result
+  ansible.builtin.debug:
+    var: sops_test
 
 - name: Write to pmxcfs
   ansible.builtin.shell: cat > /etc/pve/firewall/145.fw

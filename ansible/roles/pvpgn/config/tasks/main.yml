@@ -24,10 +24,9 @@
   no_log: true
 
 - name: Write to pmxcfs
-  ansible.builtin.copy:
-    content: "{{ fw_decrypted.stdout | replace('\r\n', '\n') }}"
-    dest: /etc/pve/firewall/145.fw
-    mode: "0644"
+  ansible.builtin.shell:
+    cmd: "cat > /etc/pve/firewall/145.fw"
+    stdin: "{{ fw_decrypted.stdout | replace('\r\n', '\n') }}"
   become: true
   delegate_to: pve
   no_log: true

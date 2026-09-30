@@ -3,7 +3,6 @@ when:
     branch: main
     path:
       include:
-        - ansible/pvpgn_config.yml
         - ansible/roles/pvpgn/config/**
 
   - event: manual
@@ -17,12 +16,40 @@ steps:
         from_secret: ssh_key
 
     commands:
-      - apk add --no-cache sops
-      - sops --version
-      - mkdir -p ~/.ssh
-      - printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
-      - chmod 600 ~/.ssh/id_ed25519
-      - sops -d ansible/roles/pvpgn/config/files/145.fw.enc
-      - export ANSIBLE_CONFIG=ansible/ansible.cfg
-      - ansible-inventory -i ansible/hosts_prod --graph
-      - ansible-playbook -i ansible/hosts_prod ansible/pvpgn_config.yml
+      - |
+        if [ "$CI_PIPELINE_EVENT" = "manual" ]; then
+          if [ -z "$ROLE" ]; then
+            echo "ERROR: ROLE parameter is required"
+            exit 1
+          fi
+
+          if [ -z "$TARGET" ]; then
+            echo "ERROR: TARGET parameter is required"
+            exit 1
+          fi
+        else
+          ROLE="pvpgn"
+          TARGET="pvpgn"
+        fi
+
+        echo "ROLE=$ROLE"
+        echo "TARGET=$TARGET"
+
+        apk add --no-cache sops
+        sops --version
+
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+
+        export ANSIBLE_CONFIG=ansible/ansible.cfg
+
+        ansible-inventory \
+          -i ansible/inventory \
+          --graph
+
+        ansible-playbook \
+          -i ansible/inventory \
+          ansible/run-role.yml \
+          -e "role_name=${ROLE}" \
+          -e "target_hosts=${TARGET}"

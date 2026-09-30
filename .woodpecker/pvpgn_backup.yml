@@ -6,6 +6,7 @@ when:
         - ansible/roles/pvpgn/backup/**
 
   - event: manual
+    evaluate: 'PIPELINE == "backup"'
 
 steps:
   deploy:

@@ -6,6 +6,7 @@ when:
         - ansible/roles/pvpgn/config/**
 
   - event: manual
+    evaluate: 'PIPELINE == "config"'
 
 steps:
   deploy:

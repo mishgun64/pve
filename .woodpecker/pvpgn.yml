@@ -29,7 +29,7 @@ steps:
           fi
         else
           ROLE="pvpgn"
-          TARGET="pvpgn"
+          TARGET="pvpgn_lxc"
         fi
 
         echo "ROLE=$ROLE"
@@ -45,7 +45,7 @@ steps:
         export ANSIBLE_CONFIG=ansible/ansible.cfg
 
         ansible-inventory \
-          -i ansible/inventory \
+          -i ansible/hosts_prod \
           --graph
 
         ansible-playbook \

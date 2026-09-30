@@ -50,6 +50,6 @@ steps:
 
         ansible-playbook \
           -i ansible/inventory \
-          ansible/run-role.yml \
+          ansible/run_role.yml \
           -e "role_name=${ROLE}" \
           -e "target_hosts=${TARGET}"

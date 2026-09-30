@@ -28,7 +28,7 @@
     path: /srv/backups/pvpgn
     state: directory
     mode: '0755'
-  delegate_to: localhost
+  delegate_to: control_node
   when: pvpgn_var_dir.stat.exists
 
 #------------------------------------------Stop container------------------------------------------
@@ -63,13 +63,20 @@
 
 #------------------------------------------Fetch------------------------------------------
 
-- name: Fetch backup
+- name: Fetch backup to Woodpecker container
   ansible.builtin.fetch:
     src: "/home/docker/pvpgn_{{ backup_time }}.tar.gz"
-    dest: "/srv/backups/pvpgn/"
+    dest: "/tmp/"
     flat: true
   when: pvpgn_var_dir.stat.exists
 
+- name: Copy backup to control node
+  ansible.builtin.copy:
+    src: "/tmp/pvpgn_{{ backup_time }}.tar.gz"
+    dest: "/srv/backups/pvpgn/pvpgn_{{ backup_time }}.tar.gz"
+    mode: '0644'
+  delegate_to: control_node
+  when: pvpgn_var_dir.stat.exists
 #------------------------------------------Cleanup------------------------------------------
 
 - name: Cleanup remote files

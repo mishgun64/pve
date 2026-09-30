@@ -28,7 +28,7 @@ steps:
             exit 1
           fi
         else
-          ROLE="pvpgn"
+          ROLE="pvpgn/config"
           TARGET="pvpgn_lxc"
         fi
 

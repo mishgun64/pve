@@ -1,19 +1,37 @@
 ---
+# -------------------------- Find backup on control node --------------------------
 
-#--------------------------Find backup----------------------------------
-
-- name: Find latest backup
-  delegate_to: localhost
+- name: Find latest backup on control node
+  delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
     ls -1t /srv/backups/pvpgn/pvpgn_*.tar.gz 2>/dev/null | head -n 1 || true
   register: latest_backup
+  changed_when: false
 
-- name: Set fact
-  set_fact:
+- name: Set backup facts
+  ansible.builtin.set_fact:
     backup_exists: "{{ latest_backup.stdout | length > 0 }}"
+    backup_file: "{{ latest_backup.stdout | basename }}"
+  run_once: true
 
-#--------------------------Stop container----------------------------------
+- name: Show selected backup
+  ansible.builtin.debug:
+    msg: "Selected backup: {{ backup_file }}"
+  when: backup_exists
+
+# -------------------------- Fetch backup --------------------------
+
+- name: Fetch backup from control node
+  ansible.builtin.fetch:
+    src: "{{ latest_backup.stdout }}"
+    dest: "/tmp/"
+    flat: true
+  delegate_to: control_node
+  run_once: true
+  when: backup_exists
+
+# -------------------------- Stop container --------------------------
 
 - name: Stop docker compose
   ansible.builtin.shell: docker compose down
@@ -21,16 +39,16 @@
     chdir: /home/docker
   when: backup_exists
 
-#--------------------------Extract----------------------------------
+# -------------------------- Extract backup --------------------------
 
 - name: Extract backup
   ansible.builtin.unarchive:
-    src: "/srv/backups/pvpgn/{{ (latest_backup.stdout | basename) }}"
+    src: "/tmp/{{ backup_file }}"
     dest: /home/docker/
     remote_src: false
   when: backup_exists
 
-#--------------------------Start container----------------------------------
+# -------------------------- Start container --------------------------
 
 - name: Start PVPGN
   ansible.builtin.shell: docker compose up -d
@@ -39,3 +57,4 @@
   become: true
   become_method: su
   become_user: docker
+  when: backup_exists

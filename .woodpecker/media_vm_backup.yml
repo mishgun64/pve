@@ -37,7 +37,8 @@ steps:
           echo "TARGET=$TARGET"
           
           apk add --no-cache rsync
-          
+          apk add --no-cache sops
+        
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519

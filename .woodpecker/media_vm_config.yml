@@ -1,0 +1,52 @@
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - ansible/roles/media_vm/config_soft/**
+
+  - event: manual
+    evaluate: 'PIPELINE == "media/config"'
+
+steps:
+  deploy:
+    image: alpine/ansible:latest
+
+    environment:
+      SSH_KEY:
+        from_secret: ssh_key
+
+    commands:
+      - |
+        if [ "$CI_PIPELINE_EVENT" = "manual" ]; then
+          if [ -z "$ROLE" ]; then
+            echo "ERROR: ROLE parameter is required"
+            exit 1
+          fi
+
+          if [ -z "$TARGET" ]; then
+            echo "ERROR: TARGET parameter is required"
+            exit 1
+          fi
+        else
+          ROLE="media_vm/config"
+          TARGET="media_vm"
+        fi
+
+        echo "ROLE=$ROLE"
+        echo "TARGET=$TARGET"
+
+        apk add --no-cache sops
+        sops --version
+
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+
+        export ANSIBLE_CONFIG=ansible/ansible.cfg
+
+        ansible-playbook \
+          -i ansible/hosts_prod \
+          ansible/run_role.yml \
+          -e "role_name=${ROLE}" \
+          -e "target_hosts=${TARGET}"

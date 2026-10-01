@@ -74,25 +74,25 @@
     state: present
     reload: yes
 
-#-----------------------Copy init config----------------------------------
+# ----------------------- Decrypt init config --------------------------
 
 - name: Decrypt encrypted archives
   delegate_to: localhost
   run_once: true
-  shell: >
+  ansible.builtin.shell: >
     sops -d {{ item.src }} > {{ item.dest }}
   args:
     creates: "{{ item.dest }}"
   environment:
-    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /var/lib/jenkins/.ssh/id_ed25519
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /root/.ssh/id_ed25519
   loop:
-    - { src: "{{ init_dir_jenkins }}/emby_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/emby_init_config.tar.gz" }
-    - { src: "{{ init_dir_jenkins }}/jellyfin_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/jellyfin_init_config.tar.gz" }
-    - { src: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz" }
-    - { src: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/radarr_init_config.tar.gz" }
-    - { src: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/seerr_init_config.tar.gz" }
-    - { src: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz" }
-    - { src: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz.enc", dest: "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/emby_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/emby_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/jellyfin_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/jellyfin_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/prowlarr_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/prowlarr_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/radarr_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/radarr_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/seerr_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/seerr_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/sonarr_anime_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/sonarr_anime_init_config.tar.gz" }
+    - { src: "{{ role_path }}/files/init_config/sonarr_series_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/sonarr_series_init_config.tar.gz" }
 
 - name: Create directories for docker services
   ansible.builtin.file:
@@ -124,21 +124,6 @@
     - init_config/seerr_init_config.tar.gz
     - init_config/sonarr_anime_init_config.tar.gz
     - init_config/sonarr_series_init_config.tar.gz
-
-- name: Remove decrypted archives from control node
-  delegate_to: localhost
-  run_once: true
-  file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "{{ init_dir_jenkins }}/emby_init_config.tar.gz"
-    - "{{ init_dir_jenkins }}/jellyfin_init_config.tar.gz"
-    - "{{ init_dir_jenkins }}/prowlarr_init_config.tar.gz"
-    - "{{ init_dir_jenkins }}/radarr_init_config.tar.gz"
-    - "{{ init_dir_jenkins }}/seerr_init_config.tar.gz"
-    - "{{ init_dir_jenkins }}/sonarr_anime_init_config.tar.gz"
-    - "{{ init_dir_jenkins }}/sonarr_series_init_config.tar.gz"
 
 - name: Extract archives
   unarchive:
@@ -217,29 +202,21 @@
 #--------------------------Firewall rules----------------------------------
 
 - name: Decrypt locally
-  ansible.builtin.set_fact:
-    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
+  ansible.builtin.command:
+    cmd: sops -d {{ playbook_dir }}/roles/media_vm/config_soft/files/124.fw.enc
   delegate_to: localhost
+  register: fw_decrypted
+  changed_when: false
   no_log: true
 
 - name: Write to pmxcfs
-  ansible.builtin.shell: cat > /etc/pve/firewall/124.fw
-  args:
-    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
+  ansible.builtin.shell:
+    cmd: "cat > /etc/pve/firewall/124.fw"
+    stdin: "{{ fw_decrypted.stdout | replace('\r\n', '\n') }}"
   become: true
   delegate_to: pve
   no_log: true
 
-#- name: Copy rules to target
-#  ansible.builtin.copy:
-#    dest: /etc/pve/firewall/124.fw
-#    owner: root
-#    group: www-data
-#    mode: '0640'
-#    content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/124.fw.enc') }}"
-#    unsafe_writes: true
-#  delegate_to: pve
-#
 - name: Convert rules to ASCII
   ansible.builtin.shell: >
     sed -i 's/\r//' /etc/pve/firewall/124.fw
@@ -255,15 +232,15 @@
 
 #-----------------------Autobackup----------------------------------
 
-- name: Initialize media services backup
-  ansible.builtin.cron:
-    name: "Initialize media services backup"
-    hour: "4"
-    minute: "0"
-    job: >-
-      curl -X POST
-      "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
-      -H "Content-Type: application/json"
-      -d '{"event":"media_vm_backup","node":"pve1","host":"pve1.local"}'
-      >> /var/log/media-vm-backup-webhook.log 2>&1
-    state: "{{ state | default('present') }}"
+#- name: Initialize media services backup
+#  ansible.builtin.cron:
+#    name: "Initialize media services backup"
+#    hour: "4"
+#    minute: "0"
+#    job: >-
+#      curl -X POST
+#      "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=pve-webhook"
+#      -H "Content-Type: application/json"
+#      -d '{"event":"media_vm_backup","node":"pve1","host":"pve1.local"}'
+#      >> /var/log/media-vm-backup-webhook.log 2>&1
+#    state: "{{ state | default('present') }}"

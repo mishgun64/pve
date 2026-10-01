@@ -79,8 +79,14 @@
     mode: "0755"
 
 - name: Set timestamp
-  set_fact:
-    backup_ts: "{{ ansible_date_time.year }}.{{ ansible_date_time.month }}.{{ ansible_date_time.day }}_{{ ansible_date_time.hour }}.{{ ansible_date_time.minute }}.{{ ansible_date_time.second }}"
+  ansible.builtin.set_fact:
+    backup_ts: >-
+      {{ ansible_facts["date_time"]["year"] }}_
+      {{ ansible_facts["date_time"]["month"] }}_
+      {{ ansible_facts["date_time"]["day"] }}_
+      {{ ansible_facts["date_time"]["hour"] }}_
+      {{ ansible_facts["date_time"]["minute"] }}_
+      {{ ansible_facts["date_time"]["second"] }}
 
 - name: Backup Emby
   become: true

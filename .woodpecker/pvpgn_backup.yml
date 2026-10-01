@@ -1,10 +1,4 @@
 when:
-  - event: push
-    branch: main
-    path:
-      include:
-        - ansible/roles/pvpgn/backup/**
-
   - event: manual
     evaluate: 'PIPELINE == "pvpgn/backup"'
 

@@ -48,5 +48,5 @@ steps:
         ansible-playbook \
           -i ansible/hosts_prod \
           ansible/run_role.yml \
-          -e "role_name=${ROLE}" \
-          -e "target_hosts=${TARGET}"
+          -e "role_name=$${ROLE}" \
+          -e "target_hosts=$${TARGET}"

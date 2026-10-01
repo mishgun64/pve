@@ -1,7 +1,7 @@
 ---
 - name: Run selected roles
   hosts: "{{ target_hosts }}"
-  become: true
+  remote_user: root
 
   tasks:
     - name: Show selected roles

@@ -1,6 +1,6 @@
 when:
   - event: manual
-    evaluate: 'PIPELINE == "restore"'
+    evaluate: 'PIPELINE == "pvpgn/restore"'
 
 steps:
   deploy:

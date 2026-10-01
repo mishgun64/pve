@@ -3,7 +3,7 @@ when:
     branch: main
 
   - event: manual
-    evaluate: 'PIPELINE == "full"'
+    evaluate: 'PIPELINE == "pvpgn/full"'
 
 steps:
   deploy:

@@ -3,10 +3,10 @@ when:
     branch: main
     path:
       include:
-        - ansible/roles/pvpgn/backup/**
+        - ansible/roles/media_vm/backup/**
 
   - event: manual
-    evaluate: 'PIPELINE == "pvpgn/backup"'
+    evaluate: 'PIPELINE == "media_vm/backup"'
 
 steps:
   deploy:
@@ -29,8 +29,8 @@ steps:
               exit 1
             fi
           else
-            ROLE="pvpgn/backup"
-            TARGET="pvpgn_lxc"
+            ROLE="media_vm/backup"
+            TARGET="media_vm"
           fi
     
           echo "ROLE=$ROLE"

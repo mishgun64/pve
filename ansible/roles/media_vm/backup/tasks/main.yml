@@ -61,15 +61,6 @@
     return_content: true
   register: sonarr_series_backup
 
-- name: Show Sonarr_series API key
-  ansible.builtin.debug:
-    msg: "API Key: {{ secrets.sonarr_series_api_key }}"
-
-- name: Show Sonarr_series response
-  ansible.builtin.debug:
-    var: sonarr_series_backup
-
-
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
 
 - name: Stop docker compose stack
@@ -90,13 +81,7 @@
 
 - name: Set timestamp
   ansible.builtin.set_fact:
-    backup_ts: >-
-      {{ ansible_facts["date_time"]["year"] }}.
-      {{ ansible_facts["date_time"]["month"] }}.
-      {{ ansible_facts["date_time"]["day"] }}_
-      {{ ansible_facts["date_time"]["hour"] }}.
-      {{ ansible_facts["date_time"]["minute"] }}.
-      {{ ansible_facts["date_time"]["second"] }}
+    backup_ts: "{{ ansible_facts['date_time']['year'] }}.{{ ansible_facts['date_time']['month'] }}.{{ ansible_facts['date_time']['day'] }}_{{ ansible_facts['date_time']['hour'] }}.{{ ansible_facts['date_time']['minute'] }}.{{ ansible_facts['date_time']['second'] }}"
 
 - name: Backup Emby
   become: true
@@ -108,16 +93,16 @@
     dest: "/home/docker/backups/emby_backup_{{ backup_ts }}.zip"
     format: zip
 
-#- name: Backup Jellyfin
-#  become: true
-#  ansible.builtin.archive:
-#    path:
-#      - /home/docker/jellyfin_config/data
-#      - /home/docker/jellyfin_config/encoding.xml
-#      - /home/docker/jellyfin_config/system.xml
-#      - /home/docker/jellyfin_config/database.xml
-#    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
-#    format: zip
+- name: Backup Jellyfin
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/jellyfin_config/data
+      - /home/docker/jellyfin_config/encoding.xml
+      - /home/docker/jellyfin_config/system.xml
+      - /home/docker/jellyfin_config/database.xml
+    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
+    format: zip
 
 - name: Backup Seerr
   become: true

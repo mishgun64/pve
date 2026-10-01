@@ -16,9 +16,9 @@
 
 #------------------------------------------Generate timestamp------------------------------------------
 
-- name: Generate timestamp
+- name: Set timestamp
   ansible.builtin.set_fact:
-    backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
+    backup_time: "{{ ansible_facts['date_time']['year'] }}.{{ ansible_facts['date_time']['month'] }}.{{ ansible_facts['date_time']['day'] }}_{{ ansible_facts['date_time']['hour'] }}.{{ ansible_facts['date_time']['minute'] }}.{{ ansible_facts['date_time']['second'] }}"
   when: pvpgn_var_dir.stat.exists
 
 #------------------------------------------Create backup dir------------------------------------------

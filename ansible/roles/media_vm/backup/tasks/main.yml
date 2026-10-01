@@ -49,7 +49,7 @@
     status_code: [200, 201]
 
 - name: Trigger Sonarr_series backup
-  uri:
+  ansible.builtin.uri:
     url: http://localhost:8990/api/v3/command
     method: POST
     headers:
@@ -58,6 +58,16 @@
     body:
       name: Backup
     status_code: [200, 201]
+    return_content: true
+  register: sonarr_series_backup
+
+- name: Show Sonarr_series API key
+  ansible.builtin.debug:
+    msg: "API Key: {{ secrets.sonarr_series_api_key }}"
+
+- name: Show Sonarr_series response
+  ansible.builtin.debug:
+    var: sonarr_series_backup
 
 
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------

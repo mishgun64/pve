@@ -81,11 +81,11 @@
 - name: Set timestamp
   ansible.builtin.set_fact:
     backup_ts: >-
-      {{ ansible_facts["date_time"]["year"] }}_
-      {{ ansible_facts["date_time"]["month"] }}_
+      {{ ansible_facts["date_time"]["year"] }}.
+      {{ ansible_facts["date_time"]["month"] }}.
       {{ ansible_facts["date_time"]["day"] }}_
-      {{ ansible_facts["date_time"]["hour"] }}_
-      {{ ansible_facts["date_time"]["minute"] }}_
+      {{ ansible_facts["date_time"]["hour"] }}.
+      {{ ansible_facts["date_time"]["minute"] }}.
       {{ ansible_facts["date_time"]["second"] }}
 
 - name: Backup Emby

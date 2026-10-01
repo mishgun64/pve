@@ -67,6 +67,7 @@
       - zip
       - unzip
       - htop
+      - rsync
     state: latest
 
 - name: Install sops binary

@@ -29,7 +29,7 @@ steps:
             exit 1
           fi
         else
-          ROLE="media_vm/backup,media_vm/config,media_vm/restore"
+          ROLE="media_vm/backup;media_vm/config;media_vm/restore"
           TARGET="media_vm"
         fi
 

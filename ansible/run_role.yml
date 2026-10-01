@@ -4,7 +4,15 @@
   become: true
 
   tasks:
-    - name: Run roles
+    - name: Show selected roles
+      ansible.builtin.debug:
+        msg:
+          - "ROLE={{ role_name }}"
+          - "TARGET={{ target_hosts }}"
+
+    - name: Run selected roles
       ansible.builtin.include_role:
         name: "{{ item }}"
-      loop: "{{ role_name.split(',') | map('trim') | list }}"
+      loop: "{{ role_name.split(';') | map('trim') | list }}"
+      loop_control:
+        label: "{{ item }}"

@@ -61,9 +61,9 @@
     return_content: true
   register: sonarr_series_backup
 
-- name: Show Sonarr_series response
-  ansible.builtin.debug:
-    var: sonarr_series_backup
+- name: Wait 10 seconds
+  ansible.builtin.pause:
+    seconds: 10
 
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
 

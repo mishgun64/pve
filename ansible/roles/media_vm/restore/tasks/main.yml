@@ -54,8 +54,11 @@
     src: "{{ item.value.path }}"
     dest: "/home/docker/backups/{{ item.value.path | basename }}"
     mode: push
+    checksum: true
   delegate_to: control_node
   loop: "{{ latest_backups | dict2items }}"
+  loop_control:
+    label: "{{ item.value.service }}"
 
 - name: Stop docker compose stack
   ansible.builtin.shell: docker compose down
@@ -94,8 +97,13 @@
 - name: Extract backups
   become: true
   ansible.builtin.command:
-    cmd: "unzip -o {{ item.value.path | quote }} -d /home/docker/backups/{{ item.value.service | quote }}"
+    cmd: >
+      unzip -o
+      "/home/docker/backups/{{ item.value.path | basename }}"
+      -d "{{ service_dirs[item.value.service] }}"
   loop: "{{ latest_backups | dict2items }}"
+  loop_control:
+    label: "{{ item.value.service }}"
 
 - name: Find wal and shm files
   ansible.builtin.find:

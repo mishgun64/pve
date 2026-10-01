@@ -4,7 +4,7 @@
 
 | Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |
 |---|---|---|---|---|
-| config | `media/backup, media/config, media/restore` | `media_vm/config` | `media_vm` | `Media Config` |
+| config | `media/config` | `media_vm/backup, media_vm/config, media_vm/restore` | `media_vm` | `Media Config` |
 | backup | `media/backup` | `media_vm/backup` | `media_vm` | `Media Backup` |
 | restore | `media/restore` | `media_vm/restore` | `media_vm` | `Media Restore` |
 | full | `media/full` | — | — | `Media Full` |

@@ -1,10 +1,10 @@
 ---
-
-- name: Run selected role
-  hosts: "{{ target_hosts | default('all') }}"
+- name: Run selected roles
+  hosts: "{{ target_hosts }}"
   become: true
-  remote_user: root
-  gather_facts: true
 
-  roles:
-    - "{{ role_name }}"
+  tasks:
+    - name: Run roles
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop: "{{ role_name.split(',') | map('trim') | list }}"

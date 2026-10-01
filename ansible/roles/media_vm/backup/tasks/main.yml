@@ -92,16 +92,16 @@
     dest: "/home/docker/backups/emby_backup_{{ backup_ts }}.zip"
     format: zip
 
-- name: Backup Jellyfin
-  become: true
-  ansible.builtin.archive:
-    path:
-      - /home/docker/jellyfin_config/data
-      - /home/docker/jellyfin_config/encoding.xml
-      - /home/docker/jellyfin_config/system.xml
-      - /home/docker/jellyfin_config/database.xml
-    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
-    format: zip
+#- name: Backup Jellyfin
+#  become: true
+#  ansible.builtin.archive:
+#    path:
+#      - /home/docker/jellyfin_config/data
+#      - /home/docker/jellyfin_config/encoding.xml
+#      - /home/docker/jellyfin_config/system.xml
+#      - /home/docker/jellyfin_config/database.xml
+#    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
+#    format: zip
 
 - name: Backup Seerr
   become: true
@@ -112,6 +112,14 @@
       - /home/docker/seerr_config/anime-list.xml
       - /home/docker/seerr_config/settings.json
     dest: "/home/docker/backups/seerr_backup_{{ backup_ts }}.zip"
+    format: zip
+
+- name: Backup Bazarr
+  become: true
+  ansible.builtin.archive:
+    path:
+      - /home/docker/bazarr_config/
+    dest: "/home/docker/backups/bazarr_backup_{{ backup_ts }}.zip"
     format: zip
 
 #-----------------------Get backups from Prowlarr, Sonarr, Radarr, Bazarr----------------------------------
@@ -200,11 +208,13 @@
     unique_services: "{{ services | unique }}"
 
 - name: Create service directories on control node
-  delegate_to: localhost
   ansible.builtin.file:
     path: "/srv/backups/media/{{ item }}"
     state: directory
+    owner: root
+    group: root
     mode: "0755"
+  delegate_to: control_node
   loop: "{{ unique_services }}"
 
 - name: Fetch backups into service directories
@@ -214,7 +224,7 @@
       | regex_replace('_backup.*$', '')
       | regex_replace('_v[0-9\\.]+.*$', '') }}/"
     mode: pull
-  delegate_to: localhost
+  delegate_to: control_node
   loop: "{{ backup_files.files }}"
 
 - name: Remove remote backups directory

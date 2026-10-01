@@ -203,7 +203,7 @@
 
 - name: Decrypt locally
   ansible.builtin.command:
-    cmd: sops -d {{ playbook_dir }}/roles/media_vm/config_soft/files/124.fw.enc
+    cmd: sops -d {{ playbook_dir }}/roles/media/config_soft/files/124.fw.enc
   delegate_to: localhost
   register: fw_decrypted
   changed_when: false

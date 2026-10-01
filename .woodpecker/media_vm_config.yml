@@ -3,7 +3,7 @@ when:
     branch: main
     path:
       include:
-        - ansible/roles/media_vm/config_soft/**
+        - ansible/roles/media_vm/config/**
 
   - event: manual
     evaluate: 'PIPELINE == "media/config"'

@@ -7,6 +7,6 @@
   roles:
       - common/basic
       - common/docker
-      - common/monitoring
-      - media_vm/config_soft
+#      - common/monitoring
+      - media_vm/config
       - media_vm/restore

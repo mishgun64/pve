@@ -61,9 +61,39 @@
     return_content: true
   register: sonarr_series_backup
 
-- name: Wait 10 seconds
-  ansible.builtin.pause:
-    seconds: 10
+- name: Wait for Sonarr_series backup to finish
+  ansible.builtin.shell: |
+    for i in $(seq 1 150); do
+      FILE=$(find /home/docker/sonarr_series_config/Backups/manual \
+        -type f \
+        -name 'sonarr_backup_*.zip' \
+        -printf '%T@ %p\n' 2>/dev/null |
+        sort -nr |
+        head -n1 |
+        cut -d' ' -f2-)
+
+      if [ -n "$FILE" ]; then
+        SIZE1=$(stat -c%s "$FILE")
+        sleep 2
+        SIZE2=$(stat -c%s "$FILE")
+
+        if [ "$SIZE1" -eq "$SIZE2" ] && [ "$SIZE1" -gt 0 ]; then
+          echo "$FILE"
+          exit 0
+        fi
+      fi
+
+      sleep 2
+    done
+
+    echo "Sonarr backup did not finish within 300 seconds" >&2
+    exit 1
+  register: sonarr_series_backup_file
+  changed_when: false
+
+- name: Show completed Sonarr backup
+  ansible.builtin.debug:
+    msg: "Backup completed: {{ sonarr_series_backup_file.stdout }}"
 
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
 

@@ -1,7 +1,4 @@
 when:
-  - event: push
-    branch: main
-
   - event: manual
     evaluate: 'PIPELINE == "pvpgn/full"'
 

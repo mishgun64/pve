@@ -32,6 +32,8 @@ steps:
             ROLE="media_vm/backup"
             TARGET="media_vm"
           fi
+        
+          apk add --no-cache sops
     
           echo "ROLE=$ROLE"
           echo "TARGET=$TARGET"

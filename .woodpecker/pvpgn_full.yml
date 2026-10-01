@@ -23,4 +23,4 @@ steps:
 
         ansible-playbook \
           -i ansible/hosts_prod \
-          ansible/pvpgn_config.yml
+          ansible/pvpgn.yml

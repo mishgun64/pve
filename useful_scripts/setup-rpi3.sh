@@ -136,6 +136,19 @@ apt-get install -y \
     ca-certificates \
     curl
 
+# ------------------------------------------------ cleanup_backups.sh ---
+log "Установка cleanup_backups.sh"
+
+CLEANUP_URL="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/cleanup_backups.sh"
+
+curl -fsSL "$CLEANUP_URL" -o /root/cleanup_backups.sh
+
+chmod 0755 /root/cleanup_backups.sh
+chown root:root /root/cleanup_backups.sh
+
+echo "Установлен:"
+ls -l /root/cleanup_backups.sh
+
 # ------------------------------------------------------------------ sops ---
 log "Установка sops"
 

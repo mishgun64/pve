@@ -97,16 +97,34 @@
     dest: "/home/docker/backups/emby_backup_{{ backup_ts }}.zip"
     format: zip
 
-#- name: Backup Jellyfin
-#  become: true
-#  ansible.builtin.archive:
-#    path:
-#      - /home/docker/jellyfin_config/data
-#      - /home/docker/jellyfin_config/encoding.xml
-#      - /home/docker/jellyfin_config/system.xml
-#      - /home/docker/jellyfin_config/database.xml
-#    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
-#    format: zip
+- name: Find Jellyfin data
+  become: true
+  ansible.builtin.find:
+    paths: /home/docker/jellyfin_config/data
+    recurse: true
+    file_type: file
+  register: jellyfin_data_files
+
+- name: Backup Jellyfin
+  become: true
+  ansible.builtin.archive:
+    path: >-
+      {{
+        (
+          jellyfin_data_files.files
+          | rejectattr('path', 'match', '^/home/docker/jellyfin_config/data/trickplay(/|$)')
+          | map(attribute='path')
+          | list
+        )
+        +
+        [
+          '/home/docker/jellyfin_config/encoding.xml',
+          '/home/docker/jellyfin_config/system.xml',
+          '/home/docker/jellyfin_config/database.xml'
+        ]
+      }}
+    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
+    format: zip
 
 - name: Backup Seerr
   become: true

@@ -208,12 +208,13 @@
   loop: "{{ unique_services }}"
 
 - name: Fetch backups into service directories
-  ansible.builtin.fetch:
+  ansible.posix.synchronize:
     src: "{{ item.path }}"
     dest: "/srv/backups/media/{{ (item.path | basename)
       | regex_replace('_backup.*$', '')
       | regex_replace('_v[0-9\\.]+.*$', '') }}/"
-    flat: yes
+    mode: pull
+  delegate_to: localhost
   loop: "{{ backup_files.files }}"
 
 - name: Remove remote backups directory

@@ -32,12 +32,12 @@ steps:
             ROLE="media_vm/backup"
             TARGET="media_vm"
           fi
-        
-          apk add --no-cache sops
     
           echo "ROLE=$ROLE"
           echo "TARGET=$TARGET"
-    
+          
+          apk add --no-cache rsync
+          
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519

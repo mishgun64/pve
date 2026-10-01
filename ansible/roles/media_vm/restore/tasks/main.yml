@@ -14,7 +14,7 @@
     patterns: "*.zip"
     recurse: yes
   register: backup_files
-  delegate_to: localhost
+  delegate_to: control_node
 
 - name: Parse backup metadata
   set_fact:
@@ -49,11 +49,12 @@
 
 #-----------------------Delivery latest backups to target----------------------------------
 
-- name: Copy latest backups to target
-  ansible.builtin.copy:
+- name: Copy latest backups from control_node to target
+  ansible.posix.synchronize:
     src: "{{ item.value.path }}"
     dest: "/home/docker/backups/{{ item.value.path | basename }}"
-    mode: '0644'
+    mode: push
+  delegate_to: control_node
   loop: "{{ latest_backups | dict2items }}"
 
 - name: Stop docker compose stack

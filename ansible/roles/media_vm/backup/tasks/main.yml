@@ -61,6 +61,10 @@
     return_content: true
   register: sonarr_series_backup
 
+- name: Show Sonarr_series response
+  ansible.builtin.debug:
+    var: sonarr_series_backup
+
 #-----------------------Get backups from Seerr, Emby, Jellifin----------------------------------
 
 - name: Stop docker compose stack
@@ -93,16 +97,16 @@
     dest: "/home/docker/backups/emby_backup_{{ backup_ts }}.zip"
     format: zip
 
-- name: Backup Jellyfin
-  become: true
-  ansible.builtin.archive:
-    path:
-      - /home/docker/jellyfin_config/data
-      - /home/docker/jellyfin_config/encoding.xml
-      - /home/docker/jellyfin_config/system.xml
-      - /home/docker/jellyfin_config/database.xml
-    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
-    format: zip
+#- name: Backup Jellyfin
+#  become: true
+#  ansible.builtin.archive:
+#    path:
+#      - /home/docker/jellyfin_config/data
+#      - /home/docker/jellyfin_config/encoding.xml
+#      - /home/docker/jellyfin_config/system.xml
+#      - /home/docker/jellyfin_config/database.xml
+#    dest: "/home/docker/backups/jellyfin_backup_{{ backup_ts }}.zip"
+#    format: zip
 
 - name: Backup Seerr
   become: true

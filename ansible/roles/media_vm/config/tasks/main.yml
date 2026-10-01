@@ -207,13 +207,12 @@
   delegate_to: localhost
   register: fw_decrypted
   changed_when: false
-  no_log: true
+#  no_log: true
 
 - name: Write to pmxcfs
   ansible.builtin.shell:
     cmd: "cat > /etc/pve/firewall/124.fw"
     stdin: "{{ fw_decrypted.stdout | replace('\r\n', '\n') }}"
-  become: true
   delegate_to: pve
   no_log: true
 

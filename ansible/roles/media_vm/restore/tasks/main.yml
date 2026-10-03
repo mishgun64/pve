@@ -64,8 +64,6 @@
   ansible.builtin.shell: docker compose down
   args:
     chdir: /home/docker
-  become: true
-  become_user: docker
 
 - name: Create qbittorrent dir
   ansible.builtin.file:

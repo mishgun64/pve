@@ -1,11 +1,26 @@
 {
     "Anime": {
-        "save_path": "/data/torrents/anime"
+        "download_path": null,
+        "inactive_seeding_time_limit": -2,
+        "ratio_limit": -2,
+        "save_path": "/data/torrents/anime",
+        "seeding_time_limit": -2,
+        "share_limit_action": "Default"
     },
-    "Movie": {
-        "save_path": "/data/torrents/movies"
+    "Movies": {
+        "download_path": null,
+        "inactive_seeding_time_limit": -2,
+        "ratio_limit": -2,
+        "save_path": "/data/torrents/movies",
+        "seeding_time_limit": -2,
+        "share_limit_action": "Default"
     },
     "Series": {
-        "save_path": "/data/torrents/series"
+        "download_path": null,
+        "inactive_seeding_time_limit": -2,
+        "ratio_limit": -2,
+        "save_path": "/data/torrents/series",
+        "seeding_time_limit": -2,
+        "share_limit_action": "Default"
     }
 }

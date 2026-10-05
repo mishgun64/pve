@@ -49,12 +49,9 @@
 
 #------------------------------------------Start container------------------------------------------
 
-- name: Start docker compose
-  ansible.builtin.shell: docker compose up -d
-  args:
-    chdir: /home/docker
-  become: true
-  become_user: docker
+- name: Start docker compose as docker user
+  ansible.builtin.shell: |
+    su - docker -c 'cd /home/docker && docker compose up -d'
   when: valheim_config_dir.stat.exists
 
 #------------------------------------------Fetch------------------------------------------

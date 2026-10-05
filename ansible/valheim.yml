@@ -7,5 +7,7 @@
   roles:
       - common/basic
       - common/docker
-      - common/monitoring
+      #- common/monitoring
+      - valheim/backup
       - valheim/config
+      - valheim/restore

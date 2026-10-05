@@ -7,7 +7,7 @@
   roles:
     - common/basic
     - common/docker
-    - common/monitoring
-    #    - pvpgn/backup
+#    - common/monitoring
+    - pvpgn/backup
     - pvpgn/config
-#    - pvpgn/restore
+    - pvpgn/restore

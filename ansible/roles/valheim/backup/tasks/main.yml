@@ -2,7 +2,7 @@
 #-----------------------------------------User settings---------------------------------------------
 
 - name: Set shell for docker user
-  user:
+  ansible.builtin.user:
     name: docker
     shell: /bin/bash
 
@@ -15,14 +15,14 @@
 
 #------------------------------------------Generate timestamp------------------------------------------
 
-- name: Generate timestamp
+- name: Set timestamp
   ansible.builtin.set_fact:
-    backup_time: "{{ lookup('pipe', 'date +%d_%m_%Y_%H_%M') }}"
+    backup_ts: "{{ ansible_facts['date_time']['year'] }}.{{ ansible_facts['date_time']['month'] }}.{{ ansible_facts['date_time']['day'] }}_{{ ansible_facts['date_time']['hour'] }}.{{ ansible_facts['date_time']['minute'] }}.{{ ansible_facts['date_time']['second'] }}"
   when: valheim_config_dir.stat.exists
 
 #------------------------------------------Create backup dir------------------------------------------
 
-- name: Create backup directory on control
+- name: Create backup directory on Woodpecker
   ansible.builtin.file:
     path: /srv/backups/valheim
     state: directory
@@ -41,10 +41,9 @@
 #------------------------------------------Archive------------------------------------------
 
 - name: Archive Valheim config
-  become: true
   ansible.builtin.archive:
     path: /home/docker/config
-    dest: "/home/docker/valheim_{{ backup_time }}.tar.gz"
+    dest: "/home/docker/valheim_{{ backup_ts }}.tar.gz"
     format: gz
   when: valheim_config_dir.stat.exists
 
@@ -55,16 +54,15 @@
   args:
     chdir: /home/docker
   become: true
-  become_method: su
   become_user: docker
   when: valheim_config_dir.stat.exists
 
 #------------------------------------------Fetch------------------------------------------
 
-- name: Fetch backup
+- name: Fetch backup to Woodpecker
   ansible.builtin.fetch:
-    src: "/home/docker/valheim_{{ backup_time }}.tar.gz"
-    dest: "/srv/backups/valheim/"
+    src: "/home/docker/valheim_{{ backup_ts }}.tar.gz"
+    dest: /srv/backups/valheim/
     flat: true
   when: valheim_config_dir.stat.exists
 
@@ -72,8 +70,6 @@
 
 - name: Cleanup remote files
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "/home/docker/valheim_{{ backup_ts }}.tar.gz"
     state: absent
-  loop:
-    - "/home/docker/valheim_{{ backup_time }}.tar.gz"
   when: valheim_config_dir.stat.exists

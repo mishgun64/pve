@@ -1,16 +1,16 @@
 ---
-
 #--------------------------Find backup----------------------------------
 
 - name: Find latest backup
   delegate_to: localhost
   run_once: true
   ansible.builtin.shell: |
-    ls -1t /srv/backups/pvpgn/pvpgn_*.tar.gz 2>/dev/null | head -n 1 || true
+    ls -1t /srv/backups/valheim/valheim_*.tar.gz 2>/dev/null | head -n 1 || true
   register: latest_backup
+  changed_when: false
 
 - name: Set fact
-  set_fact:
+  ansible.builtin.set_fact:
     backup_exists: "{{ latest_backup.stdout | length > 0 }}"
 
 #--------------------------Stop container----------------------------------
@@ -25,17 +25,16 @@
 
 - name: Extract backup
   ansible.builtin.unarchive:
-    src: "/srv/backups/pvpgn/{{ (latest_backup.stdout | basename) }}"
+    src: "{{ latest_backup.stdout }}"
     dest: /home/docker/
     remote_src: false
   when: backup_exists
 
 #--------------------------Start container----------------------------------
 
-- name: Start PVPGN
+- name: Start Valheim server
   ansible.builtin.shell: docker compose up -d
   args:
     chdir: /home/docker
   become: true
-  become_method: su
   become_user: docker

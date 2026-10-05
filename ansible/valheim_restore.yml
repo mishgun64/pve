@@ -1,8 +1,0 @@
----
-
-- name: Valheim LXC restore
-  hosts: valheim_lxc
-  remote_user: root
-  gather_facts: true
-  roles:
-    - valheim/restore

@@ -1,8 +1,0 @@
----
-
-- name: Valheim LXC backup
-  hosts: valheim_lxc
-  remote_user: root
-  gather_facts: true
-  roles:
-    - valheim/backup

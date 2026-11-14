@@ -22,7 +22,7 @@
     path: /srv/backups/nextcloud
     state: directory
     mode: '0755'
-  delegate_to: localhost
+  delegate_to: control_node
 
 #------------------------------------------Detect MariaDB container name (FIX)------------------------------------------
 
@@ -79,11 +79,18 @@
 
 #------------------------------------------Fetch------------------------------------------
 
-- name: Fetch backup
+- name: Fetch backup to the CI container
   ansible.builtin.fetch:
     src: "/home/docker/nextcloud_{{ backup_time }}.tar.gz.enc"
-    dest: "/srv/backups/nextcloud/"
+    dest: "/tmp/"
     flat: true
+
+- name: Copy backup to the control node
+  ansible.builtin.copy:
+    src: "/tmp/nextcloud_{{ backup_time }}.tar.gz.enc"
+    dest: "/srv/backups/nextcloud/nextcloud_{{ backup_time }}.tar.gz.enc"
+    mode: '0644'
+  delegate_to: control_node
 
 #------------------------------------------Cleanup------------------------------------------
 

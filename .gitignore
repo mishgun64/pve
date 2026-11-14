@@ -16,3 +16,7 @@
 /ansible/roles/santa_bot/config/files/148.fw
 /ansible/roles/santa_bot/config/files/secrets.yml
 /ansible/roles/santa_bot/config/files/secrets.json
+
+# IDE project files accidentally created inside .woodpecker
+/.woodpecker/*.xml
+/.woodpecker/*.iml

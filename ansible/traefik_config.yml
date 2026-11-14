@@ -1,7 +1,7 @@
 ---
 
 - name: Traefik VM config
-  hosts: traefik_vm
+  hosts: traefik_lxc
   remote_user: root
   gather_facts: true
   roles:

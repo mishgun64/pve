@@ -18,6 +18,9 @@
 | restore | `nextcloud/restore` | `nextcloud/restore` | `nextcloud_vm` | `Nextcloud Restore` |
 | full | `nextcloud/full` | — | — | `Nextcloud Full` |
 
+Pipeline files: `.woodpecker/nextcloud_config.yml`, `nextcloud_backup.yml`, `nextcloud_restore.yml`, `nextcloud_full.yml`.
+Backups are stored on `control_node` in `/srv/backups/nextcloud` (encrypted with sops).
+
 ## pvpgn
 
 | Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |
@@ -36,6 +39,9 @@
 | restore | `traefik/restore` | `traefik/restore` | `traefik_lxc` | `Traefik Restore` |
 | full | `traefik/full` | — | — | `Traefik Full` |
 
+Pipeline files: `.woodpecker/traefik_config.yml`, `traefik_backup.yml`, `traefik_restore.yml`, `traefik_full.yml`.
+Backups (acme.json, acme-dns, crowdsec) are stored on `control_node` in `/srv/backups`, encrypted with sops, last 5 kept.
+
 ## valheim
 
 | Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |
@@ -51,6 +57,8 @@
 |---|---|---|---|---|
 | config | `wireguard/config` | `wireguard/config` | `wg_lxc` | `WireGuard Config` |
 | full | `wireguard/full` | — | — | `WireGuard Full` |
+
+> ⚠️ Pipeline files for WireGuard do not exist yet (`.woodpecker/wireguard_*.yml`), so these menu entries currently start an empty pipeline.
 
 ## santa_bot
 

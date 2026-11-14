@@ -15,19 +15,25 @@
     patterns: "acme_*.json.enc"
     file_type: file
   register: backup_files_acme
-  delegate_to: localhost
+  delegate_to: control_node
 
 - name: Select newest acme backup
   ansible.builtin.set_fact:
     latest_backup_acme: "{{ (backup_files_acme.files | sort(attribute='mtime'))[-1].path }}"
   when: backup_files_acme.matched | int > 0
-  delegate_to: localhost
 
-- name: Decrypt latest acme backup (locally)
+- name: Fetch latest acme backup from the control node
+  ansible.builtin.fetch:
+    src: "{{ latest_backup_acme }}"
+    dest: "/tmp/"
+    flat: true
+  delegate_to: control_node
+  when: backup_files_acme.matched | int > 0
+
+- name: Decrypt latest acme backup
   ansible.builtin.command:
-    cmd: sops -d --output-type json {{ latest_backup_acme }}
+    cmd: sops -d --output-type json /tmp/{{ latest_backup_acme | basename }}
   register: decrypted_acme
-  delegate_to: localhost
   changed_when: false
   when: backup_files_acme.matched | int > 0
 
@@ -49,7 +55,7 @@
 #--------------------------Find and copy latest ACME-DNS backup----------------------------------
 
 - name: Find latest acme-dns backup
-  delegate_to: localhost
+  delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
     ls -1t /srv/backups/acme-dns_*.tar.gz.enc 2>/dev/null | head -n 1 || true
@@ -64,10 +70,18 @@
     msg: "No acme-dns backups found on local host. Skipping restore."
   when: not backup_exists_acme_dns
 
-- name: Decrypt acme-dns backup locally
+- name: Fetch acme-dns backup from the control node
+  ansible.builtin.fetch:
+    src: "{{ latest_backup_acme_dns.stdout }}"
+    dest: "/tmp/"
+    flat: true
+  delegate_to: control_node
+  run_once: true
+  when: backup_exists_acme_dns
+
+- name: Decrypt acme-dns backup
   ansible.builtin.shell: |
-    sops -d --input-type binary --output-type binary {{ latest_backup_acme_dns.stdout }} > /tmp/{{ (latest_backup_acme_dns.stdout | basename) | regex_replace('.enc$', '') }}
-  delegate_to: localhost
+    sops -d --input-type binary --output-type binary /tmp/{{ latest_backup_acme_dns.stdout | basename }} > /tmp/{{ (latest_backup_acme_dns.stdout | basename) | regex_replace('.enc$', '') }}
   when: backup_exists_acme_dns
 
 - name: Set local decrypted acme-dns path
@@ -108,13 +122,12 @@
   ansible.builtin.file:
     path: "{{ local_tar_acme_dns }}"
     state: absent
-  delegate_to: localhost
   when: backup_exists_acme_dns
 
 #--------------------------Find and copy latest crowdsec backup----------------------------------
 
-- name: Find latest CrowdSec backup (local)
-  delegate_to: localhost
+- name: Find latest CrowdSec backup
+  delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
     ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | head -n 1 || true
@@ -129,10 +142,18 @@
     msg: "No CrowdSec backups found on local host. Skipping restore."
   when: not backup_exists_crowdsec
 
-- name: Decrypt CrowdSec backup locally
+- name: Fetch CrowdSec backup from the control node
+  ansible.builtin.fetch:
+    src: "{{ latest_backup_crowdsec.stdout }}"
+    dest: "/tmp/"
+    flat: true
+  delegate_to: control_node
+  run_once: true
+  when: backup_exists_crowdsec
+
+- name: Decrypt CrowdSec backup
   ansible.builtin.shell: |
-    sops -d {{ latest_backup_crowdsec.stdout }} > /tmp/{{ (latest_backup_crowdsec.stdout | basename) | regex_replace('.enc$', '') }}
-  delegate_to: localhost
+    sops -d /tmp/{{ latest_backup_crowdsec.stdout | basename }} > /tmp/{{ (latest_backup_crowdsec.stdout | basename) | regex_replace('.enc$', '') }}
   when: backup_exists_crowdsec
 
 - name: Set local decrypted crowdsec path
@@ -173,7 +194,6 @@
   ansible.builtin.file:
     path: "{{ local_tar_crowdsec }}"
     state: absent
-  delegate_to: localhost
   when: backup_exists_crowdsec
 
 #--------------------------Run container---------------------------------------

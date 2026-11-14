@@ -23,7 +23,7 @@
 
 - name: Decrypt locally
   ansible.builtin.set_fact:
-    fw_content: "{{ lookup('pipe', 'sops -d /var/lib/jenkins/jobs/pve/workspace/ansible/roles/nextcloud/config/files/125.fw.enc') }}"
+    fw_content: "{{ lookup('pipe', 'sops -d ' + role_path + '/files/125.fw.enc') }}"
   delegate_to: localhost
   no_log: true
 

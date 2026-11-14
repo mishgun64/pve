@@ -13,17 +13,17 @@
         - age:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
 
-- name: Create .sops.yaml on localhost
+- name: Create .sops.yaml on backup host
   ansible.builtin.copy:
     dest: /srv/backups/.sops.yaml
-    owner: jenkins
-    group: jenkins
+    owner: root
+    group: root
     mode: '0600'
     content: |
       creation_rules:
         - age:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
-  delegate_to: localhost
+  delegate_to: control_node
 
 - name: Generate timestamp
   ansible.builtin.set_fact:
@@ -41,11 +41,19 @@
     chdir: /home/docker/certs/traefik
   when: acme_json_stat.stat.exists
 
-- name: Fetch encrypted acme.json
+- name: Fetch encrypted acme.json to the CI container
   ansible.builtin.fetch:
     src: "/home/docker/certs/traefik/acme_{{ backup_time }}.json.enc"
-    dest: "/srv/backups/"
+    dest: "/tmp/"
     flat: true
+  when: acme_json_stat.stat.exists
+
+- name: Copy encrypted acme.json to the control node
+  ansible.builtin.copy:
+    src: "/tmp/acme_{{ backup_time }}.json.enc"
+    dest: "/srv/backups/acme_{{ backup_time }}.json.enc"
+    mode: '0600'
+  delegate_to: control_node
   when: acme_json_stat.stat.exists
 
 - name: Remove remote encrypted acme.json
@@ -60,7 +68,7 @@
     patterns: "acme_*.json.enc"
     file_type: file
   register: all_backups
-  delegate_to: localhost
+  delegate_to: control_node
   when: acme_json_stat.stat.exists
 
 - name: Remove old acme.json backups (keep last 5)
@@ -69,7 +77,7 @@
     state: absent
   loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
   when: acme_json_stat.stat.exists and all_backups.matched | int > 5
-  delegate_to: localhost
+  delegate_to: control_node
 
 #------------------------------------------ACME-DNS backup------------------------------------------
 
@@ -113,11 +121,19 @@
     chdir: /home/docker
   when: acme_dns_exists
 
-- name: Fetch encrypted acme-dns backup
+- name: Fetch encrypted acme-dns backup to the CI container
   ansible.builtin.fetch:
     src: "/home/docker/acme-dns_{{ backup_time }}.tar.gz.enc"
-    dest: "/srv/backups/"
+    dest: "/tmp/"
     flat: true
+  when: acme_dns_exists
+
+- name: Copy encrypted acme-dns backup to the control node
+  ansible.builtin.copy:
+    src: "/tmp/acme-dns_{{ backup_time }}.tar.gz.enc"
+    dest: "/srv/backups/acme-dns_{{ backup_time }}.tar.gz.enc"
+    mode: '0600'
+  delegate_to: control_node
   when: acme_dns_exists
 
 - name: Remove remote encrypted acme-dns backup
@@ -135,7 +151,7 @@
     patterns: "acme-dns_*.tar.gz.enc"
     file_type: file
   register: all_backups
-  delegate_to: localhost
+  delegate_to: control_node
   when: acme_dns_exists
 
 - name: Remove old acme-dns backups (keep last 5)
@@ -144,7 +160,7 @@
     state: absent
   loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
   when: acme_dns_exists and all_backups.matched | int > 5
-  delegate_to: localhost
+  delegate_to: control_node
 
 #------------------------------------------Crowdsec backup------------------------------------------
 
@@ -183,11 +199,19 @@
     chdir: /home/docker
   when: crowdsec_stat.stat.exists
 
-- name: Fetch encrypted crowdsec backup to local machine
+- name: Fetch encrypted crowdsec backup to the CI container
   ansible.builtin.fetch:
     src: "{{ remote_encrypted }}"
-    dest: /srv/backups/
+    dest: /tmp/
     flat: true
+  when: crowdsec_stat.stat.exists
+
+- name: Copy encrypted crowdsec backup to the control node
+  ansible.builtin.copy:
+    src: "/tmp/crowdsec_{{ backup_time }}.tar.gz.enc"
+    dest: "/srv/backups/crowdsec_{{ backup_time }}.tar.gz.enc"
+    mode: '0600'
+  delegate_to: control_node
   when: crowdsec_stat.stat.exists
 
 - name: Remove remote unencrypted crowdsec archive
@@ -202,8 +226,8 @@
     state: absent
   when: crowdsec_stat.stat.exists
 
-- name: Keep only last 5 CrowdSec backups (local)
-  delegate_to: localhost
+- name: Keep only last 5 CrowdSec backups
+  delegate_to: control_node
   ansible.builtin.shell: |
     ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | tail -n +6 | xargs -r rm -f
   when: crowdsec_stat.stat.exists

@@ -10,7 +10,7 @@
 #--------------------------Find backup----------------------------------
 
 - name: Find latest backup
-  delegate_to: localhost
+  delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
     ls -1t /srv/backups/nextcloud/nextcloud_*.tar.gz.enc 2>/dev/null | head -n 1 || true
@@ -22,10 +22,18 @@
 
 #--------------------------Decrypt----------------------------------
 
-- name: Decrypt backup locally
+- name: Fetch encrypted backup from the control node
+  ansible.builtin.fetch:
+    src: "{{ latest_backup.stdout }}"
+    dest: "/tmp/"
+    flat: true
+  delegate_to: control_node
+  run_once: true
+  when: backup_exists
+
+- name: Decrypt backup
   ansible.builtin.shell: |
-    sops -d --input-type binary --output-type binary {{ latest_backup.stdout }} > /tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}
-  delegate_to: localhost
+    sops -d --input-type binary --output-type binary /tmp/{{ latest_backup.stdout | basename }} > /tmp/{{ (latest_backup.stdout | basename) | regex_replace('.enc$', '') }}
   when: backup_exists
 
 #--------------------------Extract----------------------------------

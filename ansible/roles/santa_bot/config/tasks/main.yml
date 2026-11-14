@@ -53,6 +53,19 @@
       git config --global --add safe.directory "{{ santa_bot_dir }}"
   changed_when: false
 
+- name: Check for existing git checkout
+  ansible.builtin.stat:
+    path: "{{ santa_bot_dir }}/.git"
+  register: santa_bot_git_dir
+
+- name: Exclude CI Dockerfile from git status (keep working tree clean)
+  ansible.builtin.lineinfile:
+    path: "{{ santa_bot_dir }}/.git/info/exclude"
+    line: "Dockerfile.ci"
+    create: true
+    state: present
+  when: santa_bot_git_dir.stat.exists
+
 - name: Clone Santa Bobot repository
   ansible.builtin.git:
     repo: "{{ santa_bot_repo }}"

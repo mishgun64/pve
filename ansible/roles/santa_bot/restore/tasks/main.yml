@@ -53,6 +53,24 @@
     remote_src: false
   when: backup_exists
 
+# -------------------------- Normalize file permissions --------------------------
+# The backup tar preserves the modes captured at backup time. If data/*.json
+# was ever chmod'ed to 0755 (e.g. by an old role version that applied
+# "mode: '0755'" together with "recurse: true"), git sees it as a local
+# modification and the next "Clone Santa Bobot repository" task fails with
+# "Local modifications exist in the destination". Reset tracked data files to
+# their git mode 0644; secrets.json is not in the archive and is written
+# separately with 0600 by secrets.yml.
+
+- name: Reset tracked data file permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: '0644'
+  loop:
+    - "{{ santa_bot_dir }}/data/users.json"
+    - "{{ santa_bot_dir }}/data/secrets-example.json"
+  when: backup_exists
+
 # -------------------------- Restore secrets --------------------------
 # The bot token is excluded from backups and is always deployed from
 # files/secrets.enc.yml (or the santa_bot_token variable).

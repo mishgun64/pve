@@ -1,6 +1,6 @@
 when:
   - event: manual
-    evaluate: 'PIPELINE == "media_vm/restore"'
+    evaluate: 'PIPELINE == "media/restore"'
 
 steps:
   deploy:

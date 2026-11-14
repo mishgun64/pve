@@ -1,0 +1,22 @@
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - terraform/main.tf
+        - terraform/prod.tfvars
+
+  - event: manual
+    evaluate: 'PIPELINE == "terraform"'
+
+steps:
+  terraform:
+    image: hashicorp/terraform:latest
+
+    commands:
+      - set +x
+      - export TF_VAR_proxmox_password=$(sops -d ./terraform/secrets/pass.enc)
+      - set -x
+      - terraform -chdir=./terraform/ init -upgrade -var-file="prod.tfvars"
+      - terraform -chdir=./terraform/ plan -var-file="prod.tfvars"
+      - terraform -chdir=./terraform/ apply -var-file="prod.tfvars" -auto-approve

@@ -489,6 +489,76 @@ resource "proxmox_virtual_environment_container" "valheim" {
     nesting = true
   }
 }
+
+# #------------------------------------Monitoring LXC (Prometheus + Alertmanager + Grafana)------------------------------------
+#
+# resource "proxmox_virtual_environment_container" "monitoring" {
+#   node_name = var.target_node_name
+#   vm_id     = 147
+#
+#   unprivileged   = true
+#   started        = true
+#   start_on_boot  = true
+#
+#   initialization {
+#     hostname = "monitoring"
+#
+#     user_account {
+#       keys = [var.control_ssh_key]
+#     }
+#
+#     ip_config {
+#       ipv4 {
+#         address = "192.168.4.7/24"
+#         gateway = "192.168.4.1"
+#       }
+#     }
+#
+#     ip_config {
+#       ipv4 {
+#         address = "192.168.2.10/24"
+#       }
+#     }
+#   }
+#
+#   operating_system {
+#     template_file_id = var.lxc_ostemplate
+#     type             = "debian"
+#   }
+#
+#   cpu {
+#     cores = 1
+#   }
+#
+#   memory {
+#     dedicated = 2048
+#     swap      = 0
+#   }
+#
+#   disk {
+#     datastore_id = "local-lvm"
+#     size         = 15
+#   }
+#
+#   network_interface {
+#     name        = "eth0"
+#     bridge      = "vmbr1"
+#     mac_address = "BC:24:11:DB:27:48"
+#     firewall    = true
+#   }
+#
+#   network_interface {
+#     name        = "eth1"
+#     bridge      = "vmbr0"
+#     mac_address = "BC:24:11:DB:27:49"
+#     firewall    = true
+#   }
+#
+#   features {
+#     nesting = true
+#   }
+# }
+
 #------------------------------------Santa Bobot LXC (Telegram bot)------------------------------------
 
 resource "proxmox_virtual_environment_container" "santa_bot" {
@@ -550,214 +620,144 @@ resource "proxmox_virtual_environment_container" "santa_bot" {
 }
 
 #------------------------------------Media_VM webhook trigger------------------------------------
-
-resource "terraform_data" "media_vm_trigger" {
-  depends_on = [proxmox_virtual_environment_vm.media_vm]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_vm.media_vm]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "media_vm"}'
-    EOT
-  }
-}
-
-#------------------------------------NextCloud_VM webhook trigger------------------------------------
-
-resource "terraform_data" "nextcloud_vm_trigger" {
-  depends_on = [proxmox_virtual_environment_vm.nextcloud_vm]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_vm.nextcloud_vm]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "nextcloud-config"}'
-    EOT
-  }
-}
-
-#------------------------------------Wireguard webhook trigger------------------------------------
-
-resource "terraform_data" "wireguard_trigger" {
-  depends_on = [proxmox_virtual_environment_container.wireguard]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.wireguard]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "wireguard"}'
-    EOT
-  }
-}
-
-#------------------------------------Traefik webhook trigger------------------------------------
-
-resource "terraform_data" "traefik_trigger" {
-  depends_on = [proxmox_virtual_environment_container.traefik]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.traefik]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "traefik-config"}'
-    EOT
-  }
-}
-
-#------------------------------------prosody webhook trigger------------------------------------
-
-resource "terraform_data" "prosody_trigger" {
-  depends_on = [proxmox_virtual_environment_container.prosody]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.prosody]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "prosody-config"}'
-    EOT
-  }
-}
-
-#------------------------------------PVPGN webhook trigger------------------------------------
-
-resource "terraform_data" "pvpgn_trigger" {
-  depends_on = [proxmox_virtual_environment_container.pvpgn]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.pvpgn]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "pvpgn-config"}'
-    EOT
-  }
-}
-
-#------------------------------------Valheim webhook trigger------------------------------------
-
-resource "terraform_data" "valheim_trigger" {
-  depends_on = [proxmox_virtual_environment_container.valheim]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.valheim]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "valheim-config"}'
-    EOT
-  }
-}
-
-#------------------------------------Monitoring LXC (Prometheus + Alertmanager + Grafana)------------------------------------
-
-resource "proxmox_virtual_environment_container" "monitoring" {
-  node_name = var.target_node_name
-  vm_id     = 147
-
-  unprivileged   = true
-  started        = true
-  start_on_boot  = true
-
-  initialization {
-    hostname = "monitoring"
-
-    user_account {
-      keys = [var.control_ssh_key]
-    }
-
-    ip_config {
-      ipv4 {
-        address = "192.168.4.7/24"
-        gateway = "192.168.4.1"
-      }
-    }
-
-    ip_config {
-      ipv4 {
-        address = "192.168.2.10/24"
-      }
-    }
-  }
-
-  operating_system {
-    template_file_id = var.lxc_ostemplate
-    type             = "debian"
-  }
-
-  cpu {
-    cores = 1
-  }
-
-  memory {
-    dedicated = 2048
-    swap      = 0
-  }
-
-  disk {
-    datastore_id = "local-lvm"
-    size         = 15
-  }
-
-  network_interface {
-    name        = "eth0"
-    bridge      = "vmbr1"
-    mac_address = "BC:24:11:DB:27:48"
-    firewall    = true
-  }
-
-  network_interface {
-    name        = "eth1"
-    bridge      = "vmbr0"
-    mac_address = "BC:24:11:DB:27:49"
-    firewall    = true
-  }
-
-  features {
-    nesting = true
-  }
-}
-
+#
+# resource "terraform_data" "media_vm_trigger" {
+#   depends_on = [proxmox_virtual_environment_vm.media_vm]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_vm.media_vm]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "media_vm"}'
+#     EOT
+#   }
+# }
+#
+# #------------------------------------NextCloud_VM webhook trigger------------------------------------
+#
+# resource "terraform_data" "nextcloud_vm_trigger" {
+#   depends_on = [proxmox_virtual_environment_vm.nextcloud_vm]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_vm.nextcloud_vm]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "nextcloud-config"}'
+#     EOT
+#   }
+# }
+#
+# #------------------------------------Wireguard webhook trigger------------------------------------
+#
+# resource "terraform_data" "wireguard_trigger" {
+#   depends_on = [proxmox_virtual_environment_container.wireguard]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_container.wireguard]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "wireguard"}'
+#     EOT
+#   }
+# }
+#
+# #------------------------------------Traefik webhook trigger------------------------------------
+#
+# resource "terraform_data" "traefik_trigger" {
+#   depends_on = [proxmox_virtual_environment_container.traefik]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_container.traefik]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "traefik-config"}'
+#     EOT
+#   }
+# }
+#
+# #------------------------------------prosody webhook trigger------------------------------------
+#
+# resource "terraform_data" "prosody_trigger" {
+#   depends_on = [proxmox_virtual_environment_container.prosody]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_container.prosody]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "prosody-config"}'
+#     EOT
+#   }
+# }
+#
+# #------------------------------------PVPGN webhook trigger------------------------------------
+#
+# resource "terraform_data" "pvpgn_trigger" {
+#   depends_on = [proxmox_virtual_environment_container.pvpgn]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_container.pvpgn]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "pvpgn-config"}'
+#     EOT
+#   }
+# }
+#
+# #------------------------------------Valheim webhook trigger------------------------------------
+#
+# resource "terraform_data" "valheim_trigger" {
+#   depends_on = [proxmox_virtual_environment_container.valheim]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_container.valheim]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "valheim-config"}'
+#     EOT
+#   }
+# }
 #------------------------------------Monitoring webhook trigger------------------------------------
 
-resource "terraform_data" "monitoring_trigger" {
-  depends_on = [proxmox_virtual_environment_container.monitoring]
-    lifecycle {
-      replace_triggered_by = [proxmox_virtual_environment_container.monitoring]
-    }
-
-  provisioner "local-exec" {
-    command = <<EOT
-      sleep 30
-      curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
-      -H "Content-Type: application/json" \
-      -d '{"event": "monitoring-config"}'
-    EOT
-  }
-}
+# resource "terraform_data" "monitoring_trigger" {
+#   depends_on = [proxmox_virtual_environment_container.monitoring]
+#     lifecycle {
+#       replace_triggered_by = [proxmox_virtual_environment_container.monitoring]
+#     }
+#
+#   provisioner "local-exec" {
+#     command = <<EOT
+#       sleep 30
+#       curl -X POST "http://192.168.2.200:8080/generic-webhook-trigger/invoke?token=${var.webhook_token}" \
+#       -H "Content-Type: application/json" \
+#       -d '{"event": "monitoring-config"}'
+#     EOT
+#   }
+# }

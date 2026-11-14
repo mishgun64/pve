@@ -201,6 +201,40 @@ $services = @(
                 Message = "WireGuard Full"
             }
         )
+    },
+
+    @{
+        Name = "Santa Bot"
+        Pipelines = @(
+            @{
+                Name = "Config"
+                Role = "santa_bot/config"
+                Pipeline = "santa_bot/config"
+                Target = "santa_bot_lxc"
+                Message = "Santa Bot Config"
+            },
+            @{
+                Name = "Backup"
+                Role = "santa_bot/backup"
+                Pipeline = "santa_bot/backup"
+                Target = "santa_bot_lxc"
+                Message = "Santa Bot Backup"
+            },
+            @{
+                Name = "Restore"
+                Role = "santa_bot/restore"
+                Pipeline = "santa_bot/restore"
+                Target = "santa_bot_lxc"
+                Message = "Santa Bot Restore"
+            },
+            @{
+                Name = "Full"
+                Role = $null
+                Pipeline = "santa_bot/full"
+                Target = $null
+                Message = "Santa Bot Full"
+            }
+        )
     }
 )
 

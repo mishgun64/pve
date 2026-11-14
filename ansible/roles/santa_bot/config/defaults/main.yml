@@ -1,0 +1,17 @@
+---
+
+#------------------------------------Santa Bobot role variables------------------------------------
+
+# Git repository with the bot source code
+santa_bot_repo: "https://github.com/mishgun64/Santa_Bobot.git"
+santa_bot_version: "master"
+
+# Working directory of the bot on the LXC (data/ is mounted to /app/data)
+santa_bot_dir: "/home/docker/santa_bot"
+santa_bot_compose_dir: "/home/docker"
+santa_bot_container_name: "santa_bot"
+
+# Telegram bot token (secret). Empty by default - provide it via
+#   - files/secrets.enc.yml (key: santa_bot_token), or
+#   - ansible extra var: -e santa_bot_token=...
+santa_bot_token: ""

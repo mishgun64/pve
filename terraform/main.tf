@@ -489,6 +489,66 @@ resource "proxmox_virtual_environment_container" "valheim" {
     nesting = true
   }
 }
+#------------------------------------Santa Bobot LXC (Telegram bot)------------------------------------
+
+resource "proxmox_virtual_environment_container" "santa_bot" {
+  node_name = var.target_node_name
+  vm_id     = 148
+
+  unprivileged  = true
+  started       = true
+  start_on_boot = true
+
+  initialization {
+    hostname = "santa-bot"
+
+    user_account {
+      keys = [var.control_ssh_key]
+    }
+
+    ip_config {
+      ipv4 {
+        address = "192.168.2.11/24"
+        gateway = "192.168.2.1"
+      }
+    }
+
+    dns {
+      servers = ["192.168.2.1"]
+    }
+  }
+
+  operating_system {
+    template_file_id = var.lxc_ostemplate
+    type             = "debian"
+  }
+
+  cpu {
+    cores = 1
+  }
+
+  memory {
+    dedicated = 1024
+    swap      = 0
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = 8
+  }
+
+  network_interface {
+    name        = "eth0"
+    bridge      = "vmbr0"
+    mac_address = "BC:24:11:DB:27:4A"
+    firewall    = true
+  }
+
+  features {
+    nesting = true
+  }
+}
+
 #------------------------------------Media_VM webhook trigger------------------------------------
 
 resource "terraform_data" "media_vm_trigger" {

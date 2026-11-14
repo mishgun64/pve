@@ -1,0 +1,13 @@
+---
+
+- name: Santa Bobot LXC config
+  hosts: santa_bot_lxc
+  remote_user: root
+  gather_facts: true
+  roles:
+      - common/basic
+      - common/docker
+#      - common/monitoring
+      - santa_bot/backup
+      - santa_bot/config
+      - santa_bot/restore

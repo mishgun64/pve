@@ -1,0 +1,123 @@
+---
+
+#--------------------------User settings----------------------------------
+
+- name: Change root password
+  ansible.builtin.user:
+    name: root
+    password: '$6$GE9vNLn0xfZZ9jKP$VfFu6W1QAvXv7m9pVbE4wTsxRpl5lyTtHgvaTiF3p77EXpNJWGqTgCRNzEr5bNx1zczTmzhK9PUk4WKvXUvpQ1'
+    # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512))"
+
+- name: Set shell for docker user
+  ansible.builtin.user:
+    name: docker
+    shell: /bin/bash
+
+#--------------------------Firewall rules----------------------------------
+
+- name: Decrypt firewall rules locally
+  ansible.builtin.command:
+    cmd: sops -d {{ role_path }}/files/148.fw.enc
+  delegate_to: localhost
+  register: santa_bot_fw_decrypted
+  changed_when: false
+  no_log: true
+
+- name: Write to pmxcfs
+  ansible.builtin.shell:
+    cmd: "cat > /etc/pve/firewall/148.fw"
+    stdin: "{{ santa_bot_fw_decrypted.stdout | replace('\r\n', '\n') }}"
+  delegate_to: pve
+  no_log: true
+
+- name: Convert to ASCII
+  ansible.builtin.shell: >
+    sed -i 's/\r//' /etc/pve/firewall/148.fw
+  delegate_to: pve
+  changed_when: false
+
+#--------------------------Packages----------------------------------
+
+- name: Install packages required to build the bot
+  ansible.builtin.apt:
+    name:
+      - git
+    state: present
+    update_cache: true
+
+#--------------------------Bot source code----------------------------------
+
+- name: Clone Santa Bobot repository
+  ansible.builtin.git:
+    repo: "{{ santa_bot_repo }}"
+    dest: "{{ santa_bot_dir }}"
+    version: "{{ santa_bot_version }}"
+    update: true
+    accept_hostkey: true
+
+- name: Deploy Dockerfile for the CI build
+  ansible.builtin.copy:
+    src: Dockerfile
+    dest: "{{ santa_bot_dir }}/Dockerfile.ci"
+    mode: '0644'
+
+#--------------------------Bot data and secrets----------------------------------
+
+- name: Check for the bot users database
+  ansible.builtin.stat:
+    path: "{{ santa_bot_dir }}/data/users.json"
+  register: santa_bot_users_file
+
+- name: Fail when data/users.json is missing
+  ansible.builtin.fail:
+    msg: >-
+      {{ santa_bot_dir }}/data/users.json not found. main.py reads
+      invited_users/exceptions/bans from it at start-up, so the bot cannot run
+      without it. Restore the file from a backup (santa_bot/restore) before
+      starting the bot.
+  when: not santa_bot_users_file.stat.exists
+
+- name: Provide bot token (data/secrets.json)
+  ansible.builtin.import_tasks: secrets.yml
+
+#--------------------------Docker compose----------------------------------
+
+- name: Copy docker-compose.yml
+  ansible.builtin.copy:
+    src: docker-compose.yml
+    dest: "{{ santa_bot_compose_dir }}/docker-compose.yml"
+    owner: docker
+    group: docker
+    mode: '0644'
+
+#------------------------------------------Build and start container------------------------------------------
+
+- name: Build and start docker compose stack
+  ansible.builtin.shell: docker compose up -d --build
+  args:
+    chdir: "{{ santa_bot_compose_dir }}"
+  become: true
+  become_method: su
+  become_user: docker
+
+- name: Wait for the bot container to be running
+  ansible.builtin.shell: >
+    docker inspect -f '{{ '{{' }}.State.Running{{ '}}' }}' {{ santa_bot_container_name }}
+  register: santa_bot_running
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: santa_bot_running.stdout | trim == "true"
+
+- name: Get bot container logs
+  ansible.builtin.shell: >
+    docker logs --tail 20 {{ santa_bot_container_name }} 2>&1 || true
+  register: santa_bot_logs
+  changed_when: false
+  retries: 6
+  delay: 5
+  until: santa_bot_logs.stdout | length > 0
+
+- name: Display bot log
+  ansible.builtin.debug:
+    var: santa_bot_logs.stdout_lines

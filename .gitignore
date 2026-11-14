@@ -13,3 +13,6 @@
 /ansible/roles/retroarch_sync/files/secrets.yml
 /improved_pve/
 /ansible/roles/valheim/config/files/146.fw
+/ansible/roles/santa_bot/config/files/148.fw
+/ansible/roles/santa_bot/config/files/secrets.yml
+/ansible/roles/santa_bot/config/files/secrets.json

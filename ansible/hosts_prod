@@ -22,6 +22,8 @@ local_hosts:
       ansible_host: 192.168.2.9
     prometheus_lxc:
       ansible_host: 192.168.2.10
+    santa_bot_lxc:
+      ansible_host: 192.168.2.11
 
   vars:
     ansible_ssh_private_key_file: ~/.ssh/id_ed25519

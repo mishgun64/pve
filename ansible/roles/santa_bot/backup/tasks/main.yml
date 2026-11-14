@@ -1,0 +1,69 @@
+---
+
+#-----------------------------------------User settings---------------------------------------------
+
+- name: Set shell for docker user
+  ansible.builtin.user:
+    name: docker
+    shell: /bin/bash
+
+#------------------------------------------Check directory------------------------------------------
+
+- name: Check bot data directory
+  ansible.builtin.stat:
+    path: "{{ santa_bot_dir }}/data"
+  register: santa_bot_data_dir
+
+#------------------------------------------Generate timestamp------------------------------------------
+
+- name: Set timestamp
+  ansible.builtin.set_fact:
+    backup_time: "{{ ansible_facts['date_time']['year'] }}.{{ ansible_facts['date_time']['month'] }}.{{ ansible_facts['date_time']['day'] }}_{{ ansible_facts['date_time']['hour'] }}.{{ ansible_facts['date_time']['minute'] }}.{{ ansible_facts['date_time']['second'] }}"
+  when: santa_bot_data_dir.stat.exists
+
+#------------------------------------------Create backup dir------------------------------------------
+
+- name: Create backup directory on control node
+  ansible.builtin.file:
+    path: "{{ santa_bot_backup_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: control_node
+  when: santa_bot_data_dir.stat.exists
+
+#------------------------------------------Archive------------------------------------------
+
+- name: Archive bot data (secret token is excluded)
+  ansible.builtin.shell: >
+    tar -czf /home/docker/santa_bot_{{ backup_time }}.tar.gz
+    -C {{ santa_bot_dir }} --exclude=data/secrets.json data
+  when: santa_bot_data_dir.stat.exists
+
+#------------------------------------------Fetch------------------------------------------
+
+- name: Fetch backup to CI container
+  ansible.builtin.fetch:
+    src: "/home/docker/santa_bot_{{ backup_time }}.tar.gz"
+    dest: "/tmp/"
+    flat: true
+  when: santa_bot_data_dir.stat.exists
+
+#------------------------------------------Copy to control node------------------------------------------
+
+- name: Copy backup to control node
+  ansible.builtin.copy:
+    src: "/tmp/santa_bot_{{ backup_time }}.tar.gz"
+    dest: "{{ santa_bot_backup_dir }}/santa_bot_{{ backup_time }}.tar.gz"
+    mode: '0644'
+  delegate_to: control_node
+  when: santa_bot_data_dir.stat.exists
+
+#------------------------------------------Cleanup------------------------------------------
+
+- name: Cleanup remote files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/home/docker/santa_bot_{{ backup_time }}.tar.gz"
+  when: santa_bot_data_dir.stat.exists

@@ -1,0 +1,21 @@
+services:
+  santa_bot:
+    # The image is built locally from the cloned repository (files/Dockerfile)
+    # and is not published to any registry.
+    build:
+      context: ./santa_bot
+      dockerfile: Dockerfile.ci
+    image: santa_bot:latest
+    # Prevents the daily "docker compose pull" cron from common/docker from
+    # trying to pull a non-registry image and failing the whole stack.
+    # The role always builds explicitly with "docker compose up -d --build".
+    pull_policy: never
+    container_name: santa_bot
+    restart: unless-stopped
+    # Run as the "docker" user of the LXC (uid/gid 1000), which owns ./santa_bot,
+    # so the bot can write db.json/log into the bind-mounted data directory.
+    user: "1000:1000"
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      - ./santa_bot/data:/app/data

@@ -51,3 +51,18 @@
 |---|---|---|---|---|
 | config | `wireguard/config` | `wireguard/config` | `wg_lxc` | `WireGuard Config` |
 | full | `wireguard/full` | — | — | `WireGuard Full` |
+
+## santa_bot
+
+Telegram bot [Santa_Bobot](https://github.com/mishgun64/Santa_Bobot) in a Docker container on LXC 148 (`santa-bot`, `192.168.2.11`).
+
+| Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |
+|---|---|---|---|---|
+| config | `santa_bot/config` | `santa_bot/config` | `santa_bot_lxc` | `Santa Bot Config` |
+| backup | `santa_bot/backup` | `santa_bot/backup` | `santa_bot_lxc` | `Santa Bot Backup` |
+| restore | `santa_bot/restore` | `santa_bot/restore` | `santa_bot_lxc` | `Santa Bot Restore` |
+| full | `santa_bot/full` | — | — | `Santa Bot Full` |
+
+Pipeline files: `.woodpecker/santa_bot_config.yml`, `santa_bot_backup.yml`, `santa_bot_restore.yml`, `santa_bot_full.yml`.
+
+The bot token (`santa_bot_token`) is not stored in the repository. Provide it either through the encrypted `ansible/roles/santa_bot/config/files/secrets.enc.yml` or as an extra var (see `ansible/roles/santa_bot/README.md`).

@@ -1,0 +1,8 @@
+---
+
+# Directory for Traefik backups on the control node.
+# Shared by the backup and restore roles so both always agree on the location.
+traefik_backup_dir: /srv/backups/traefik
+
+# How many backup generations to keep per artifact (acme.json, acme-dns, crowdsec)
+traefik_backup_keep: 5

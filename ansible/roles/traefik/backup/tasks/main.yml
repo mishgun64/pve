@@ -13,9 +13,16 @@
         - age:
             - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB jenkins@control
 
+- name: Create Traefik backup directory on the control node
+  ansible.builtin.file:
+    path: "{{ traefik_backup_dir }}"
+    state: directory
+    mode: '0700'
+  delegate_to: control_node
+
 - name: Create .sops.yaml on backup host
   ansible.builtin.copy:
-    dest: /srv/backups/.sops.yaml
+    dest: "{{ traefik_backup_dir }}/.sops.yaml"
     owner: root
     group: root
     mode: '0600'
@@ -51,7 +58,7 @@
 - name: Copy encrypted acme.json to the control node
   ansible.builtin.copy:
     src: "/tmp/acme_{{ backup_time }}.json.enc"
-    dest: "/srv/backups/acme_{{ backup_time }}.json.enc"
+    dest: "{{ traefik_backup_dir }}/acme_{{ backup_time }}.json.enc"
     mode: '0600'
   delegate_to: control_node
   when: acme_json_stat.stat.exists
@@ -62,21 +69,21 @@
     state: absent
   when: acme_json_stat.stat.exists
 
-- name: Find all acme.json backups (local)
+- name: Find all acme.json backups
   ansible.builtin.find:
-    paths: /srv/backups/
+    paths: "{{ traefik_backup_dir }}"
     patterns: "acme_*.json.enc"
     file_type: file
   register: all_backups
   delegate_to: control_node
   when: acme_json_stat.stat.exists
 
-- name: Remove old acme.json backups (keep last 5)
+- name: Remove old acme.json backups
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
-  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
-  when: acme_json_stat.stat.exists and all_backups.matched | int > 5
+  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-traefik_backup_keep | int] }}"
+  when: acme_json_stat.stat.exists and all_backups.matched | int > traefik_backup_keep | int
   delegate_to: control_node
 
 #------------------------------------------ACME-DNS backup------------------------------------------
@@ -131,7 +138,7 @@
 - name: Copy encrypted acme-dns backup to the control node
   ansible.builtin.copy:
     src: "/tmp/acme-dns_{{ backup_time }}.tar.gz.enc"
-    dest: "/srv/backups/acme-dns_{{ backup_time }}.tar.gz.enc"
+    dest: "{{ traefik_backup_dir }}/acme-dns_{{ backup_time }}.tar.gz.enc"
     mode: '0600'
   delegate_to: control_node
   when: acme_dns_exists
@@ -145,21 +152,21 @@
     - /home/docker/acme-dns_{{ backup_time }}.tar.gz
   when: acme_dns_exists
 
-- name: Find all acme-dns backups (local)
+- name: Find all acme-dns backups
   ansible.builtin.find:
-    paths: /srv/backups/
+    paths: "{{ traefik_backup_dir }}"
     patterns: "acme-dns_*.tar.gz.enc"
     file_type: file
   register: all_backups
   delegate_to: control_node
   when: acme_dns_exists
 
-- name: Remove old acme-dns backups (keep last 5)
+- name: Remove old acme-dns backups
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: absent
-  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-5] }}"
-  when: acme_dns_exists and all_backups.matched | int > 5
+  loop: "{{ (all_backups.files | sort(attribute='mtime'))[:-traefik_backup_keep | int] }}"
+  when: acme_dns_exists and all_backups.matched | int > traefik_backup_keep | int
   delegate_to: control_node
 
 #------------------------------------------Crowdsec backup------------------------------------------
@@ -209,7 +216,7 @@
 - name: Copy encrypted crowdsec backup to the control node
   ansible.builtin.copy:
     src: "/tmp/crowdsec_{{ backup_time }}.tar.gz.enc"
-    dest: "/srv/backups/crowdsec_{{ backup_time }}.tar.gz.enc"
+    dest: "{{ traefik_backup_dir }}/crowdsec_{{ backup_time }}.tar.gz.enc"
     mode: '0600'
   delegate_to: control_node
   when: crowdsec_stat.stat.exists
@@ -226,8 +233,8 @@
     state: absent
   when: crowdsec_stat.stat.exists
 
-- name: Keep only last 5 CrowdSec backups
+- name: Keep only last {{ traefik_backup_keep }} CrowdSec backups
   delegate_to: control_node
   ansible.builtin.shell: |
-    ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | tail -n +6 | xargs -r rm -f
+    ls -1t {{ traefik_backup_dir }}/crowdsec_*.tar.gz.enc 2>/dev/null | tail -n +{{ traefik_backup_keep + 1 }} | xargs -r rm -f
   when: crowdsec_stat.stat.exists

@@ -11,7 +11,7 @@
 
 - name: Find latest acme backup
   ansible.builtin.find:
-    paths: /srv/backups/
+    paths: "{{ traefik_backup_dir }}"
     patterns: "acme_*.json.enc"
     file_type: file
   register: backup_files_acme
@@ -58,7 +58,7 @@
   delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
-    ls -1t /srv/backups/acme-dns_*.tar.gz.enc 2>/dev/null | head -n 1 || true
+    ls -1t {{ traefik_backup_dir }}/acme-dns_*.tar.gz.enc 2>/dev/null | head -n 1 || true
   register: latest_backup_acme_dns
 
 - name: Set fact - acme-dns backup exists
@@ -130,7 +130,7 @@
   delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
-    ls -1t /srv/backups/crowdsec_*.tar.gz.enc 2>/dev/null | head -n 1 || true
+    ls -1t {{ traefik_backup_dir }}/crowdsec_*.tar.gz.enc 2>/dev/null | head -n 1 || true
   register: latest_backup_crowdsec
 
 - name: Set fact - crowdsec backup exists

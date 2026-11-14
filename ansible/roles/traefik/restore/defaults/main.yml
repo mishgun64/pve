@@ -1,0 +1,4 @@
+---
+
+traefik_backup_dir: /srv/backups/traefik
+traefik_backup_keep: 5

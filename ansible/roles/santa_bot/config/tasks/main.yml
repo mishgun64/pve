@@ -66,6 +66,22 @@
     state: present
   when: santa_bot_git_dir.stat.exists
 
+- name: Normalize tracked file modes and ignore future mode drift
+  ansible.builtin.shell: |
+    cd "{{ santa_bot_dir }}"
+    # An old role version applied "mode: 0755" with "recurse: true" to data/,
+    # turning the tracked data/*.json files into 0755. Git reports that as a
+    # local modification and the clone below fails with
+    # "Local modifications exist in the destination". Restore the git-recorded
+    # modes (content is left untouched), then stop chmod drift from ever
+    # marking the tree dirty again.
+    git ls-files -s | awk '$1 ~ /^100/ {print $1, $4}' | while read -r mode path; do
+      chmod "${mode#100}" "$path"
+    done
+    git config core.fileMode false
+  changed_when: false
+  when: santa_bot_git_dir.stat.exists
+
 - name: Clone Santa Bobot repository
   ansible.builtin.git:
     repo: "{{ santa_bot_repo }}"

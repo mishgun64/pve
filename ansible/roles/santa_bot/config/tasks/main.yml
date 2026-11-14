@@ -47,6 +47,12 @@
 
 #--------------------------Bot source code----------------------------------
 
+- name: Trust docker-owned repo directory for root git
+  ansible.builtin.shell: |
+    git config --global --get-all safe.directory | grep -qx "{{ santa_bot_dir }}" || \
+      git config --global --add safe.directory "{{ santa_bot_dir }}"
+  changed_when: false
+
 - name: Clone Santa Bobot repository
   ansible.builtin.git:
     repo: "{{ santa_bot_repo }}"

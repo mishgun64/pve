@@ -1,5 +1,6 @@
 ---
 
 santa_bot_dir: "/home/docker/santa_bot"
+santa_bot_results_file: "{{ santa_bot_dir }}/data/results.json"
 santa_bot_compose_dir: "/home/docker"
 santa_bot_backup_dir: "/srv/backups/santa_bot"

@@ -8,11 +8,20 @@ inside a Docker container on LXC 148 (`santa-bot`, `192.168.2.11`).
 | Role | Purpose |
 |---|---|
 | `santa_bot/config` | Clone the repo, deploy `data/secrets.json`, build & start the container |
-| `santa_bot/backup` | Archive `data/` to the control node (`/srv/backups/santa_bot`) |
+| `santa_bot/backup` | Archive `data/results.json` to the control node (`/srv/backups/santa_bot`) |
 | `santa_bot/restore` | Restore the latest archive from the control node |
 
 `config/tasks/secrets.yml` is shared by `config` and `restore`, because
 `data/secrets.json` is deliberately excluded from backups.
+
+## Backup contents
+
+Backups archive only `data/results.json`, the results file the bot writes when
+an admin presses "Запись результатов". `data/secrets.json` (bot token) and
+`data/users.json` (shipped by the repository) are not archived. The archive
+keeps the member path `data/results.json`, so `santa_bot/restore` unpacks it
+into `{{ santa_bot_dir }}/` unchanged. If `data/results.json` does not exist,
+the backup role skips the run and prints a debug message instead.
 
 ## Bot token
 

@@ -7,19 +7,19 @@
     name: docker
     shell: /bin/bash
 
-#------------------------------------------Check directory------------------------------------------
+#------------------------------------------Check results file------------------------------------------
 
-- name: Check bot data directory
+- name: Check bot results file
   ansible.builtin.stat:
-    path: "{{ santa_bot_dir }}/data"
-  register: santa_bot_data_dir
+    path: "{{ santa_bot_results_file }}"
+  register: santa_bot_results_stat
 
 #------------------------------------------Generate timestamp------------------------------------------
 
 - name: Set timestamp
   ansible.builtin.set_fact:
     backup_time: "{{ ansible_facts['date_time']['year'] }}.{{ ansible_facts['date_time']['month'] }}.{{ ansible_facts['date_time']['day'] }}_{{ ansible_facts['date_time']['hour'] }}.{{ ansible_facts['date_time']['minute'] }}.{{ ansible_facts['date_time']['second'] }}"
-  when: santa_bot_data_dir.stat.exists
+  when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Create backup dir------------------------------------------
 
@@ -29,15 +29,19 @@
     state: directory
     mode: '0755'
   delegate_to: control_node
-  when: santa_bot_data_dir.stat.exists
+  when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Archive------------------------------------------
+# Only data/results.json (written by the bot on "Запись результатов") is archived.
+# data/secrets.json (bot token) and data/users.json (shipped by the repository)
+# are not part of the backup; secrets.json is recreated by santa_bot/config.
 
-- name: Archive bot data (secret token is excluded)
+- name: Archive bot results file
   ansible.builtin.shell: >
     tar -czf /home/docker/santa_bot_{{ backup_time }}.tar.gz
-    -C {{ santa_bot_dir }} --exclude=data/secrets.json data
-  when: santa_bot_data_dir.stat.exists
+    -C {{ santa_bot_dir }} data/results.json
+  changed_when: true
+  when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Fetch------------------------------------------
 
@@ -46,7 +50,7 @@
     src: "/home/docker/santa_bot_{{ backup_time }}.tar.gz"
     dest: "/tmp/"
     flat: true
-  when: santa_bot_data_dir.stat.exists
+  when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Copy to control node------------------------------------------
 
@@ -56,14 +60,26 @@
     dest: "{{ santa_bot_backup_dir }}/santa_bot_{{ backup_time }}.tar.gz"
     mode: '0644'
   delegate_to: control_node
-  when: santa_bot_data_dir.stat.exists
+  when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Cleanup------------------------------------------
 
-- name: Cleanup remote files
+- name: Cleanup remote archive
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "/home/docker/santa_bot_{{ backup_time }}.tar.gz"
     state: absent
-  loop:
-    - "/home/docker/santa_bot_{{ backup_time }}.tar.gz"
-  when: santa_bot_data_dir.stat.exists
+  when: santa_bot_results_stat.stat.exists
+
+- name: Cleanup fetched backup on CI container
+  ansible.builtin.file:
+    path: "/tmp/santa_bot_{{ backup_time }}.tar.gz"
+    state: absent
+  delegate_to: localhost
+  when: santa_bot_results_stat.stat.exists
+
+#------------------------------------------Nothing to do------------------------------------------
+
+- name: Report missing results file
+  ansible.builtin.debug:
+    msg: "{{ santa_bot_results_file }} not found, nothing to back up - backup skipped"
+  when: not santa_bot_results_stat.stat.exists

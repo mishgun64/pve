@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Ежедневный бэкап Woodpecker CI на Google Drive (перезапись одного файла).
-# Шифрование sops + age, ключ root хранится на этом же хосте.
+# Шифрование sops + age, в качестве age-ключа используется SSH-ключ root
+# (/root/.ssh/id_ed25519).
 # Запуск: sudo /root/backup-woodpecker.sh (cron: 0 3 * * *)
 set -euo pipefail
 
@@ -13,7 +14,8 @@ AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RCLONE_REMOTE="gdrive:"
 RCLONE_BACKUP_DIR="woodpecker"
 BACKUP_NAME="woodpecker_backup"
-AGE_KEY_FILE="/root/.config/sops/age/keys.txt"
+SSH_KEY_FILE="/root/.ssh/id_ed25519"
+SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
 
 REMOTE_FILE="${RCLONE_REMOTE}${RCLONE_BACKUP_DIR}/${BACKUP_NAME}.tar.gz.enc"
 
@@ -35,31 +37,29 @@ trap 'rm -rf "$STAGING"' EXIT
 
 log "Старт бэкапа Woodpecker (staging: $STAGING)"
 
-# --------------------------------------------------------------- age key ---
-if [[ ! -f "$AGE_KEY_FILE" ]]; then
-    log "age-ключа нет, генерирую новый: $AGE_KEY_FILE"
+# ------------------------------------------------------- age (SSH) key ---
+# sops принимает SSH-публичный ключ ed25519 как age-получателя,
+# а приватный SSH-ключ root используется для расшифровки.
+[[ -f "$SSH_KEY_FILE" ]] ||
+    fail "Нет SSH-ключа $SSH_KEY_FILE (он же age-ключ для sops)"
 
-    mkdir -p "$(dirname "$AGE_KEY_FILE")"
-    chmod 700 "$(dirname "$AGE_KEY_FILE")"
+chmod 600 "$SSH_KEY_FILE"
+chown root:root "$SSH_KEY_FILE"
 
-    age-keygen -o "$AGE_KEY_FILE"
-
-    chmod 600 "$AGE_KEY_FILE"
-    chown root:root "$AGE_KEY_FILE"
-
-    PUB_KEY="$(age-keygen -y "$AGE_KEY_FILE")"
-
-    log "Сгенерирован age-ключ, публичный: $PUB_KEY"
-    log "ВНИМАНИЕ: сохрани приватный ключ $AGE_KEY_FILE в надёжном месте."
-    log "Без него бэкап на Drive не расшифровать."
+# Публичный ключ: берём готовый .pub либо выводим из приватного
+if [[ -s "$SSH_PUB_FILE" ]]; then
+    RECIPIENT="$(awk 'NR==1 {print $1" "$2}' "$SSH_PUB_FILE")"
 else
-    chmod 600 "$AGE_KEY_FILE"
-    chown root:root "$AGE_KEY_FILE"
+    RECIPIENT="$(ssh-keygen -y -f "$SSH_KEY_FILE" | awk 'NR==1 {print $1" "$2}')"
 
-    PUB_KEY="$(age-keygen -y "$AGE_KEY_FILE")"
-
-    log "Использую age-ключ $AGE_KEY_FILE (публичный: $PUB_KEY)"
+    printf '%s\n' "$RECIPIENT" > "$SSH_PUB_FILE"
+    chmod 644 "$SSH_PUB_FILE"
 fi
+
+[[ "$RECIPIENT" == ssh-* ]] ||
+    fail "Не удалось получить SSH-публичный ключ из $SSH_KEY_FILE"
+
+log "Использую age-получателя (SSH-ключ root): $RECIPIENT"
 
 # ------------------------------------------------------------- конфигурация ---
 [[ -f "$WP_DIR/docker-compose.yml" ]] || fail "Нет $WP_DIR/docker-compose.yml"
@@ -105,9 +105,9 @@ log "Собираю общий архив $BACKUP_NAME.tar.gz"
 tar czf "$STAGING/$BACKUP_NAME.tar.gz" -C "$STAGING" "${ARCHIVE_FILES[@]}"
 
 # --------------------------------------------------------------- шифрование ---
-log "Шифрую sops + age"
+log "Шифрую sops + age (SSH-ключ root)"
 
-SOPS_AGE_RECIPIENTS="$PUB_KEY" sops -e \
+SOPS_AGE_RECIPIENTS="$RECIPIENT" sops -e \
     --input-type binary \
     --output-type binary \
     "$STAGING/$BACKUP_NAME.tar.gz" \

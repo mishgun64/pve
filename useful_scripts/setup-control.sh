@@ -12,7 +12,8 @@ SOPS_URL="https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3
 RCLONE_REMOTE="gdrive:"
 RCLONE_BACKUP_DIR="woodpecker"
 BACKUP_NAME="woodpecker_backup"
-AGE_KEY_FILE="/root/.config/sops/age/keys.txt"
+SSH_KEY_FILE="/root/.ssh/id_ed25519"
+SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts"
@@ -34,10 +35,10 @@ if [[ "$ARCH" != "amd64" ]]; then
 fi
 
 # --------------------------------------------------------------- SSH key ---
-log "Настройка SSH ключа"
+log "Настройка SSH ключа (он же age-ключ для sops)"
 
 SSH_DIR="/root/.ssh"
-SSH_KEY="$SSH_DIR/id_ed25519"
+SSH_KEY="$SSH_KEY_FILE"
 
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
@@ -97,6 +98,27 @@ else
 
     echo "SSH ключ сохранён: $SSH_KEY"
 fi
+
+# Публичный ключ нужен sops как age-получатель
+if [[ -s "$SSH_PUB_FILE" ]]; then
+    chmod 644 "$SSH_PUB_FILE"
+else
+    ssh-keygen -y -f "$SSH_KEY" > "$SSH_PUB_FILE"
+    chmod 644 "$SSH_PUB_FILE"
+fi
+
+AGE_RECIPIENT="$(awk 'NR==1 {print $1" "$2}' "$SSH_PUB_FILE")"
+
+if [[ "$AGE_RECIPIENT" != ssh-* ]]; then
+    echo "Не удалось получить SSH-публичный ключ из $SSH_KEY" >&2
+    exit 1
+fi
+
+echo "SSH файлы:"
+ls -l "$SSH_KEY" "$SSH_PUB_FILE"
+echo ""
+echo "age-получатель (SSH-ключ root):"
+echo "  $AGE_RECIPIENT"
 
 # ---------------------------------------------------------------- .bashrc ---
 add_aliases() {
@@ -197,61 +219,24 @@ else
     echo "Remote '$RCLONE_REMOTE' найден."
 fi
 
-# --------------------------------------------------------------- age key ---
-log "Настройка age-ключа для sops"
+# --------------------------------------------------- age = root SSH key ---
+log "age для sops: используется SSH-ключ root"
 
-AGE_KEY_DIR="$(dirname "$AGE_KEY_FILE")"
-
-mkdir -p "$AGE_KEY_DIR"
-chmod 700 "$AGE_KEY_DIR"
-
-if [[ -f "$AGE_KEY_FILE" ]]; then
-    echo "age-ключ уже существует: $AGE_KEY_FILE"
-
-    chmod 600 "$AGE_KEY_FILE"
-    chown root:root "$AGE_KEY_FILE"
-else
-    echo "age-ключа нет. Варианты:"
-    echo "  (i) вставить существующий приватный age-ключ (нужен для расшифровки бэкапа)"
-    echo "  (g) сгенерировать новый age-ключ"
-    echo ""
-
-    read -rp "Выбор [i/g]: " AGE_CHOICE </dev/tty
-
-    case "$AGE_CHOICE" in
-        i|I)
-            echo ""
-            echo "Вставь приватный age-ключ (строка AGE-SECRET-KEY-1...)."
-            echo "После последней строки нажми Enter, затем Ctrl+D."
-            echo ""
-
-            AGE_KEY_CONTENT="$(cat </dev/tty)"
-
-            if ! grep -qE '^AGE-SECRET-KEY-1' <<< "$AGE_KEY_CONTENT"; then
-                echo "Не найдена строка AGE-SECRET-KEY-1..., это не приватный age-ключ." >&2
-                exit 1
-            fi
-
-            printf '%s\n' "$AGE_KEY_CONTENT" > "$AGE_KEY_FILE"
-
-            echo "age-ключ сохранён: $AGE_KEY_FILE"
-            ;;
-        *)
-            age-keygen -o "$AGE_KEY_FILE"
-
-            echo ""
-            echo "Сгенерирован новый age-ключ: $AGE_KEY_FILE"
-            echo "ВНИМАНИЕ: сохрани приватный ключ в надёжном месте."
-            echo "Без него бэкап Woodpecker на Drive не расшифровать."
-            ;;
-    esac
-
-    chmod 600 "$AGE_KEY_FILE"
-    chown root:root "$AGE_KEY_FILE"
+if [[ ! -f "$SSH_KEY_FILE" ]]; then
+    echo "Нет SSH-ключа $SSH_KEY_FILE (он же age-ключ)." >&2
+    exit 1
 fi
 
-echo "Публичный ключ (recipient для шифрования):"
-age-keygen -y "$AGE_KEY_FILE"
+chmod 600 "$SSH_KEY_FILE"
+chown root:root "$SSH_KEY_FILE"
+
+echo "Приватный ключ (для расшифровки бэкапа): $SSH_KEY_FILE"
+echo "Публичный ключ (age-получатель для шифрования): $SSH_PUB_FILE"
+echo "  $AGE_RECIPIENT"
+echo ""
+echo "sops использует:"
+echo "  шифрование:  SOPS_AGE_RECIPIENTS='<ssh-ed25519 ...>'"
+echo "  расшифровка: SOPS_AGE_SSH_PRIVATE_KEY_FILE=$SSH_KEY_FILE"
 
 # ---------------------------------------------------------------- docker ---
 log "Установка Docker"
@@ -326,7 +311,7 @@ if [[ "$RESTORE_ANSWER" =~ ^[Yy]$ ]]; then
         "$BACKUP_REMOTE_PATH" \
         "$RESTORE_DIR/${BACKUP_NAME}.tar.gz.enc"
 
-    SOPS_AGE_KEY_FILE="$AGE_KEY_FILE" sops -d \
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE="$SSH_KEY_FILE" sops -d \
         --input-type binary \
         --output-type binary \
         "$RESTORE_DIR/${BACKUP_NAME}.tar.gz.enc" \
@@ -558,8 +543,8 @@ echo "rclone remotes:"
 rclone listremotes || true
 
 echo ""
-echo "age public key:"
-age-keygen -y "$AGE_KEY_FILE"
+echo "age recipient (SSH-ключ root):"
+echo "  $AGE_RECIPIENT"
 
 echo ""
 echo "cron:"

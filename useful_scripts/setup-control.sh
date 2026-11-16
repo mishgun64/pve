@@ -27,6 +27,10 @@ PI_WEB_HOST=""
 PI_WEB_DIR="/opt/pi-web"
 PI_WEB_BIN="$PI_WEB_DIR/node_modules/.bin/pi-web"
 PI_WEB_PKG="@agegr/pi-web"
+# Имена, по которым к Pi Web обращаются снаружи (reverse proxy).
+# Нужны, когда Host за прокси не совпадает с адресом бинда: иначе POST-запросы
+# получают 403 «Untrusted API request». Пусто — спросить.
+PI_WEB_ALLOWED_HOSTS=""
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts"
@@ -568,6 +572,21 @@ if [[ -z "$PI_WEB_HOST" ]]; then
     esac
 fi
 
+# Домены, по которым Pi Web открывают снаружи. Pi Web пускает Host, только если
+# это localhost, IP-литерал или значение из PI_WEB_ALLOWED_HOSTS; домен за
+# reverse proxy без этой настройки даёт 403 «Untrusted API request» на всех POST.
+if [[ -z "$PI_WEB_ALLOWED_HOSTS" ]]; then
+    echo ""
+    echo "Pi Web будет открываться по домену через reverse proxy (traefik/nginx)?"
+    echo "Если да — перечисли домены через запятую (например: pi.example.com)."
+    echo "Enter — без домена (доступ только по IP/loopback)."
+
+    read -rp "Домены: " PI_WEB_ALLOWED_HOSTS </dev/tty || PI_WEB_ALLOWED_HOSTS=""
+fi
+
+# Нормализуем: без пробелов вокруг элементов.
+PI_WEB_ALLOWED_HOSTS="$(tr -d ' ' <<< "$PI_WEB_ALLOWED_HOSTS")"
+
 echo ""
 echo "Pi Web ставится в $PI_WEB_DIR и работает от пользователя $USER_NAME."
 echo "Адрес: http://$PI_WEB_HOST:$PI_WEB_PORT"
@@ -671,9 +690,16 @@ Environment=HOME=/home/$USER_NAME
 Environment=NODE_ENV=production
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=PI_WEB_NO_OPEN=1
-Environment=PI_WEB_PORT=$PI_WEB_PORT
+Environment=PORT=$PI_WEB_PORT
 Environment=PI_WEB_HOSTNAME=$PI_WEB_HOST
 EOF
+
+        # PI Web читает порт из PORT (PI_WEB_PORT он не знает), а домены за
+        # reverse proxy — из PI_WEB_ALLOWED_HOSTS; без них все POST дают 403.
+        if [[ -n "$PI_WEB_ALLOWED_HOSTS" ]]; then
+            printf 'Environment=PI_WEB_ALLOWED_HOSTS=%s
+' "$PI_WEB_ALLOWED_HOSTS"
+        fi
 
         # EnvironmentFile читается systemd от root; пароль в юнит не попадает.
         if [[ -n "$PI_WEB_PASSWORD" ]]; then

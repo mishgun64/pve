@@ -224,6 +224,22 @@ else
     fail 'setup-control.sh: нет автоопределения LAN-адреса'
 fi
 
+# Pi Web читает порт из PORT; PI_WEB_PORT он игнорирует (иначе слушает 30141
+# независимо от настроек). Домены за reverse proxy идут в PI_WEB_ALLOWED_HOSTS.
+if grep -q '^Environment=PORT=\$PI_WEB_PORT$' "$SETUP_SCRIPT" &&
+    ! grep -q '^Environment=PI_WEB_PORT=' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: порт Pi Web передаётся через PORT'
+else
+    fail 'setup-control.sh: порт Pi Web не через PORT (PI_WEB_PORT игнорируется)'
+fi
+
+if grep -q 'PI_WEB_ALLOWED_HOSTS' "$SETUP_SCRIPT" &&
+    grep -q 'Untrusted API request' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: домены reverse proxy попадают в PI_WEB_ALLOWED_HOSTS'
+else
+    fail 'setup-control.sh: нет PI_WEB_ALLOWED_HOSTS для домена за прокси'
+fi
+
 # system-level unit от pi, а не per-user сервисы.
 if grep -q '/etc/systemd/system/pi-web.service' "$SETUP_SCRIPT" &&
     grep -q 'systemctl enable --now pi-web' "$SETUP_SCRIPT"; then

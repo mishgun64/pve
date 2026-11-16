@@ -168,11 +168,10 @@ else
     fail 'setup-control.sh: скачивание Node.js без проверки sha256'
 fi
 
-if grep -q '@jmfederico/pi-web' "$SETUP_SCRIPT" &&
-    grep -q 'pi-web install' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: PI WEB ставится через @jmfederico/pi-web + pi-web install'
+if grep -q '@agegr/pi-web' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: Pi Web ставится из @agegr/pi-web'
 else
-    fail 'setup-control.sh: нет установки @jmfederico/pi-web / pi-web install'
+    fail 'setup-control.sh: нет установки @agegr/pi-web'
 fi
 
 if grep -q -- '--allow-scripts=node-pty' "$SETUP_SCRIPT"; then
@@ -181,54 +180,66 @@ else
     fail 'setup-control.sh: нет --allow-scripts=node-pty'
 fi
 
-# Per-user systemd-сервисы требуют user-контекста и linger.
-if grep -q 'XDG_RUNTIME_DIR="/run/user/' "$SETUP_SCRIPT" &&
-    grep -q 'DBUS_SESSION_BUS_ADDRESS=' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: pi-web install запускается в user-контексте systemd'
+# Отдельный каталог: бинарник pi-web не должен затирать другие реализации.
+if grep -q 'PI_WEB_DIR="/opt/pi-web"' "$SETUP_SCRIPT" &&
+    grep -q 'PI_WEB_BIN="\$PI_WEB_DIR/node_modules/.bin/pi-web"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: Pi Web ставится в отдельный каталог /opt/pi-web'
 else
-    fail 'setup-control.sh: нет XDG_RUNTIME_DIR/DBUS_SESSION_BUS_ADDRESS'
+    fail 'setup-control.sh: Pi Web не в отдельном каталоге'
 fi
 
-if grep -q 'enable-linger' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: включён linger для pi'
+# Пароль обязателен при бинде наружу и не должен попадать в unit-файл.
+if grep -q 'PI_WEB_PASS_FILE=' "$SETUP_SCRIPT" &&
+    grep -q 'EnvironmentFile=' "$SETUP_SCRIPT" &&
+    ! grep -qE '^Environment=PI_WEB_PASSWORD=' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: пароль Pi Web хранится в файле, а не в юните'
 else
-    fail 'setup-control.sh: нет loginctl enable-linger'
+    fail 'setup-control.sh: пароль Pi Web не отделён от unit-файла'
 fi
 
-# Сервисы используют login shell (-lc) — PATH обязан быть в .profile, а не в .bashrc.
-if grep -q 'PI_WEB_PROFILE="\$PI_WEB_USER_HOME/.profile"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: PATH для сервисов пишется в .profile'
+if grep -q 'PI_WEB_PASSWORD" > "\$PI_WEB_PASS_FILE"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: пароль записывается в файл'
 else
-    fail 'setup-control.sh: PATH для сервисов не в .profile'
+    fail 'setup-control.sh: пароль не записывается в файл'
 fi
 
-# PI WEB без авторизации — нельзя биндиться на 0.0.0.0, адрес выбирается интерактивно.
+if grep -q 'umask 077' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: umask 077 перед записью пароля'
+else
+    fail 'setup-control.sh: нет umask 077 для файла пароля'
+fi
+
+# Адрес выбирается интерактивно; 0.0.0.0 не используется.
 if grep -q 'PI_WEB_HOST=""' "$SETUP_SCRIPT" &&
     grep -q 'LAN-адрес этой машины' "$SETUP_SCRIPT" &&
     ! grep -qE 'PI_WEB_HOST="0\.0\.0\.0"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: адрес PI WEB выбирается (LAN/loopback), 0.0.0.0 не используется'
+    pass 'setup-control.sh: адрес Pi Web выбирается (LAN/loopback), 0.0.0.0 не используется'
 else
-    fail 'setup-control.sh: нет выбора адреса PI WEB или есть 0.0.0.0'
+    fail 'setup-control.sh: нет выбора адреса Pi Web или есть 0.0.0.0'
 fi
 
-# LAN-адрес в скрипте определяется автоматически.
 if grep -q 'ip -4 route get' "$SETUP_SCRIPT"; then
     pass 'setup-control.sh: LAN-адрес определяется автоматически'
 else
     fail 'setup-control.sh: нет автоопределения LAN-адреса'
 fi
 
-# Старый вариант (ravshansbox/pi-web) не должен остаться.
-if grep -q 'ravshansbox\|/opt/pi-web' "$SETUP_SCRIPT"; then
-    fail 'setup-control.sh: остались следы ravshansbox/pi-web или /opt/pi-web'
+# system-level unit от pi, а не per-user сервисы.
+if grep -q '/etc/systemd/system/pi-web.service' "$SETUP_SCRIPT" &&
+    grep -q 'systemctl enable --now pi-web' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: Pi Web запускается systemd-сервисом'
 else
-    pass 'setup-control.sh: нет ravshansbox/pi-web и /opt/pi-web'
+    fail 'setup-control.sh: нет systemd-юнита для Pi Web'
 fi
 
-check_order "$SETUP_SCRIPT" \
-    'npm install -g --ignore-scripts' \
-    'pi_web_as_user "pi-web install' \
-    'setup-control.sh: pi agent ставится раньше PI WEB'
+# Следы предыдущего варианта (jmfederico/pi-web) не должны остаться.
+if grep -q 'jmfederico\|pi_web_as_user\|enable-linger\|pi-web-sessiond' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: остались следы jmfederico/pi-web'
+else
+    pass 'setup-control.sh: нет следов jmfederico/pi-web'
+fi
+
+check_order "$SETUP_SCRIPT" \n    'npm install -g --ignore-scripts' \n    'PI_WEB_PKG@latest' \n    'setup-control.sh: pi agent ставится раньше Pi Web'
 
 # --- 8. загрузка с ретраями, а не с жёсткими таймаутами ---------------------
 if grep -q 'rclone copyto' "$BACKUP_SCRIPT" &&

@@ -47,22 +47,19 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
 - Пароли `root` и `pi` задаются интерактивно (дважды, без эха). Пароль передаётся только через stdin `chpasswd` — в аргументах командной строки его нет.
 - Все пользователи, которые могут залогиниться (UID 0 или 1000–60000 и реальный shell), кроме `root` и `pi`, показываются списком с запросом подтверждения и затем удаляются (`pkill -KILL -u` + `userdel --remove`, при неудаче — `userdel` без домашнего каталога).
 
-## pi agent и PI WEB
+## pi agent и Pi Web
 
 - **pi agent**: требует Node.js ≥ 22.19. Если подходящего Node нет, ставится официальный бинарный дистрибутив с `nodejs.org` (latest-v22.x) в `/usr/local` с обязательной проверкой `sha256sum`; затем `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`. Если `pi` уже стоит — предлагается `pi update`. Официальный `https://pi.dev/install.sh` не используется: он интерактивен и без tty не умеет ставить Node.
-- **PI WEB** — [jmfederico/pi-web](https://github.com/jmfederico/pi-web) (пакет `@jmfederico/pi-web`):
-  - ставится глобально: `npm install -g --allow-scripts=node-pty @jmfederico/pi-web@latest` (`--allow-scripts=node-pty` разрешает install-скрипт только `node-pty`, нужный для терминалов; на npm < 12 флага нет — там скрипты разрешены по умолчанию). На Linux `node-pty` собирается из исходников, поэтому дополнительно ставится `build-essential python3`.
-  - регистрируется не вручную, а своим CLI: `pi-web install --host <адрес> --port 8504`. Он создаёт **два per-user systemd-сервиса** — `pi-web.service` (web/API) и `pi-web-sessiond.service` (долгоживущие сессии).
-  - всё выполняется от пользователя `pi` в его user-контексте (`XDG_RUNTIME_DIR=/run/user/<uid>`, `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/<uid>/bus`, `bash -lc`) — без этого `systemctl --user` не работает. Дополнительно включается `loginctl enable-linger pi`, чтобы сервисы жили после логаута и перезагрузки.
-  - `PATH` с глобальным npm-prefix дописывается в `/home/pi/.profile` (не в `.bashrc`): сервисы запускаются через `-lc` и `.bashrc` не читают. Без этого `pi-web` не найдёт `pi`, SDK которого он переиспользует.
-  - Встроенной авторизации нет (README проекта: «Do not expose PI WEB directly to the public internet»). Адрес спрашивается при установке: по умолчанию LAN-адрес машины (определяется через `ip route get 1.1.1.1`), либо `127.0.0.1` — для доступа через SSH-туннель. `0.0.0.0` не предлагается и не используется.
-  - **Важно:** доступ к порту = shell от `pi`, а `pi` есть в sudoers с `NOPASSWD`. Для доступа извне — Tailscale/VPN/reverse-proxy с авторизацией.
+- **Pi Web** — [agegr/pi-web](https://github.com/agegr/pi-web) (пакет `@agegr/pi-web`):
+  - ставится не глобально, а в отдельный каталог `/opt/pi-web` (`npm install --omit=dev --allow-scripts=node-pty @agegr/pi-web@latest` от `pi`). Отдельный каталог нужен потому, что пакет предоставляет бинарник `pi-web`, и глобальная установка конфликтует с другими реализациями того же имени. `--allow-scripts=node-pty` разрешает install-скрипт только `node-pty` (на npm < 12 флага нет — там скрипты разрешены по умолчанию). На Linux `node-pty` собирается из исходников, поэтому дополнительно ставится `build-essential python3`; после установки скрипт проверяет, что модуль загружается.
+  - запускается **system-level** юнитом `/etc/systemd/system/pi-web.service` (`User=pi`, `WorkingDirectory=/opt/pi-web`, `Restart=on-failure`, `enable --now`). Своего установщика сервисов у Pi Web нет, поэтому unit пишется скриптом.
+  - адрес выбирается интерактивно: LAN-адрес машины (определяется через `ip route get 1.1.1.1`, по умолчанию) или `127.0.0.1` для доступа только через SSH-туннель. `0.0.0.0` не используется — бинд на конкретный интерфейс держит порт вне других сетей.
+  - при бинде на не-loopback адрес включается **пароль**: `PI_WEB_PASSWORD` (логин `pi` / пароль, плюс Basic Auth для API). Пароль спрашивается без эха, Enter — сгенерировать случайный, и хранится в `/home/pi/.config/pi-web/password` (`0600`). В юнит пароль не попадает: он лежит в `/home/pi/.config/pi-web/service.env` (`0600`), подключаемом через `EnvironmentFile=`.
+  - **Важно:** даже с паролем пароль и трафик по HTTP не шифруются — только доверенная LAN, VPN или HTTPS reverse proxy. Доступ к порту = shell от `pi`, а у `pi` sudo без пароля.
   - Если выбрано `127.0.0.1`, работать с любой машины так:
-    `ssh -N -L 8504:127.0.0.1:8504 pi@<host>`, затем `http://127.0.0.1:8504`.
-  - Сменить адрес потом: `~/.config/pi-web/config.json` → `"host"`, затем `systemctl --user restart pi-web` (от `pi`). `pi-web install` перезапишет конфиг указанным `--host`.
-  - Управление: `sudo -u pi -i pi-web status|logs|restart|update|doctor`. Если `pi-web install` не смог поднять user-сервисы, установка не валится — печатаются команды для ручного повтора `pi-web doctor` /
-    `pi-web install`, а в финале отражается только факт наличия `pi-web`.
-  - Порт/хост вынесены в `PI_WEB_HOST`/`PI_WEB_PORT` (пустой `PI_WEB_HOST` = спросить), пакет — в `PI_WEB_NPM_PACKAGE`.
+    `ssh -N -L 30141:127.0.0.1:30141 pi@<host>`, затем `http://127.0.0.1:30141`.
+  - Управление: `systemctl status|restart pi-web`, логи — `journalctl -u pi-web -f`. Сменить адрес/порт: поправить `Environment=PI_WEB_HOSTNAME`/`PI_WEB_PORT` в юните и `systemctl daemon-reload && systemctl restart pi-web`.
+  - Порт/хост/каталог/пакет вынесены в `PI_WEB_PORT`, `PI_WEB_HOST` (пустой = спросить), `PI_WEB_DIR`, `PI_WEB_BIN`, `PI_WEB_PKG`.
 
 ## Проверки
 

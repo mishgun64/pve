@@ -20,11 +20,13 @@ RCLONE_TRANSFER_ARGS=(--retries 3 --low-level-retries 10 --contimeout 30s --time
 BACKUP_NAME="woodpecker_backup"
 SSH_KEY_FILE="/root/.ssh/id_ed25519"
 SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
-PI_WEB_PORT=8504
+PI_WEB_PORT=30141
 # Пусто = спросить (по умолчанию предлагается LAN-адрес машины).
 # Значения: 127.0.0.1 (только локально) или конкретный LAN-IP.
 PI_WEB_HOST=""
-PI_WEB_NPM_PACKAGE="@jmfederico/pi-web@latest"
+PI_WEB_DIR="/opt/pi-web"
+PI_WEB_BIN="$PI_WEB_DIR/node_modules/.bin/pi-web"
+PI_WEB_PKG="@agegr/pi-web"
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts"
@@ -522,22 +524,20 @@ echo "pi: $(command -v pi) ($(pi --version 2>/dev/null || echo '?'))"
 echo "node: $(node --version)"
 
 # -------------------------------------------------------- pi web ui ---
-log "Установка PI WEB (https://github.com/jmfederico/pi-web)"
+log "Установка Pi Web (https://github.com/agegr/pi-web)"
 
-# Адрес, на котором слушает PI WEB.
-# Встроенной авторизации нет, поэтому 0.0.0.0 не предлагаем: либо loopback
-# (доступ только через ssh-туннель), либо конкретный LAN-IP.
-PI_WEB_LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null |\
+# Pi Web слушает loopback по умолчанию. Наружу — только вместе с паролем:
+# без пароля доступ к порту = shell от $USER_NAME с sudo без пароля.
+PI_WEB_LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null |
     awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
 
 if [[ -z "$PI_WEB_HOST" ]]; then
     echo ""
-    echo "На каком адресе слушать PI WEB?"
+    echo "На каком адресе слушать Pi Web?"
     echo "  1) LAN-адрес этой машины — доступ с других хостов сети (по умолчанию)"
     echo "  2) 127.0.0.1 — только локально/через ssh-туннель"
     echo ""
-    echo "У PI WEB НЕТ авторизации: доступ к порту = shell от $USER_NAME,"
-    echo "а у $USER_NAME есть sudo без пароля. Во внешнюю сеть так не выставляй."
+    echo "При доступе по сети Pi Web будет требовать пароль (вход: pi / пароль)."
     echo ""
 
     if [[ -n "$PI_WEB_LAN_IP" ]]; then
@@ -561,7 +561,7 @@ if [[ -z "$PI_WEB_HOST" ]]; then
             fi
             ;;
         *)
-            # Разрешаем ввести адрес вручную — вдруг нужен другой интерфейс.
+            # Другой интерфейс: разрешаем ввести адрес вручную.
             PI_WEB_HOST="$PI_WEB_HOST_CHOICE"
             echo "Использую введённый адрес: $PI_WEB_HOST"
             ;;
@@ -569,146 +569,155 @@ if [[ -z "$PI_WEB_HOST" ]]; then
 fi
 
 echo ""
-echo "PI WEB ставится пакетом @jmfederico/pi-web и работает от пользователя $USER_NAME."
-echo "Он ставит ДВА per-user сервиса (pi-web.service + pi-web-sessiond.service) и"
-echo "слушает $PI_WEB_HOST:$PI_WEB_PORT."
-
+echo "Pi Web ставится в $PI_WEB_DIR и работает от пользователя $USER_NAME."
+echo "Адрес: http://$PI_WEB_HOST:$PI_WEB_PORT"
 echo ""
 
-read -rp "Установить PI WEB? [Y/n]: " INSTALL_PI_WEB </dev/tty || INSTALL_PI_WEB="y"
+read -rp "Установить Pi Web? [Y/n]: " INSTALL_PI_WEB </dev/tty || INSTALL_PI_WEB="y"
 
 if [[ "$INSTALL_PI_WEB" =~ ^[NnНн]$ ]]; then
-    echo "Установка PI WEB пропущена"
+    echo "Установка Pi Web пропущена"
 else
-    # node-pty (терминалы) на Linux собирается из исходников: нужен компилятор
-    # и python3, иначе сессионный демон поднимется без терминала.
+    # node-pty (терминалы в браузере) собирается из исходников: нужен компилятор.
     apt-get install -y build-essential python3
 
-    echo "Устанавливаю @jmfederico/pi-web глобально (npm prefix: $(npm prefix -g))"
+    # Отдельный каталог, а не глобальный npm prefix: пакет ставит бинарник
+    # `pi-web`, и глобальная установка конфликтует с другими реализациями.
+    install -d -m 0755 -o "$USER_NAME" -g "$USER_NAME" "$PI_WEB_DIR"
 
-    # --allow-scripts=node-pty: точечно разрешает install-скрипт только node-pty
-    # (нужен для нативной сборки). На npm < 12 флага нет, но и запрета нет —
-    # там скрипты выполняются по умолчанию.
-    if ! npm install -g --allow-scripts=node-pty "$PI_WEB_NPM_PACKAGE"; then
-        echo "ОШИБКА: npm install $PI_WEB_NPM_PACKAGE завершился с ошибкой" >&2
+    echo "Устанавливаю $PI_WEB_PKG@latest в $PI_WEB_DIR"
+
+    # --allow-scripts=node-pty: точечно разрешает install-скрипт только node-pty.
+    # На npm < 12 флага нет, но там скрипты и так разрешены.
+    if ! sudo -u "$USER_NAME" -H \
+        env PATH="/usr/local/bin:/usr/bin:/bin" \
+        sh -c "cd '$PI_WEB_DIR' && npm install --omit=dev --no-fund --no-audit \
+            --allow-scripts=node-pty '$PI_WEB_PKG@latest'"; then
+        echo "ОШИБКА: npm install $PI_WEB_PKG завершился с ошибкой" >&2
         exit 1
     fi
 
-    hash -r
-
-    if ! command -v pi-web >/dev/null 2>&1; then
-        echo "ОШИБКА: pi-web не найден в PATH после установки" >&2
+    if [[ ! -x "$PI_WEB_BIN" ]]; then
+        echo "ОШИБКА: не найден $PI_WEB_BIN после установки" >&2
         exit 1
     fi
 
-    echo "pi-web: $(command -v pi-web) ($(pi-web --version 2>/dev/null || echo '?'))"
+    echo "pi-web: $(sudo -u "$USER_NAME" -H "$PI_WEB_BIN" --version 2>/dev/null || echo '?')"
 
-    # pi-web install пишет per-user unit'ы и дёргает systemctl --user: нужен
-    # живой user-контекст systemd (XDG_RUNTIME_DIR + DBUS_SESSION_BUS_ADDRESS).
-    # Сервисы переживают логаут/перезагрузку только с linger.
-    PI_WEB_USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
-    PI_WEB_UID="$(id -u "$USER_NAME")"
-    NPM_GLOBAL_BIN="$(npm prefix -g)/bin"
-
-    # Сервисы запускаются через login shell (-lc), а -lc не читает .bashrc,
-    # поэтому PATH пишем в ~/.profile.
-    PI_WEB_PROFILE="$PI_WEB_USER_HOME/.profile"
-    PI_WEB_PATH_LINE="export PATH=\"$NPM_GLOBAL_BIN:\$PATH\""
-
-    touch "$PI_WEB_PROFILE"
-
-    if ! grep -qxF "$PI_WEB_PATH_LINE" "$PI_WEB_PROFILE"; then
-        printf '%s\n' "$PI_WEB_PATH_LINE" >> "$PI_WEB_PROFILE"
-        echo "PATH (pi, pi-web) добавлен в $PI_WEB_PROFILE"
+    # Проверка нативной сборки терминалов: без неё UI поднимется без терминала.
+    if ! sudo -u "$USER_NAME" -H node -e \
+        "require('$PI_WEB_DIR/node_modules/node-pty')" >/dev/null 2>&1; then
+        echo "ВНИМАНИЕ: node-pty не загружается — терминалы в UI будут недоступны." >&2
     fi
 
-    chown "$USER_NAME:$USER_NAME" "$PI_WEB_PROFILE"
+    # ----------------------------------------------------- пароль ---
+    # Пароль нужен при бинде на не-loopback. Храним в файле 0600, а не в юните:
+    # unit читается всеми, а пароль — нет.
+    PI_WEB_CONF_DIR="/home/$USER_NAME/.config/pi-web"
+    PI_WEB_PASS_FILE="$PI_WEB_CONF_DIR/password"
+    PI_WEB_ENV_FILE="$PI_WEB_CONF_DIR/service.env"
 
-    if command -v loginctl >/dev/null 2>&1; then
-        loginctl enable-linger "$USER_NAME" 2>/dev/null &&
-            echo "Включён linger для $USER_NAME (сервисы не зависят от ssh-сессии)"
+    install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$PI_WEB_CONF_DIR"
 
-        # linger поднимает user@UID.service и создаёт /run/user/UID не мгновенно.
-        for _ in $(seq 1 20); do
-            [[ -d "/run/user/$PI_WEB_UID" ]] && break
-            sleep 1
-        done
+    PI_WEB_PASSWORD=""
+
+    if [[ "$PI_WEB_HOST" != "127.0.0.1" && "$PI_WEB_HOST" != "::1" ]]; then
+        if [[ -s "$PI_WEB_PASS_FILE" ]]; then
+            PI_WEB_PASSWORD="$(cat "$PI_WEB_PASS_FILE")"
+            echo "Использую существующий пароль Pi Web ($PI_WEB_PASS_FILE)"
+        else
+            echo ""
+            echo "Задай пароль для входа в Pi Web (пользователь: $USER_NAME)."
+            echo "Enter — сгенерировать случайный."
+
+            read -rsp "Пароль (ввод не отображается): " PI_WEB_PASSWORD </dev/tty ||
+                PI_WEB_PASSWORD=""
+
+            echo
+
+            if [[ -z "$PI_WEB_PASSWORD" ]]; then
+                PI_WEB_PASSWORD="$(od -An -tx1 -N24 /dev/urandom | tr -d ' \n')"
+                echo "Сгенерирован случайный пароль"
+            fi
+
+            # Пароль передаём через stdin, а не аргументом: umask 077 + redirection.
+            (umask 077 && printf '%s\n' "$PI_WEB_PASSWORD" > "$PI_WEB_PASS_FILE") || {
+                echo "ОШИБКА: не удалось записать $PI_WEB_PASS_FILE" >&2
+                exit 1
+            }
+
+            chown "$USER_NAME:$USER_NAME" "$PI_WEB_PASS_FILE"
+            chmod 600 "$PI_WEB_PASS_FILE"
+            echo "Пароль сохранён: $PI_WEB_PASS_FILE (0600)"
+        fi
     fi
 
-    # PI WEB переиспользует SDK уже установленного pi и требует, чтобы `pi` был
-    # именно npm-пакетом (бинарная сборка без SDK не поддерживается). Наш
-    # `npm install -g @earendil-works/pi-coding-agent` этому соответствует;
-    # путь фиксируем явно, чтобы сервисы не зависели от PATH login shell.
-    PI_SDK_DIR="$(npm root -g)/@earendil-works/pi-coding-agent"
+    # ------------------------------------------------------- unit ---
+    PI_WEB_UNIT="/etc/systemd/system/pi-web.service"
 
-    if [[ ! -f "$PI_SDK_DIR/package.json" ]]; then
-        echo "ВНИМАНИЕ: не найден SDK pi в $PI_SDK_DIR" >&2
-        echo "          PI WEB может не найти pi: проверь 'pi-web doctor'." >&2
-        PI_SDK_DIR=""
-    fi
+    {
+        cat <<EOF
+[Unit]
+Description=Pi Web (agegr/pi-web) — browser UI for pi coding agent
+After=network-online.target
+Wants=network-online.target
 
-    # Запуск команды от pi в его user-контексте systemd.
-    pi_web_as_user() {
-        local sdk_env=()
+[Service]
+Type=simple
+User=$USER_NAME
+Group=$USER_NAME
+WorkingDirectory=$PI_WEB_DIR
+Environment=HOME=/home/$USER_NAME
+Environment=NODE_ENV=production
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PI_WEB_NO_OPEN=1
+Environment=PI_WEB_PORT=$PI_WEB_PORT
+Environment=PI_WEB_HOSTNAME=$PI_WEB_HOST
+EOF
 
-        # Путь к SDK pi передаём только если он реально найден.
-        [[ -n "$PI_SDK_DIR" ]] && sdk_env=("PI_WEB_PI_PACKAGE_DIR=$PI_SDK_DIR")
+        # EnvironmentFile читается systemd от root; пароль в юнит не попадает.
+        if [[ -n "$PI_WEB_PASSWORD" ]]; then
+            (umask 077 && printf 'PI_WEB_PASSWORD=%s\n' "$PI_WEB_PASSWORD" > "$PI_WEB_ENV_FILE")
+            chown "$USER_NAME:$USER_NAME" "$PI_WEB_ENV_FILE"
+            chmod 600 "$PI_WEB_ENV_FILE"
 
-        sudo -u "$USER_NAME" -H \
-            env HOME="$PI_WEB_USER_HOME" \
-            XDG_RUNTIME_DIR="/run/user/$PI_WEB_UID" \
-            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$PI_WEB_UID/bus" \
-            PATH="$NPM_GLOBAL_BIN:/usr/local/bin:/usr/bin:/bin" \
-            "${sdk_env[@]}" \
-            bash -lc "$*"
-    }
-
-    echo ""
-    echo "Запускаю 'pi-web install' от $USER_NAME ($PI_WEB_HOST:$PI_WEB_PORT)"
-    echo ""
-
-    if ! pi_web_as_user "pi-web install --host $PI_WEB_HOST --port $PI_WEB_PORT"; then
-        echo "ВНИМАНИЕ: 'pi-web install' не смог поставить user-сервисы" >&2
-        echo "          (обычно нет systemd user-сессии у $USER_NAME)." >&2
-        echo "          Сам пакет @jmfederico/pi-web уже установлен." >&2
-        echo "" >&2
-        echo "  Диагностика от имени $USER_NAME:" >&2
-        echo "    sudo -u $USER_NAME -i pi-web doctor" >&2
-        echo "    sudo -u $USER_NAME -i pi-web install --host $PI_WEB_HOST --port $PI_WEB_PORT" >&2
-        echo "" >&2
-
-        PI_WEB_SERVICES_OK=0
-    else
-        PI_WEB_SERVICES_OK=1
-    fi
-
-    if [[ "$PI_WEB_SERVICES_OK" -eq 1 ]]; then
-        echo ""
-        echo "Сервисы:"
-        pi_web_as_user "systemctl --user is-enabled pi-web.service pi-web-sessiond.service" ||
-            true
-
-        # doctor сверяет окружение сервисов с login shell. Не валим установку,
-        # но показываем проблемы: без терминала сессии будут урезаны.
-        if ! pi_web_as_user "pi-web doctor"; then
-            echo "ВНИМАНИЕ: 'pi-web doctor' сообщил о проблемах (см. вывод выше)." >&2
+            echo "EnvironmentFile=$PI_WEB_ENV_FILE"
         fi
 
-        echo ""
-        echo "PI WEB: http://$PI_WEB_HOST:$PI_WEB_PORT"
+        cat <<EOF
+ExecStart=$PI_WEB_BIN
+Restart=on-failure
+RestartSec=5
 
-        if [[ "$PI_WEB_HOST" == "127.0.0.1" ]]; then
+[Install]
+WantedBy=multi-user.target
+EOF
+    } > "$PI_WEB_UNIT"
+
+    chmod 0644 "$PI_WEB_UNIT"
+
+    systemctl daemon-reload
+    systemctl enable --now pi-web
+
+    if systemctl is-active --quiet pi-web; then
+        echo ""
+        echo "Pi Web запущен: http://$PI_WEB_HOST:$PI_WEB_PORT"
+
+        if [[ -n "$PI_WEB_PASSWORD" ]]; then
+            echo "  пользователь: $USER_NAME"
+            echo "  пароль:       sudo -u $USER_NAME cat $PI_WEB_PASS_FILE"
+        elif [[ "$PI_WEB_HOST" == "127.0.0.1" || "$PI_WEB_HOST" == "::1" ]]; then
             echo "  слушает только loopback — с других хостов:"
             echo "    ssh -N -L $PI_WEB_PORT:127.0.0.1:$PI_WEB_PORT $USER_NAME@<этот-хост>"
-        else
-            echo "  слушает $PI_WEB_HOST — доступен из этой сети БЕЗ авторизации."
-            echo "  Доступ к порту = shell от $USER_NAME (sudo без пароля)."
         fi
 
-        echo "  статус: sudo -u $USER_NAME -i pi-web status"
-        echo "  логи:   sudo -u $USER_NAME -i pi-web logs"
-        echo "  сменить адрес: редактировать ~/.config/pi-web/config.json (host)"
+        echo "  логи:         journalctl -u pi-web -f"
+    else
+        echo "ВНИМАНИЕ: pi-web не запустился:" >&2
+        journalctl -u pi-web -n 20 --no-pager >&2 || true
     fi
+
+    unset PI_WEB_PASSWORD
 fi
 
 # ------------------------------------------------ cleanup_backups.sh ---
@@ -1450,20 +1459,23 @@ echo "pi:"
 command -v pi && pi --version 2>/dev/null || true
 echo "node: $(node --version 2>/dev/null || echo 'нет')"
 
-if command -v pi-web >/dev/null 2>&1; then
-    # Фактический адрес берём из конфига: pi-web читает host при старте.
-    PI_WEB_EFFECTIVE_HOST="$(sudo -u "$USER_NAME" -H \
-        python3 -c 'import json,os,sys
-p=os.path.expanduser("~/.config/pi-web/config.json")
-try: print(json.load(open(p)).get("host", ""))
-except Exception: sys.exit(0)' 2>/dev/null || true)"
+if [[ -x "$PI_WEB_BIN" ]]; then
+    # Фактический адрес берём из юнита: там Environment=PI_WEB_HOSTNAME.
+    PI_WEB_EFFECTIVE_HOST="$(awk -F= '/^Environment=PI_WEB_HOSTNAME=/{print $2; exit}' \
+        /etc/systemd/system/pi-web.service 2>/dev/null || true)"
 
     echo ""
-    echo "PI WEB:"
-    echo "  $(command -v pi-web) ($(pi-web --version 2>/dev/null || echo '?'))"
+    echo "Pi Web:"
+    echo "  $(sudo -u "$USER_NAME" -H "$PI_WEB_BIN" --version 2>/dev/null || echo '?')"
     echo "  http://${PI_WEB_EFFECTIVE_HOST:-$PI_WEB_HOST}:$PI_WEB_PORT"
-    echo "  статус: sudo -u $USER_NAME -i pi-web status"
-    echo "  логи:   sudo -u $USER_NAME -i pi-web logs"
+    systemctl is-active pi-web 2>/dev/null || true
+
+    if [[ -s "/home/$USER_NAME/.config/pi-web/password" ]]; then
+        echo "  пользователь: $USER_NAME"
+        echo "  пароль:       sudo -u $USER_NAME cat /home/$USER_NAME/.config/pi-web/password"
+    fi
+
+    echo "  логи:         journalctl -u pi-web -f"
 fi
 echo ""
 echo "cron:"

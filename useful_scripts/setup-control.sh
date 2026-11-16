@@ -6,6 +6,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 USER_NAME="mishgun"
+TIMEZONE="Europe/Moscow"
 WP_DIR="/opt/woodpecker"
 PROJECT_NAME="woodpecker"
 SOPS_URL="https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.amd64"
@@ -193,6 +194,30 @@ apt-get install -y \
     age \
     openssh-client \
     lm-sensors
+
+# --------------------------------------------------------------- timezone ---
+log "Часовой пояс: $TIMEZONE"
+
+CURRENT_TZ="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+
+if [[ "$CURRENT_TZ" == "$TIMEZONE" ]]; then
+    echo "Уже установлен: $TIMEZONE"
+elif [[ -d "/usr/share/zoneinfo/$TIMEZONE" ]]; then
+    if command -v timedatectl >/dev/null 2>&1 &&
+        timedatectl set-timezone "$TIMEZONE" 2>/dev/null; then
+        echo "Установлен через timedatectl: $TIMEZONE"
+    else
+        # Fallback для окружений без работающего systemd-dbus
+        ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+        printf '%s\n' "$TIMEZONE" > /etc/timezone
+        dpkg-reconfigure -f noninteractive tzdata >/dev/null 2>&1 || true
+        echo "Установлен вручную (/etc/localtime + /etc/timezone): $TIMEZONE"
+    fi
+else
+    echo "ВНИМАНИЕ: нет /usr/share/zoneinfo/$TIMEZONE — часовой пояс не изменён" >&2
+fi
+
+echo "Проверка: $(date '+%Z %z  %Y-%m-%d %H:%M:%S')"
 
 # ------------------------------------------------ cleanup_backups.sh ---
 log "Установка cleanup_backups.sh"

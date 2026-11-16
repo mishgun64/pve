@@ -101,7 +101,26 @@ else
     pass 'setup-control.sh: обхода «Продолжить без rclone» нет'
 fi
 
-# --- 7. stub-прогон backup-скрипта -----------------------------------------
+# --- 7. часовой пояс ----------------------------------------------------
+if grep -q '^TIMEZONE="Europe/Moscow"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: TIMEZONE="Europe/Moscow"'
+else
+    fail 'setup-control.sh: нет TIMEZONE="Europe/Moscow"'
+fi
+
+if grep -q 'timedatectl set-timezone' "$SETUP_SCRIPT" &&
+    grep -q '/etc/localtime' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: timedatectl set-timezone + fallback /etc/localtime'
+else
+    fail 'setup-control.sh: нет timedatectl set-timezone и/или fallback /etc/localtime'
+fi
+
+check_order "$SETUP_SCRIPT" \
+    'timedatectl set-timezone' \
+    'log "Woodpecker CI"' \
+    'setup-control.sh: секция timezone раньше woodpecker'
+
+# --- 8. stub-прогон backup-скрипта -----------------------------------------
 # rclone всегда падает => preflight обязан остановить скрипт ДО docker и sops.
 run_stub_backup_test() {
     local tmp stub patched rc

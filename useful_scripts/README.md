@@ -34,6 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
 - Обхода «продолжить без rclone» нет: даётся 5 попыток настройки (каждая печатает причину отказа rclone), затем скрипт прерывает установку с `exit 1`.
 - Повторный запуск `setup-control.sh` безопасен: если `/opt/woodpecker/.env` уже есть, восстановление и переустановка пропускаются (`.env`, compose и volume не трогаются), выполняется только `docker compose up -d`.
 - `backup-woodpecker.sh` проверяет конфиг, remote и `rclone lsd` до дорогой работы (docker tar, sops); при `rc=1` подсказывает запустить `sudo /root/setup-control.sh`.
+- Проверки идут с короткими таймаутами (быстрый fail), а сама передача файла — с ретраями и запасом (`--retries 3 --low-level-retries 10 --contimeout 30s --timeout 300s`): на медленном канале до Google TLS-хендшейк не укладывается в 10 с и загрузка без ретраев падает.
 - Копия в `/var/backups/woodpecker/woodpecker_backup.tar.gz.enc` — только страховка от потери прогона при неудачной загрузке (удаляется после успешной загрузки). Восстановление всегда идёт с Drive, а не из этого каталога.
 
 ## Проверки

@@ -82,7 +82,7 @@ fi
 
 # --- 5. паритет констант ---------------------------------------------------
 for const in RCLONE_REMOTE RCLONE_BACKUP_DIR RCLONE_CONFIG_FILE \
-    BACKUP_NAME SSH_KEY_FILE PROJECT_NAME; do
+    RCLONE_TRANSFER_ARGS BACKUP_NAME SSH_KEY_FILE PROJECT_NAME; do
 
     backup_line="$(grep -m1 "^${const}=" "$BACKUP_SCRIPT")"
     setup_line="$(grep -m1 "^${const}=" "$SETUP_SCRIPT")"
@@ -119,6 +119,14 @@ check_order "$SETUP_SCRIPT" \
     'timedatectl set-timezone' \
     'log "Woodpecker CI"' \
     'setup-control.sh: секция timezone раньше woodpecker'
+
+# --- 8. загрузка с ретраями, а не с жёсткими таймаутами ---------------------
+if grep -q 'rclone copyto' "$BACKUP_SCRIPT" &&
+    awk '/rclone copyto/{f=1} f && /RCLONE_TRANSFER_ARGS/{found=1; exit} END{exit !found}' "$BACKUP_SCRIPT"; then
+    pass 'backup-woodpecker.sh: загрузка использует RCLONE_TRANSFER_ARGS'
+else
+    fail 'backup-woodpecker.sh: rclone copyto без RCLONE_TRANSFER_ARGS (будет TLS timeout)'
+fi
 
 # --- 8. stub-прогон backup-скрипта -----------------------------------------
 # rclone всегда падает => preflight обязан остановить скрипт ДО docker и sops.

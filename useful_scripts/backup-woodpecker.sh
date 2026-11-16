@@ -15,6 +15,10 @@ RCLONE_REMOTE="gdrive:"
 RCLONE_BACKUP_DIR="woodpecker"
 RCLONE_CONFIG_FILE="/root/.config/rclone/rclone.conf"
 RCLONE_TIMEOUT_ARGS=(--retries 1 --low-level-retries 1 --contimeout 10s)
+# Для самой передачи файла таймауты жёстче не нужны: на медленном/шумном канале
+# до Google TLS-хендшейк не укладывается в 10s и бэкап падает. Проверки (lsd/mkdir)
+# остаются быстрыми, а передача — с ретраями и запасом по времени.
+RCLONE_TRANSFER_ARGS=(--retries 3 --low-level-retries 10 --contimeout 30s --timeout 300s)
 BACKUP_NAME="woodpecker_backup"
 SSH_KEY_FILE="/root/.ssh/id_ed25519"
 SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
@@ -219,7 +223,7 @@ UPLOAD_ERR_FILE="$(mktemp /tmp/rclone-upload.XXXXXX)"
 
 if ! rclone copyto "$STAGING/$BACKUP_NAME.tar.gz.enc" "$REMOTE_FILE" \
     --config "$RCLONE_CONFIG_FILE" \
-    "${RCLONE_TIMEOUT_ARGS[@]}" 2>"$UPLOAD_ERR_FILE"; then
+    "${RCLONE_TRANSFER_ARGS[@]}" 2>"$UPLOAD_ERR_FILE"; then
     UPLOAD_ERR="$(cat "$UPLOAD_ERR_FILE")"
     rm -f "$UPLOAD_ERR_FILE"
     fail "Загрузка не удалась: ${UPLOAD_ERR:-нет вывода rclone}. Шифрованный архив сохранён: $LOCAL_KEEP_FILE"

@@ -14,6 +14,9 @@ RCLONE_REMOTE="gdrive:"
 RCLONE_BACKUP_DIR="woodpecker"
 RCLONE_CONFIG_FILE="/root/.config/rclone/rclone.conf"
 RCLONE_TIMEOUT_ARGS=(--retries 1 --low-level-retries 1 --contimeout 10s)
+# Для скачивания бэкапа (и любой передачи крупных файлов) — с ретраями и запасом:
+# на медленном канале TLS-хендшейк до Google не укладывается в 10s.
+RCLONE_TRANSFER_ARGS=(--retries 3 --low-level-retries 10 --contimeout 30s --timeout 300s)
 BACKUP_NAME="woodpecker_backup"
 SSH_KEY_FILE="/root/.ssh/id_ed25519"
 SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
@@ -702,7 +705,7 @@ else
             "$BACKUP_REMOTE_PATH" \
             "$RESTORE_DIR/${BACKUP_NAME}.tar.gz.enc" \
             --config "$RCLONE_CONFIG_FILE" \
-            "${RCLONE_TIMEOUT_ARGS[@]}"
+            "${RCLONE_TRANSFER_ARGS[@]}"
 
         SOPS_AGE_SSH_PRIVATE_KEY_FILE="$SSH_KEY_FILE" sops -d \
             --input-type binary \

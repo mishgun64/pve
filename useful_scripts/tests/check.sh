@@ -202,12 +202,20 @@ else
     fail 'setup-control.sh: PATH для сервисов не в .profile'
 fi
 
-# pi-web без авторизации — только loopback.
-if grep -q 'PI_WEB_HOST="127.0.0.1"' "$SETUP_SCRIPT" &&
+# PI WEB без авторизации — нельзя биндиться на 0.0.0.0, адрес выбирается интерактивно.
+if grep -q 'PI_WEB_HOST=""' "$SETUP_SCRIPT" &&
+    grep -q 'LAN-адрес этой машины' "$SETUP_SCRIPT" &&
     ! grep -qE 'PI_WEB_HOST="0\.0\.0\.0"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: PI WEB слушает только 127.0.0.1'
+    pass 'setup-control.sh: адрес PI WEB выбирается (LAN/loopback), 0.0.0.0 не используется'
 else
-    fail 'setup-control.sh: PI WEB не привязан к 127.0.0.1'
+    fail 'setup-control.sh: нет выбора адреса PI WEB или есть 0.0.0.0'
+fi
+
+# LAN-адрес в скрипте определяется автоматически.
+if grep -q 'ip -4 route get' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: LAN-адрес определяется автоматически'
+else
+    fail 'setup-control.sh: нет автоопределения LAN-адреса'
 fi
 
 # Старый вариант (ravshansbox/pi-web) не должен остаться.

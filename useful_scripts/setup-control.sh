@@ -21,7 +21,9 @@ BACKUP_NAME="woodpecker_backup"
 SSH_KEY_FILE="/root/.ssh/id_ed25519"
 SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
 PI_WEB_PORT=8504
-PI_WEB_HOST="127.0.0.1"
+# Пусто = спросить (по умолчанию предлагается LAN-адрес машины).
+# Значения: 127.0.0.1 (только локально) или конкретный LAN-IP.
+PI_WEB_HOST=""
 PI_WEB_NPM_PACKAGE="@jmfederico/pi-web@latest"
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
@@ -522,11 +524,55 @@ echo "node: $(node --version)"
 # -------------------------------------------------------- pi web ui ---
 log "Установка PI WEB (https://github.com/jmfederico/pi-web)"
 
+# Адрес, на котором слушает PI WEB.
+# Встроенной авторизации нет, поэтому 0.0.0.0 не предлагаем: либо loopback
+# (доступ только через ssh-туннель), либо конкретный LAN-IP.
+PI_WEB_LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null |\
+    awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
+
+if [[ -z "$PI_WEB_HOST" ]]; then
+    echo ""
+    echo "На каком адресе слушать PI WEB?"
+    echo "  1) LAN-адрес этой машины — доступ с других хостов сети (по умолчанию)"
+    echo "  2) 127.0.0.1 — только локально/через ssh-туннель"
+    echo ""
+    echo "У PI WEB НЕТ авторизации: доступ к порту = shell от $USER_NAME,"
+    echo "а у $USER_NAME есть sudo без пароля. Во внешнюю сеть так не выставляй."
+    echo ""
+
+    if [[ -n "$PI_WEB_LAN_IP" ]]; then
+        echo "LAN-адрес: $PI_WEB_LAN_IP"
+    else
+        echo "LAN-адрес определить не удалось."
+    fi
+
+    read -rp "Выбор [1-2] (Enter = 1): " PI_WEB_HOST_CHOICE </dev/tty ||
+        PI_WEB_HOST_CHOICE="1"
+
+    case "$PI_WEB_HOST_CHOICE" in
+        2)
+            PI_WEB_HOST="127.0.0.1"
+            ;;
+        ""|1)
+            PI_WEB_HOST="${PI_WEB_LAN_IP:-127.0.0.1}"
+
+            if [[ -z "$PI_WEB_LAN_IP" ]]; then
+                echo "ВНИМАНИЕ: LAN-адрес не найден, использую 127.0.0.1" >&2
+            fi
+            ;;
+        *)
+            # Разрешаем ввести адрес вручную — вдруг нужен другой интерфейс.
+            PI_WEB_HOST="$PI_WEB_HOST_CHOICE"
+            echo "Использую введённый адрес: $PI_WEB_HOST"
+            ;;
+    esac
+fi
+
 echo ""
 echo "PI WEB ставится пакетом @jmfederico/pi-web и работает от пользователя $USER_NAME."
 echo "Он ставит ДВА per-user сервиса (pi-web.service + pi-web-sessiond.service) и"
-echo "слушает $PI_WEB_HOST:$PI_WEB_PORT. Встроенной авторизации нет:"
-echo "наружу публикуй только через VPN/Tailscale/SSH-туннель или nginx с auth."
+echo "слушает $PI_WEB_HOST:$PI_WEB_PORT."
+
 echo ""
 
 read -rp "Установить PI WEB? [Y/n]: " INSTALL_PI_WEB </dev/tty || INSTALL_PI_WEB="y"
@@ -649,9 +695,19 @@ else
         fi
 
         echo ""
-        echo "PI WEB: http://$PI_WEB_HOST:$PI_WEB_PORT (только loopback)"
+        echo "PI WEB: http://$PI_WEB_HOST:$PI_WEB_PORT"
+
+        if [[ "$PI_WEB_HOST" == "127.0.0.1" ]]; then
+            echo "  слушает только loopback — с других хостов:"
+            echo "    ssh -N -L $PI_WEB_PORT:127.0.0.1:$PI_WEB_PORT $USER_NAME@<этот-хост>"
+        else
+            echo "  слушает $PI_WEB_HOST — доступен из этой сети БЕЗ авторизации."
+            echo "  Доступ к порту = shell от $USER_NAME (sudo без пароля)."
+        fi
+
         echo "  статус: sudo -u $USER_NAME -i pi-web status"
         echo "  логи:   sudo -u $USER_NAME -i pi-web logs"
+        echo "  сменить адрес: редактировать ~/.config/pi-web/config.json (host)"
     fi
 fi
 
@@ -1395,10 +1451,17 @@ command -v pi && pi --version 2>/dev/null || true
 echo "node: $(node --version 2>/dev/null || echo 'нет')"
 
 if command -v pi-web >/dev/null 2>&1; then
+    # Фактический адрес берём из конфига: pi-web читает host при старте.
+    PI_WEB_EFFECTIVE_HOST="$(sudo -u "$USER_NAME" -H \
+        python3 -c 'import json,os,sys
+p=os.path.expanduser("~/.config/pi-web/config.json")
+try: print(json.load(open(p)).get("host", ""))
+except Exception: sys.exit(0)' 2>/dev/null || true)"
+
     echo ""
     echo "PI WEB:"
     echo "  $(command -v pi-web) ($(pi-web --version 2>/dev/null || echo '?'))"
-    echo "  http://$PI_WEB_HOST:$PI_WEB_PORT (только loopback)"
+    echo "  http://${PI_WEB_EFFECTIVE_HOST:-$PI_WEB_HOST}:$PI_WEB_PORT"
     echo "  статус: sudo -u $USER_NAME -i pi-web status"
     echo "  логи:   sudo -u $USER_NAME -i pi-web logs"
 fi

@@ -5,7 +5,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-USER_NAME="mishgun"
+USER_NAME="pi"
 TIMEZONE="Europe/Moscow"
 WP_DIR="/opt/woodpecker"
 PROJECT_NAME="woodpecker"
@@ -20,6 +20,9 @@ RCLONE_TRANSFER_ARGS=(--retries 3 --low-level-retries 10 --contimeout 30s --time
 BACKUP_NAME="woodpecker_backup"
 SSH_KEY_FILE="/root/.ssh/id_ed25519"
 SSH_PUB_FILE="${SSH_KEY_FILE}.pub"
+PI_WEB_PORT=8504
+PI_WEB_HOST="127.0.0.1"
+PI_WEB_NPM_PACKAGE="@jmfederico/pi-web@latest"
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts"
@@ -148,6 +151,209 @@ echo ""
 echo "age-получатель (SSH-ключ root):"
 echo "  $AGE_RECIPIENT"
 
+# ------------------------------- root authorized_keys (ssh root@localhost) ---
+log "Публичный ключ root в authorized_keys (вход ssh на самого себя)"
+
+ROOT_AUTH_KEYS="$SSH_DIR/authorized_keys"
+
+install -d -m 0700 -o root -g root "$SSH_DIR"
+
+touch "$ROOT_AUTH_KEYS"
+chmod 600 "$ROOT_AUTH_KEYS"
+chown root:root "$ROOT_AUTH_KEYS"
+
+# Ключ берём из того же .pub, что уже проверен выше как age-получатель.
+ROOT_PUB_KEY="$(cat "$SSH_PUB_FILE")"
+
+if grep -qxF "$ROOT_PUB_KEY" "$ROOT_AUTH_KEYS"; then
+    echo "Ключ уже есть в $ROOT_AUTH_KEYS"
+else
+    printf '%s\n' "$ROOT_PUB_KEY" >> "$ROOT_AUTH_KEYS"
+    echo "Ключ добавлен в $ROOT_AUTH_KEYS"
+fi
+
+# ------------------------------------------------------------------- apt ---
+log "apt update && upgrade"
+
+apt-get update
+apt-get upgrade -y
+
+log "Установка пакетов"
+
+# curl нужен для скачивания sops и ключа Docker
+apt-get install -y \
+    neovim \
+    cron \
+    zip \
+    unzip \
+    htop \
+    ca-certificates \
+    curl \
+    rclone \
+    age \
+    openssh-client \
+    lm-sensors
+
+# ----------------------------------------------------------------- users ---
+log "Пользователь $USER_NAME, sudo и SSH-ключ"
+
+PI_HOME="/home/$USER_NAME"
+PI_SSH_DIR="$PI_HOME/.ssh"
+PI_AUTH_KEYS="$PI_SSH_DIR/authorized_keys"
+SUDOERS_FILE="/etc/sudoers.d/90-$USER_NAME"
+
+# sudo нужен для pi, openssh-server — чтобы sshd вообще был установлен,
+# passwd — для chpasswd.
+apt-get install -y sudo openssh-server passwd
+
+if id "$USER_NAME" &>/dev/null; then
+    echo "Пользователь $USER_NAME уже существует"
+    EXISTING_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+
+    if [[ "$EXISTING_HOME" != "$PI_HOME" ]]; then
+        echo "ВНИМАНИЕ: домашний каталог $USER_NAME — $EXISTING_HOME, а не $PI_HOME" >&2
+        PI_HOME="$EXISTING_HOME"
+        PI_SSH_DIR="$PI_HOME/.ssh"
+        PI_AUTH_KEYS="$PI_SSH_DIR/authorized_keys"
+    fi
+else
+    useradd --create-home --home-dir "$PI_HOME" --shell /bin/bash "$USER_NAME"
+    echo "Создан пользователь $USER_NAME ($PI_HOME)"
+fi
+
+usermod --shell /bin/bash "$USER_NAME"
+
+# Группа sudo + явный drop-in в sudoers (sudo без пароля: под pi могут
+# работать автоматизированные задачи).
+usermod --append --groups sudo "$USER_NAME"
+
+printf '%s ALL=(ALL:ALL) NOPASSWD: ALL\n' "$USER_NAME" > "$SUDOERS_FILE"
+chmod 0440 "$SUDOERS_FILE"
+chown root:root "$SUDOERS_FILE"
+
+# Битый sudoers ломает sudo целиком — проверяем и откатываемся.
+if ! visudo -cf "$SUDOERS_FILE" >/dev/null; then
+    rm -f "$SUDOERS_FILE"
+    echo "ОШИБКА: $SUDOERS_FILE не прошёл visudo -c, файл удалён" >&2
+    exit 1
+fi
+
+echo "$USER_NAME добавлен в sudoers: $SUDOERS_FILE"
+
+# sshd должен быть включён, иначе вход по ключам (root/pi) не заработает.
+systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null || true
+
+# ----------------------------------------------- pi: authorized_keys ---
+log "SSH-ключ для $USER_NAME"
+
+echo "Вставь публичный ключ для $USER_NAME (одной строкой)."
+echo "Enter — использовать тот же ключ, что у root:"
+echo "  $ROOT_PUB_KEY"
+echo ""
+
+read -rp "> " PI_PUB_KEY </dev/tty || PI_PUB_KEY=""
+PI_PUB_KEY="${PI_PUB_KEY:-$ROOT_PUB_KEY}"
+
+if [[ -z "$PI_PUB_KEY" ]]; then
+    echo "Публичный ключ не введён" >&2
+    exit 1
+fi
+
+if ! ssh-keygen -l -f /dev/stdin <<<"$PI_PUB_KEY" >/dev/null 2>&1; then
+    echo "Похоже, это не публичный SSH ключ." >&2
+    exit 1
+fi
+
+install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$PI_SSH_DIR"
+
+touch "$PI_AUTH_KEYS"
+chmod 600 "$PI_AUTH_KEYS"
+chown "$USER_NAME:$USER_NAME" "$PI_AUTH_KEYS"
+
+if grep -qxF "$PI_PUB_KEY" "$PI_AUTH_KEYS"; then
+    echo "Ключ уже есть в $PI_AUTH_KEYS"
+else
+    printf '%s\n' "$PI_PUB_KEY" >> "$PI_AUTH_KEYS"
+    echo "Ключ добавлен в $PI_AUTH_KEYS"
+fi
+
+# ----------------------------------- удаление прочих логинящихся юзеров ---
+log "Удаление пользователей, кроме root и $USER_NAME"
+
+# «Может залогиниться» — не системный аккаунт (UID 0 или 1000..60000)
+# с реальным шеллом (не nologin/false).
+mapfile -t LOGIN_USERS < <(
+    getent passwd | awk -F: -v keep="$USER_NAME" '
+        $1 == "root" || $1 == keep || $1 == "nobody" { next }
+        (($3 >= 1000 && $3 <= 60000) || $3 == 0) && $7 != "" &&
+            $7 !~ /(nologin|false|sync|shutdown|halt)$/ { print $1 }
+    '
+)
+
+if [[ "${#LOGIN_USERS[@]}" -eq 0 ]]; then
+    echo "Лишних пользователей с логином нет"
+else
+    echo "Найдены пользователи, которые могут залогиниться:"
+    printf '  - %s\n' "${LOGIN_USERS[@]}"
+
+    # Удаление домашних каталогов необратимо — спрашиваем подтверждение.
+    read -rp "Удалить их вместе с домашними каталогами? [y/N]: " REMOVE_USERS </dev/tty ||
+        REMOVE_USERS="n"
+
+    if [[ "$REMOVE_USERS" =~ ^[YyДд]$ ]]; then
+        for u in "${LOGIN_USERS[@]}"; do
+            if pkill -KILL -u "$u" 2>/dev/null; then
+                echo "Завершены процессы пользователя $u"
+            fi
+
+            if userdel --remove "$u" 2>/dev/null; then
+                echo "Удалён пользователь $u (с домашним каталогом)"
+            elif userdel "$u" 2>/dev/null; then
+                echo "Удалён пользователь $u (домашний каталог не тронут)"
+            else
+                echo "ВНИМАНИЕ: не удалось удалить $u (возможно, есть активная сессия)" >&2
+            fi
+        done
+    else
+        echo "Удаление пользователей пропущено"
+    fi
+fi
+
+# ----------------------------------------------------- пароли root и pi ---
+log "Установка паролей root и $USER_NAME"
+
+set_password() {
+    local user="$1" label="$2" pass confirm
+
+    while true; do
+        read -rsp "Пароль для $label: " pass </dev/tty || return 1
+        echo
+
+        if [[ -z "$pass" ]]; then
+            echo "Пароль не может быть пустым."
+            continue
+        fi
+
+        read -rsp "Повторите пароль для $label: " confirm </dev/tty || return 1
+        echo
+
+        if [[ "$pass" != "$confirm" ]]; then
+            echo "Пароли не совпадают. Попробуйте ещё раз."
+            continue
+        fi
+
+        # Пароль передаётся только через stdin chpasswd, не в аргументах.
+        printf '%s:%s\n' "$user" "$pass" | chpasswd
+
+        unset pass confirm
+        echo "Пароль для $label установлен."
+        return 0
+    done
+}
+
+set_password root root || exit 1
+set_password "$USER_NAME" "$USER_NAME" || exit 1
+
 # ---------------------------------------------------------------- .bashrc ---
 add_aliases() {
     local rc="$1" owner="${2:-}"
@@ -176,28 +382,6 @@ else
     echo "Пользователь $USER_NAME не найден, пропускаю его .bashrc" >&2
 fi
 
-# ------------------------------------------------------------------- apt ---
-log "apt update && upgrade"
-
-apt-get update
-apt-get upgrade -y
-
-log "Установка пакетов"
-
-# curl нужен для скачивания sops и ключа Docker
-apt-get install -y \
-    neovim \
-    cron \
-    zip \
-    unzip \
-    htop \
-    ca-certificates \
-    curl \
-    rclone \
-    age \
-    openssh-client \
-    lm-sensors
-
 # --------------------------------------------------------------- timezone ---
 log "Часовой пояс: $TIMEZONE"
 
@@ -221,6 +405,255 @@ else
 fi
 
 echo "Проверка: $(date '+%Z %z  %Y-%m-%d %H:%M:%S')"
+
+# ------------------------------------------------------------- pi agent ---
+log "Установка pi agent (Node.js + pi CLI)"
+
+# pi требует Node.js >= 22.19. Официальный install.sh интерактивен (меню и
+# «Start pi now?») и без tty не умеет ставить Node, поэтому ставим детерминированно:
+# официальный бинарный дистрибутив с nodejs.org + npm -g.
+NODE_VERSION="22"
+PI_NPM_PACKAGE="@earendil-works/pi-coding-agent"
+
+node_version_ok() {
+    command -v node >/dev/null 2>&1 || return 1
+
+    node -e '
+        const [maj, min] = process.versions.node.split(".").map(Number);
+        process.exit(maj > 22 || (maj === 22 && min >= 19) ? 0 : 1);
+    ' >/dev/null 2>&1
+}
+
+install_node_tarball() {
+    local tmp arch ver file
+
+    case "$ARCH" in
+        amd64) arch="x64" ;;
+        arm64) arch="arm64" ;;
+        *)
+            echo "Нет бинарника Node.js для архитектуры $ARCH — поставь Node.js 22.19+ вручную" >&2
+            return 1
+            ;;
+    esac
+
+    tmp="$(mktemp -d /tmp/node-install.XXXXXX)"
+    trap 'rm -rf "$tmp"' RETURN
+
+    echo "Определяю последний Node.js ${NODE_VERSION}.x"
+
+    curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VERSION}.x/SHASUMS256.txt" -o "$tmp/SHASUMS256.txt" || return 1
+
+    file="$(awk -v suffix="-linux-${arch}.tar.xz" '
+        index($2, "node-v") == 1 && substr($2, length($2) - length(suffix) + 1) == suffix { print $2; exit }
+    ' "$tmp/SHASUMS256.txt")"
+
+    if [[ -z "$file" ]]; then
+        echo "Не найден архив Node.js для linux-${arch}" >&2
+        return 1
+    fi
+
+    ver="${file#node-}"
+    ver="${ver%-linux-*}"
+
+    echo "Скачиваю Node.js ${ver}"
+
+    curl -fsSL "https://nodejs.org/dist/latest-v${NODE_VERSION}.x/$file" -o "$tmp/$file" || return 1
+
+    # Проверка контрольной суммы: без неё битый/подменённый архив уйдёт в /usr/local.
+    if ! (cd "$tmp" && grep " $file\$" SHASUMS256.txt | sha256sum -c -); then
+        echo "Контрольная сумма Node.js не совпала" >&2
+        return 1
+    fi
+
+    # Распаковка в /usr/local: node/npm/npx окажутся в /usr/local/bin.
+    tar -xJf "$tmp/$file" -C /usr/local --strip-components=1 --exclude='*/CHANGELOG.md' \
+        --exclude='*/LICENSE' --exclude='*/README.md' || return 1
+
+    hash -r
+
+    echo "Node.js установлен: $(node --version), npm: $(npm --version)"
+}
+
+if node_version_ok; then
+    echo "Node.js уже подходит: $(node --version)"
+else
+    if command -v node >/dev/null 2>&1; then
+        echo "Node.js $(node --version) старше 22.19 — ставлю Node.js ${NODE_VERSION}"
+    else
+        echo "Node.js не найден — ставлю Node.js ${NODE_VERSION}"
+    fi
+
+    # xz нужен для tar -xJf
+    apt-get install -y xz-utils
+
+    install_node_tarball || {
+        echo "ОШИБКА: не удалось установить Node.js" >&2
+        exit 1
+    }
+fi
+
+if command -v pi >/dev/null 2>&1; then
+    echo "pi уже установлен: $(command -v pi) ($(pi --version 2>/dev/null || echo '?'))"
+    echo "Обновить pi до последней версии? [y/N]: "
+    read -rp "> " UPDATE_PI </dev/tty || UPDATE_PI="n"
+
+    if [[ "$UPDATE_PI" =~ ^[YyДд]$ ]]; then
+        pi update || echo "ВНИМАНИЕ: pi update завершился с ошибкой" >&2
+    fi
+else
+    # --ignore-scripts: документация pi явно говорит, что lifecycle-скрипты не нужны.
+    echo "Устанавливаю $PI_NPM_PACKAGE глобально"
+    npm install -g --ignore-scripts "$PI_NPM_PACKAGE" || {
+        echo "ОШИБКА: npm install $PI_NPM_PACKAGE завершился с ошибкой" >&2
+        exit 1
+    }
+
+    hash -r
+fi
+
+if ! command -v pi >/dev/null 2>&1; then
+    echo "ОШИБКА: pi не найден в PATH после установки ($(npm prefix -g 2>/dev/null)/bin)" >&2
+    exit 1
+fi
+
+echo "pi: $(command -v pi) ($(pi --version 2>/dev/null || echo '?'))"
+echo "node: $(node --version)"
+
+# -------------------------------------------------------- pi web ui ---
+log "Установка PI WEB (https://github.com/jmfederico/pi-web)"
+
+echo ""
+echo "PI WEB ставится пакетом @jmfederico/pi-web и работает от пользователя $USER_NAME."
+echo "Он ставит ДВА per-user сервиса (pi-web.service + pi-web-sessiond.service) и"
+echo "слушает $PI_WEB_HOST:$PI_WEB_PORT. Встроенной авторизации нет:"
+echo "наружу публикуй только через VPN/Tailscale/SSH-туннель или nginx с auth."
+echo ""
+
+read -rp "Установить PI WEB? [Y/n]: " INSTALL_PI_WEB </dev/tty || INSTALL_PI_WEB="y"
+
+if [[ "$INSTALL_PI_WEB" =~ ^[NnНн]$ ]]; then
+    echo "Установка PI WEB пропущена"
+else
+    # node-pty (терминалы) на Linux собирается из исходников: нужен компилятор
+    # и python3, иначе сессионный демон поднимется без терминала.
+    apt-get install -y build-essential python3
+
+    echo "Устанавливаю @jmfederico/pi-web глобально (npm prefix: $(npm prefix -g))"
+
+    # --allow-scripts=node-pty: точечно разрешает install-скрипт только node-pty
+    # (нужен для нативной сборки). На npm < 12 флага нет, но и запрета нет —
+    # там скрипты выполняются по умолчанию.
+    if ! npm install -g --allow-scripts=node-pty "$PI_WEB_NPM_PACKAGE"; then
+        echo "ОШИБКА: npm install $PI_WEB_NPM_PACKAGE завершился с ошибкой" >&2
+        exit 1
+    fi
+
+    hash -r
+
+    if ! command -v pi-web >/dev/null 2>&1; then
+        echo "ОШИБКА: pi-web не найден в PATH после установки" >&2
+        exit 1
+    fi
+
+    echo "pi-web: $(command -v pi-web) ($(pi-web --version 2>/dev/null || echo '?'))"
+
+    # pi-web install пишет per-user unit'ы и дёргает systemctl --user: нужен
+    # живой user-контекст systemd (XDG_RUNTIME_DIR + DBUS_SESSION_BUS_ADDRESS).
+    # Сервисы переживают логаут/перезагрузку только с linger.
+    PI_WEB_USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+    PI_WEB_UID="$(id -u "$USER_NAME")"
+    NPM_GLOBAL_BIN="$(npm prefix -g)/bin"
+
+    # Сервисы запускаются через login shell (-lc), а -lc не читает .bashrc,
+    # поэтому PATH пишем в ~/.profile.
+    PI_WEB_PROFILE="$PI_WEB_USER_HOME/.profile"
+    PI_WEB_PATH_LINE="export PATH=\"$NPM_GLOBAL_BIN:\$PATH\""
+
+    touch "$PI_WEB_PROFILE"
+
+    if ! grep -qxF "$PI_WEB_PATH_LINE" "$PI_WEB_PROFILE"; then
+        printf '%s\n' "$PI_WEB_PATH_LINE" >> "$PI_WEB_PROFILE"
+        echo "PATH (pi, pi-web) добавлен в $PI_WEB_PROFILE"
+    fi
+
+    chown "$USER_NAME:$USER_NAME" "$PI_WEB_PROFILE"
+
+    if command -v loginctl >/dev/null 2>&1; then
+        loginctl enable-linger "$USER_NAME" 2>/dev/null &&
+            echo "Включён linger для $USER_NAME (сервисы не зависят от ssh-сессии)"
+
+        # linger поднимает user@UID.service и создаёт /run/user/UID не мгновенно.
+        for _ in $(seq 1 20); do
+            [[ -d "/run/user/$PI_WEB_UID" ]] && break
+            sleep 1
+        done
+    fi
+
+    # PI WEB переиспользует SDK уже установленного pi и требует, чтобы `pi` был
+    # именно npm-пакетом (бинарная сборка без SDK не поддерживается). Наш
+    # `npm install -g @earendil-works/pi-coding-agent` этому соответствует;
+    # путь фиксируем явно, чтобы сервисы не зависели от PATH login shell.
+    PI_SDK_DIR="$(npm root -g)/@earendil-works/pi-coding-agent"
+
+    if [[ ! -f "$PI_SDK_DIR/package.json" ]]; then
+        echo "ВНИМАНИЕ: не найден SDK pi в $PI_SDK_DIR" >&2
+        echo "          PI WEB может не найти pi: проверь 'pi-web doctor'." >&2
+        PI_SDK_DIR=""
+    fi
+
+    # Запуск команды от pi в его user-контексте systemd.
+    pi_web_as_user() {
+        local sdk_env=()
+
+        # Путь к SDK pi передаём только если он реально найден.
+        [[ -n "$PI_SDK_DIR" ]] && sdk_env=("PI_WEB_PI_PACKAGE_DIR=$PI_SDK_DIR")
+
+        sudo -u "$USER_NAME" -H \
+            env HOME="$PI_WEB_USER_HOME" \
+            XDG_RUNTIME_DIR="/run/user/$PI_WEB_UID" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$PI_WEB_UID/bus" \
+            PATH="$NPM_GLOBAL_BIN:/usr/local/bin:/usr/bin:/bin" \
+            "${sdk_env[@]}" \
+            bash -lc "$*"
+    }
+
+    echo ""
+    echo "Запускаю 'pi-web install' от $USER_NAME ($PI_WEB_HOST:$PI_WEB_PORT)"
+    echo ""
+
+    if ! pi_web_as_user "pi-web install --host $PI_WEB_HOST --port $PI_WEB_PORT"; then
+        echo "ВНИМАНИЕ: 'pi-web install' не смог поставить user-сервисы" >&2
+        echo "          (обычно нет systemd user-сессии у $USER_NAME)." >&2
+        echo "          Сам пакет @jmfederico/pi-web уже установлен." >&2
+        echo "" >&2
+        echo "  Диагностика от имени $USER_NAME:" >&2
+        echo "    sudo -u $USER_NAME -i pi-web doctor" >&2
+        echo "    sudo -u $USER_NAME -i pi-web install --host $PI_WEB_HOST --port $PI_WEB_PORT" >&2
+        echo "" >&2
+
+        PI_WEB_SERVICES_OK=0
+    else
+        PI_WEB_SERVICES_OK=1
+    fi
+
+    if [[ "$PI_WEB_SERVICES_OK" -eq 1 ]]; then
+        echo ""
+        echo "Сервисы:"
+        pi_web_as_user "systemctl --user is-enabled pi-web.service pi-web-sessiond.service" ||
+            true
+
+        # doctor сверяет окружение сервисов с login shell. Не валим установку,
+        # но показываем проблемы: без терминала сессии будут урезаны.
+        if ! pi_web_as_user "pi-web doctor"; then
+            echo "ВНИМАНИЕ: 'pi-web doctor' сообщил о проблемах (см. вывод выше)." >&2
+        fi
+
+        echo ""
+        echo "PI WEB: http://$PI_WEB_HOST:$PI_WEB_PORT (только loopback)"
+        echo "  статус: sudo -u $USER_NAME -i pi-web status"
+        echo "  логи:   sudo -u $USER_NAME -i pi-web logs"
+    fi
+fi
 
 # ------------------------------------------------ cleanup_backups.sh ---
 log "Установка cleanup_backups.sh"
@@ -947,6 +1380,28 @@ echo ""
 echo "age recipient (SSH-ключ root):"
 echo "  $AGE_RECIPIENT"
 
+echo ""
+echo "Пользователи и SSH:"
+id "$USER_NAME"
+pwstatus -S root || true
+pwstatus -S "$USER_NAME" || true
+echo "root authorized_keys: $ROOT_AUTH_KEYS"
+echo "$USER_NAME authorized_keys: $PI_AUTH_KEYS"
+sudo -n -l -U "$USER_NAME" 2>/dev/null || true
+
+echo ""
+echo "pi:"
+command -v pi && pi --version 2>/dev/null || true
+echo "node: $(node --version 2>/dev/null || echo 'нет')"
+
+if command -v pi-web >/dev/null 2>&1; then
+    echo ""
+    echo "PI WEB:"
+    echo "  $(command -v pi-web) ($(pi-web --version 2>/dev/null || echo '?'))"
+    echo "  http://$PI_WEB_HOST:$PI_WEB_PORT (только loopback)"
+    echo "  статус: sudo -u $USER_NAME -i pi-web status"
+    echo "  логи:   sudo -u $USER_NAME -i pi-web logs"
+fi
 echo ""
 echo "cron:"
 crontab -l

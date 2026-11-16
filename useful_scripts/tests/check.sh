@@ -120,6 +120,108 @@ check_order "$SETUP_SCRIPT" \
     'log "Woodpecker CI"' \
     'setup-control.sh: секция timezone раньше woodpecker'
 
+# --- 9. пользователи, sudo, пароли -----------------------------------------
+if grep -q '^USER_NAME="pi"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: USER_NAME="pi"'
+else
+    fail 'setup-control.sh: нет USER_NAME="pi"'
+fi
+
+for frag in 'useradd --create-home' 'usermod --append --groups sudo' \
+    '/etc/sudoers.d/90-' 'visudo -cf' 'chpasswd'; do
+
+    if grep -qF "$frag" "$SETUP_SCRIPT"; then
+        pass "setup-control.sh: есть «$frag»"
+    else
+        fail "setup-control.sh: нет «$frag»"
+    fi
+done
+
+if grep -q 'ROOT_AUTH_KEYS="\$SSH_DIR/authorized_keys"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: публичный ключ root пишется в authorized_keys'
+else
+    fail 'setup-control.sh: нет добавления ключа root в authorized_keys'
+fi
+
+# Пароли не должны попадать в аргументы командной строки.
+if grep -qE 'chpasswd .*\$pass|echo .*\$pass' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: пароль передаётся в аргументах'
+else
+    pass 'setup-control.sh: пароль передаётся только через stdin chpasswd'
+fi
+
+check_order "$SETUP_SCRIPT" \
+    'useradd --create-home' \
+    'mapfile -t LOGIN_USERS' \
+    'setup-control.sh: создание pi раньше удаления прочих пользователей'
+
+# --- 10. pi agent и pi-web --------------------------------------------------
+if grep -q '@earendil-works/pi-coding-agent' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: ставится pi coding agent'
+else
+    fail 'setup-control.sh: нет установки pi coding agent'
+fi
+
+if grep -q 'sha256sum -c' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: архив Node.js проверяется по sha256'
+else
+    fail 'setup-control.sh: скачивание Node.js без проверки sha256'
+fi
+
+if grep -q '@jmfederico/pi-web' "$SETUP_SCRIPT" &&
+    grep -q 'pi-web install' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: PI WEB ставится через @jmfederico/pi-web + pi-web install'
+else
+    fail 'setup-control.sh: нет установки @jmfederico/pi-web / pi-web install'
+fi
+
+if grep -q -- '--allow-scripts=node-pty' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: node-pty разрешён точечно (--allow-scripts)'
+else
+    fail 'setup-control.sh: нет --allow-scripts=node-pty'
+fi
+
+# Per-user systemd-сервисы требуют user-контекста и linger.
+if grep -q 'XDG_RUNTIME_DIR="/run/user/' "$SETUP_SCRIPT" &&
+    grep -q 'DBUS_SESSION_BUS_ADDRESS=' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: pi-web install запускается в user-контексте systemd'
+else
+    fail 'setup-control.sh: нет XDG_RUNTIME_DIR/DBUS_SESSION_BUS_ADDRESS'
+fi
+
+if grep -q 'enable-linger' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: включён linger для pi'
+else
+    fail 'setup-control.sh: нет loginctl enable-linger'
+fi
+
+# Сервисы используют login shell (-lc) — PATH обязан быть в .profile, а не в .bashrc.
+if grep -q 'PI_WEB_PROFILE="\$PI_WEB_USER_HOME/.profile"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: PATH для сервисов пишется в .profile'
+else
+    fail 'setup-control.sh: PATH для сервисов не в .profile'
+fi
+
+# pi-web без авторизации — только loopback.
+if grep -q 'PI_WEB_HOST="127.0.0.1"' "$SETUP_SCRIPT" &&
+    ! grep -qE 'PI_WEB_HOST="0\.0\.0\.0"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: PI WEB слушает только 127.0.0.1'
+else
+    fail 'setup-control.sh: PI WEB не привязан к 127.0.0.1'
+fi
+
+# Старый вариант (ravshansbox/pi-web) не должен остаться.
+if grep -q 'ravshansbox\|/opt/pi-web' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: остались следы ravshansbox/pi-web или /opt/pi-web'
+else
+    pass 'setup-control.sh: нет ravshansbox/pi-web и /opt/pi-web'
+fi
+
+check_order "$SETUP_SCRIPT" \
+    'npm install -g --ignore-scripts' \
+    'pi_web_as_user "pi-web install' \
+    'setup-control.sh: pi agent ставится раньше PI WEB'
+
 # --- 8. загрузка с ретраями, а не с жёсткими таймаутами ---------------------
 if grep -q 'rclone copyto' "$BACKUP_SCRIPT" &&
     awk '/rclone copyto/{f=1} f && /RCLONE_TRANSFER_ARGS/{found=1; exit} END{exit !found}' "$BACKUP_SCRIPT"; then

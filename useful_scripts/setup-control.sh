@@ -202,7 +202,7 @@ CURRENT_TZ="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
 
 if [[ "$CURRENT_TZ" == "$TIMEZONE" ]]; then
     echo "Уже установлен: $TIMEZONE"
-elif [[ -d "/usr/share/zoneinfo/$TIMEZONE" ]]; then
+elif [[ -e "/usr/share/zoneinfo/$TIMEZONE" ]]; then
     if command -v timedatectl >/dev/null 2>&1 &&
         timedatectl set-timezone "$TIMEZONE" 2>/dev/null; then
         echo "Установлен через timedatectl: $TIMEZONE"

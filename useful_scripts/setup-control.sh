@@ -1066,14 +1066,35 @@ EOF
             printf '\ninclude "/etc/nftables.d/*.nft"\n' >> /etc/nftables.conf
         fi
 
-        systemctl enable nftables || true
-        systemctl restart nftables || echo "ВНИМАНИЕ: nftables не перезапустился" >&2
+        systemctl enable nftables >/dev/null 2>&1 || true
+
+        # Применяем ТОЛЬКО свою таблицу, инкрементально.
+        # `systemctl restart nftables` выполняет `flush ruleset` из
+        # /etc/nftables.conf и сносит цепочки DOCKER/DOCKER-USER/DOCKER-ISOLATION,
+        # которые dockerd создал при своём старте. Сам демон при этом продолжает
+        # работать и потом не может вставить DNAT-правило:
+        #   iptables: No chain/target/match by that name.
+        # Поэтому чужие таблицы не трогаем: снимаем и загружаем только piweb_guard.
+        nft delete table inet piweb_guard 2>/dev/null || true
+
+        if ! nft -f /etc/nftables.d/piweb.nft; then
+            echo "ОШИБКА: не удалось загрузить /etc/nftables.d/piweb.nft" >&2
+            exit 1
+        fi
 
         if nft list table inet piweb_guard >/dev/null 2>&1; then
             echo "Порт $PI_WEB_PORT открыт для: $PIWEB_ALLOWED_SRC (+ loopback)"
         else
-            echo "ОШИБКА: таблица piweb_guard не загружена — проверь /etc/nftables.conf" >&2
+            echo "ОШИБКА: таблица piweb_guard не загружена" >&2
             echo "Порт $PI_WEB_PORT остаётся открытым без ограничений!" >&2
+        fi
+
+        # Docker наполняет свои цепочки при старте демона. Если их нет, а демон
+        # работает — публикация портов контейнеров сломается; говорим об этом.
+        if systemctl is-active --quiet docker &&
+            ! nft list chain ip nat DOCKER >/dev/null 2>&1; then
+            echo "ВНИМАНИЕ: docker запущен, но цепочек DOCKER в nft нет — контейнеры" >&2
+            echo "не смогут публиковать порты. Починить: sudo systemctl restart docker" >&2
         fi
     fi
 

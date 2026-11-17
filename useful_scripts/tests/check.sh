@@ -476,6 +476,22 @@ else
     fail 'setup-control.sh: нет ограничения порта Pi Web через nftables'
 fi
 
+# Регрессия: restart nftables выполняет `flush ruleset` из /etc/nftables.conf
+# и сносит цепочки DOCKER, которые dockerd создал при старте. Демон после этого
+# не может публиковать порты: "iptables: No chain/target/match by that name".
+if grep -vE '^\s*#' "$SETUP_SCRIPT" | grep -qE 'systemctl (restart|reload) nftables'; then
+    fail 'setup-control.sh: restart nftables сносит цепочки Docker (flush ruleset)'
+else
+    pass 'setup-control.sh: nftables не перезапускается (цепочки Docker целы)'
+fi
+
+if grep -q 'nft -f /etc/nftables.d/piweb.nft' "$SETUP_SCRIPT" &&
+    grep -q 'nft delete table inet piweb_guard' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: правило Pi Web применяется инкрементально (nft -f)'
+else
+    fail 'setup-control.sh: правило Pi Web не применяется инкрементально'
+fi
+
 # Проверки границ после запуска.
 for frag in 'sudo -u "$WEB_USER_NAME" ls "$AGENT_HOME"' \
     'sudo -u "$WEB_USER_NAME" test -w "$PI_WEB_DIR"' \

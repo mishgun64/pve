@@ -8,6 +8,9 @@ SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 BACKUP_SCRIPT="$SCRIPTS_DIR/backup-woodpecker.sh"
 SETUP_SCRIPT="$SCRIPTS_DIR/setup-control.sh"
+RESTORE_PI_SCRIPT="$SCRIPTS_DIR/restore-pi-agent.sh"
+BACKUP_PI_SH="$SCRIPTS_DIR/backup-pi-agent.sh"
+BACKUP_PI_SCRIPT="$SCRIPTS_DIR/backup-pi-agent.ps1"
 
 FAILED=0
 
@@ -59,6 +62,89 @@ if bash -n "$BACKUP_SCRIPT" 2>/dev/null; then
     pass "bash -n backup-woodpecker.sh"
 else
     fail "bash -n backup-woodpecker.sh"
+fi
+
+if bash -n "$RESTORE_PI_SCRIPT" 2>/dev/null; then
+    pass "bash -n restore-pi-agent.sh"
+else
+    fail "bash -n restore-pi-agent.sh"
+fi
+
+if bash -n "$BACKUP_PI_SH" 2>/dev/null; then
+    pass "bash -n backup-pi-agent.sh"
+else
+    fail "bash -n backup-pi-agent.sh"
+fi
+
+# --- 1a. pi agent backup/restore -------------------------------------------
+# получатель по умолчанию — ключ root@control
+if grep -qF 'DEFAULT_RECIPIENT="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB root@control"' "$BACKUP_PI_SH"; then
+    pass 'backup-pi-agent.sh: получатель по умолчанию — root@control'
+else
+    fail 'backup-pi-agent.sh: получатель по умолчанию не root@control'
+fi
+
+# источник и каталог загрузки совпадают с restore-pi-agent.sh
+grep -q 'pi-agent-backups' "$BACKUP_PI_SH" &&
+    grep -q 'RCLONE_CONFIG_FILE="/root/.config/rclone/rclone.conf"' "$BACKUP_PI_SH" &&
+    pass 'backup-pi-agent.sh: remote/каталог/конфиг rclone как у restore' ||
+    fail 'backup-pi-agent.sh: remote/каталог/конфиг rclone расходятся с restore'
+
+# перезапись одного и того же объекта
+for frag in 'rclone copyto' '--ignore-times' 'перезапись' 'sha256'; do
+    if grep -q -- "$frag" "$BACKUP_PI_SH"; then
+        pass "backup-pi-agent.sh: есть «$frag»"
+    else
+        fail "backup-pi-agent.sh: нет «$frag»"
+    fi
+done
+
+# Шифрование идёт из staging-каталога: иначе .sops.yaml рядом со скриптом
+# подменит получателя.
+check_order "$BACKUP_PI_SH"     'cd "$STAGING"'     'sops encrypt'     'backup-pi-agent.sh: шифрование из staging (не подхватывает .sops.yaml)'
+
+# preflight rclone раньше tar/sops
+check_order "$BACKUP_PI_SH"     'rclone lsd "$RCLONE_REMOTE"'     'tar -czf "$ARCHIVE"'     'backup-pi-agent.sh: rclone lsd раньше tar/sops'
+
+# restore ищет ключ для расшифровки у пользователя pi, а не у root
+if grep -q '/home/\$PI_USER/.ssh/id_ed25519' "$RESTORE_PI_SCRIPT"; then
+    pass 'restore-pi-agent.sh: ключ ищется у пользователя pi'
+else
+    fail 'restore-pi-agent.sh: нет поиска ключа в /home/$PI_USER/.ssh/'
+fi
+
+# архив распаковывается в /home/pi/.pi/agent
+if grep -q 'TARGET_DIR:=/home/\$PI_USER/.pi/agent' "$RESTORE_PI_SCRIPT"; then
+    pass 'restore-pi-agent.sh: каталог по умолчанию /home/<user>/.pi/agent'
+else
+    fail 'restore-pi-agent.sh: нет каталога по умолчанию /home/<user>/.pi/agent'
+fi
+
+# защита от path traversal до распаковки
+check_order "$RESTORE_PI_SCRIPT"     "архив содержит '..'"     "tar -xzf \"\$ARCHIVE\" -C \"\$TARGET_DIR\""     'restore-pi-agent.sh: проверка путей раньше распаковки'
+
+for frag in 'SOPS_AGE_SSH_PRIVATE_KEY_FILE' 'rclone copyto' 'sha256'; do
+    if grep -q -- "$frag" "$RESTORE_PI_SCRIPT"; then
+        pass "restore-pi-agent.sh: есть «$frag»"
+    else
+        fail "restore-pi-agent.sh: нет «$frag»"
+    fi
+done
+
+# бэкап шифрует sops-ом и перезаписывает объект на Drive
+for frag in 'sops' 'rclone copyto' '--ignore-times' 'overwrite'; do
+    if grep -q -- "$frag" "$BACKUP_PI_SCRIPT"; then
+        pass "backup-pi-agent.ps1: есть «$frag»"
+    else
+        fail "backup-pi-agent.ps1: нет «$frag»"
+    fi
+done
+
+# ключ шифрования запрашивается у пользователя интерактивно
+if grep -q 'Read-Host' "$BACKUP_PI_SCRIPT"; then
+    pass 'backup-pi-agent.ps1: ключ запрашивается интерактивно (Read-Host)'
+else
+    fail 'backup-pi-agent.ps1: нет интерактивного запроса ключа'
 fi
 
 # --- 2. preflight раньше шифрования ----------------------------------------

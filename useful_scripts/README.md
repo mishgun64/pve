@@ -90,6 +90,100 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
   - наружу — через Traefik: роутер `piweb` в `ansible/roles/traefik/config/files/traefik/dynamic/piweb.yml` (`Host(\`pi.mishgun.com\`)`, `crowdsec@file` + security-заголовки + `rateLimit` + `inFlightReq`).
   - после запуска скрипт печатает результат `systemd-analyze security pi-web.service` и проверяет границы: `piweb` не видит `/home/pi`, не пишет в `/opt/pi-web`, не может `sudo -n true`.
 
+## Бэкап и восстановление конфигурации pi agent
+
+Перенос конфигурации pi agent между машинами. Архив шифруется `sops` + `age`, где в роли age-получателя выступает **публичный SSH-ключ** (тот, чей приватный ключ будет использоваться для расшифровки).
+
+Однострочники (запуск напрямую с GitHub, клонировать репозиторий не нужно):
+
+```bash
+# бэкап /home/pi/.pi/agent -> gdrive:pi-agent-backups (перезапись)
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash
+
+# только план, без tar/sops/upload
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash -s -- --dry-run
+
+# бэкап без загрузки (локальная копия в /tmp/pibk)
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash -s -- --no-upload --out /tmp/pibk
+
+# восстановление из последнего бэкапа на Drive
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --yes
+
+# восстановление конкретного объекта + перезапуск Pi Web
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --name pi-agent-config-control.tar.gz.sops --restart-service --yes
+
+# восстановление из локального файла
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --file /root/pi-agent-config.tar.gz.sops --yes
+```
+
+> Параметры после `bash -s --` передаются скрипту; без них `restore-pi-agent.sh` спросит подтверждение (нужен tty) и выберет бэкап из списка. Для cron/без tty используйте `--yes`.
+
+На Windows (`backup-pi-agent.ps1`, PowerShell 5.1+) — то же самое без сохранения файла:
+
+```powershell
+# скачать во временный файл и запустить (ключ запрашивается интерактивно)
+iwr -useb https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.ps1 -OutFile "$env:TEMP\backup-pi-agent.ps1"; & "$env:TEMP\backup-pi-agent.ps1"
+
+# с параметрами
+iwr -useb https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.ps1 -OutFile "$env:TEMP\backup-pi-agent.ps1"; & "$env:TEMP\backup-pi-agent.ps1" -Recipient C:\Users\me\.ssh\id_ed25519.pub
+```
+
+**На Windows** (создание бэкапа, `backup-pi-agent.ps1`, PowerShell 5.1+):
+
+```powershell
+.\backup-pi-agent.ps1                       # ключ запрашивается интерактивно
+.\backup-pi-agent.ps1 -Recipient C:\Users\me\.ssh\id_ed25519.pub
+.\backup-pi-agent.ps1 -NoUpload -Out C:\temp\pibk
+.\backup-pi-agent.ps1 -WithSessions -Remote gdrive:pi-agent-backups
+```
+
+- Собирает `settings.json`, `keybindings.json`, `mcp.json`, `mcp-auth.json`, `models.json`, `models-store.json`, `auth.json`, `AGENTS.md`/`SYSTEM.md`/`APPEND_SYSTEM.md`, `ssh-remote-*.json`, `ssh-remote-memories/`, `pi-subagents/`, `extensions/`, `skills/`, `prompts/`, `themes/`, `missions/` (опционально `sessions/`, `data/`), исключая `*.bak*`, `*.tgz`, `*.html`, `node_modules`.
+- Ключ шифрования спрашивается интерактивно: `age1...`, строка `ssh-ed25519 AAAA...` или путь к `.pub`-файлу. Введённый публичный реципиент кэшируется в `%TEMP%\pi-agent-backup-recipient.txt` (не секрет) — дальше достаточно `Enter`.
+- Пакет → `sops encrypt --input-type binary` → проверка round-trip → `rclone copyto --ignore-times` (существующий файл **перезаписывается**) → сверка размера и `sha256`. Рядом с архивом кладётся `.sha256`.
+- Если публичный ключ-реципиент не парный ни одному локальному приватному ключу — это **warning**, а не ошибка (бэкап для другой машины). Битый архив при совпадающем ключе — отказ от загрузки. `-RequireVerify` делает проверку обязательной, `-SkipVerify` отключает её.
+- Параметры: `-Command Backup|Restore`, `-Dir`, `-Recipient`, `-Identity`, `-Name`, `-Remote`, `-Out`, `-WithSessions`, `-WithData`, `-NoMissions`, `-NoUpload`, `-DryRun`, `-Yes`, `-RequireVerify`, `-SkipVerify`.
+
+**На Linux (control node)** — пара `backup-pi-agent.sh` / `restore-pi-agent.sh`.
+
+`backup-pi-agent.sh` собирает `/home/pi/.pi/agent`, шифрует **публичным SSH-ключом root@control** (`ssh-ed25519 ... root@control`) и загружает в `gdrive:pi-agent-backups/pi-agent-config-<host>.tar.gz.sops`, всегда перезаписывая один и тот же объект:
+
+```bash
+sudo ./backup-pi-agent.sh                          # полный цикл: tar -> sops -> upload
+sudo ./backup-pi-agent.sh --no-upload --out /tmp/pibk
+sudo ./backup-pi-agent.sh --with-sessions --without-missions
+sudo ./backup-pi-agent.sh --dry-run
+```
+
+- Проверка rclone (`listremotes`/`lsd`/`mkdir`) идёт до `tar`/`sops`, чтобы не терять прогон на последнем шаге.
+- Шифрование выполняется из `staging`-каталога, чтобы случайный `.sops.yaml` рядом со скриптом не подменил получателя.
+- Перед загрузкой архив проверяется на расшифровку локальным `/root/.ssh/id_ed25519`: если ключ парный — обязательный round-trip (`--require-verify` делает это ошибкой, `--skip-verify` отключает проверку); если публичный ключ `root@control` не парный локальному — только warning.
+- Загруженный объект сверяется по размеру и `sha256` (рядом кладётся `.sha256`). Шифрованная копия всегда остаётся в `/var/backups/pi-agent/`, чтобы неудачная загрузка не уничтожила прогон.
+- Список изменяется флагами: `--with-sessions`, `--without-missions`, `--with-data`; исключаются `*.bak*`, `*.tgz`, `*.html`, `node_modules`.
+- Параметры: `--user`, `--src`, `--name`, `--recipient`, `--remote`, `--remote-dir`, `--rclone-config`, `--with-sessions`, `--without-missions`, `--with-data`, `--no-upload`, `--out`, `--require-verify`, `--skip-verify`, `--dry-run`.
+- Cron: `17 4 * * * /root/useful_scripts/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1`.
+
+`restore-pi-agent.sh` скачивает архив с Drive, расшифровывает приватным SSH-ключом пользователя `pi` и раскладывает файлы в `/home/pi/.pi/agent`:
+
+```bash
+sudo ./restore-pi-agent.sh                       # выберет бэкап из gdrive:pi-agent-backups
+sudo ./restore-pi-agent.sh --name pi-agent-config-DESKTOP.tar.gz.sops
+sudo ./restore-pi-agent.sh --file /root/pi-agent-config.tar.gz.sops
+sudo ./restore-pi-agent.sh --restart-service     # перезапустить pi-web.service после установки
+```
+
+- Ключ расшифровки ищется в `/home/pi/.ssh/id_ed25519` → `/home/pi/.ssh/id_rsa` → `/root/.ssh/...`; можно указать явно `--ssh-key`. Поддерживаются и ssh-ключи (`SOPS_AGE_SSH_PRIVATE_KEY_FILE`), и age identity-файлы (`AGE-SECRET-KEY-...` → `SOPS_AGE_KEY_FILE`).
+- Перед расшифровкой проверяется `sha256` (если рядом лежит `.sha256`), перед распаковкой — список файлов: запрещены абсолютные пути, `..` и элементы вне белого списка конфигов pi agent (защита от path traversal и подмены архивом).
+- Текущий `/home/pi/.pi/agent` сохраняется в `/home/pi/.pi/agent.bak.<дата>`; при `--no-backup` файлы просто перезаписываются. Секреты (`auth.json`, `mcp-auth.json`, `models-store.json`, `ssh-remote-config.json`) получают `0600`, остальное — `0644`, владелец — `pi:pi`.
+- Параметры: `--user`, `--dest`, `--name`, `--file`, `--remote`, `--remote-dir`, `--rclone-config`, `--ssh-key`, `-y`, `--no-backup`, `--restart-service`, `--keep-staging`.
+
+Расшифровать вручную:
+
+```bash
+export SOPS_AGE_SSH_PRIVATE_KEY_FILE=~/.ssh/id_ed25519
+sops decrypt --input-type binary --output-type binary --output cfg.tar.gz pi-agent-config-HOST.tar.gz.sops
+tar -xzf cfg.tar.gz -C ~/.pi/agent
+```
+
 ## Проверки
 
 Статический тест без docker/rclone/root:

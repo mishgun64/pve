@@ -1,6 +1,11 @@
 when:
-  event: manual
-  evaluate: 'PIPELINE == "media/backup"'
+  - event: manual
+    evaluate: 'PIPELINE == "media/backup"'
+
+  # Плановая задача в настройках репозитория (repo settings -> Crons).
+  # Имя должно совпадать с именем cron-задачи, иначе пайплайн пропускается.
+  - event: cron
+    cron: "Media-backup"
 
 steps:
   deploy:

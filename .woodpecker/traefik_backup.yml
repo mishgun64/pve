@@ -2,6 +2,11 @@ when:
   - event: manual
     evaluate: 'PIPELINE == "traefik/backup"'
 
+  # Плановая задача в настройках репозитория (repo settings -> Crons).
+  # Имя должно совпадать с именем cron-задачи, иначе пайплайн пропускается.
+  - event: cron
+    cron: "Traefik-backup"
+
 steps:
   deploy:
     image: alpine/ansible:latest

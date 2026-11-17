@@ -1,0 +1,43 @@
+---
+
+# Pi Web (control node, 192.168.2.200) — браузерный UI pi coding agent.
+# Приложение по своей природе = удалённый shell, поэтому наружу отдаём его
+# только через TLS + CrowdSec + лимиты, а сам порт закрыт nftables на control.
+http:
+  middlewares:
+    piweb-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        customFrameOptionsValue: "DENY"
+        contentTypeNosniff: true
+        referrerPolicy: "no-referrer"
+        permissionsPolicy: "geolocation=(), microphone=(), camera=()"
+    piweb-ratelimit:
+      rateLimit:
+        average: 10
+        burst: 20
+    piweb-inflight:
+      inFlightReq:
+        amount: 30
+
+  routers:
+    piweb:
+      rule: "Host(`pi.mishgun.com`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - crowdsec@file
+        - piweb-headers
+        - piweb-ratelimit
+        - piweb-inflight
+      service: piweb
+
+  services:
+    piweb:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.200:30141"

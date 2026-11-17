@@ -17,7 +17,20 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
 Чтобы расшифровать бэкап, скрипт настройки должен получить тот же приватный SSH-ключ root, что и на старом узле; ключ не должен быть защищён паролем (иначе расшифровка в cron/восстановлении не сработает).
 Ежедневный бэкап ставится в cron на 03:00 и всегда перезаписывает один и тот же файл `woodpecker/woodpecker_backup.tar.gz.enc`.
 
-Скрипт также ставит системный часовой пояс `Europe/Moscow` (MSK, +0300) — от него зависят время в логах и запуск cron в 03:00 по Москве.
+Скрипт также ставит системный часовой пояс `Europe/Moscow` (MSK, +0300) — от него зависят время в логах и запуск cron в 03:00 по Москве. Тот же пояс прокидывается в контейнеры Woodpecker: в `/opt/woodpecker/.env` есть `TIMEZONE=Europe/Moscow`, в `docker-compose.yml` в оба сервиса добавлено `TZ: ${TIMEZONE}` (функция `ensure_woodpecker_tz` идемпотентно доставляет это и в уже установленную инсталляцию, и в восстановленную из бэкапа). Без этого сервер работал в UTC, и cron-задачи Woodpecker срабатывали со сдвигом на 3 часа.
+
+## Cron-задачи Woodpecker (плановые бэкапы)
+
+Отдельно от системного cron хоста, в самом Woodpecker есть cron-задачи, которые запускают пайплайны из `.woodpecker/`. Задачи создаются в настройках репозитория (repo settings → Crons), **имя задачи должно точно совпадать** с фильтром `cron:` в конфиге пайплайна:
+
+| Cron-задача | Pipeline-файл | Шаги |
+| --- | --- | --- |
+| `Media-backup` | `.woodpecker/media_vm_backup.yml` | `media_vm/backup` → `media_vm` |
+| `Nextcloud-backup` | `.woodpecker/nextcloud_backup.yml` | `nextcloud/backup` → `nextcloud_vm` |
+| `Traefik-backup` | `.woodpecker/traefik_backup.yml` | `traefik/backup` → `traefik_lxc` |
+| `Valheim-backup` | `.woodpecker/valheim_backup.yml` | `valheim/backup` → `valheim_lxc` |
+
+В каждом из этих файлов два независимых условия `when`: `event: manual` + `evaluate: PIPELINE == "..."` (ручной запуск через `wp_cli`) и `event: cron` + `cron: "<имя задачи>"` (расписание). Нельзя объединять их в один блок: `evaluate` опирается на переменную `PIPELINE`, которой при cron-событии нет, и тогда пайплайн молча пропускается.
 
 ## rclone (Google Drive)
 

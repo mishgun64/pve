@@ -1153,6 +1153,47 @@ rm -f "$FANS_TMP"
 # ------------------------------------------------------------ woodpecker ---
 log "Woodpecker CI"
 
+# Часовой пояс контейнеров = системный ($TIMEZONE).
+# Скрипт идемпотентно доставляет TZ и в уже установленную инсталляцию:
+#   * .env получает TIMEZONE=... (его подставляет docker compose);
+#   * в docker-compose.yml добавляется TZ: ${TIMEZONE} в каждый сервис.
+# Без этого сервер живёт в UTC, и cron-задачи Woodpecker срабатывают со сдвигом.
+ensure_woodpecker_tz() {
+    local compose_file="$WP_DIR/docker-compose.yml"
+    local env_file="$WP_DIR/.env"
+
+    if [[ ! -f "$env_file" || ! -f "$compose_file" ]]; then
+        return 0
+    fi
+
+    if ! grep -qE '^TIMEZONE=' "$env_file"; then
+        printf '\nTIMEZONE=%s\n' "$TIMEZONE" >>"$env_file"
+        chmod 600 "$env_file"
+        echo "В $env_file добавлен TIMEZONE=$TIMEZONE"
+    fi
+
+    if ! grep -qF 'TZ: ${TIMEZONE}' "$compose_file"; then
+        local tmp_file
+        tmp_file="$(mktemp /tmp/woodpecker-compose.XXXXXX)"
+
+        awk '
+            /^    environment:[[:space:]]*$/ {
+                print
+                print "      TZ: ${TIMEZONE}"
+                print ""
+                next
+            }
+            { print }
+        ' "$compose_file" >"$tmp_file"
+
+        install -m 0644 "$tmp_file" "$compose_file"
+        rm -f "$tmp_file"
+        echo "В $compose_file добавлен TZ: \${TIMEZONE}"
+    fi
+}
+
+ensure_woodpecker_tz
+
 # Повторный запуск скрипта не должен перезаписывать рабочие .env и volume:
 # если .env уже есть, только поднимаем сервисы.
 if [[ -f "$WP_DIR/.env" ]]; then
@@ -1286,6 +1327,9 @@ else
         restore_volume "$SERVER_VOL" "woodpecker-server-data.tar.gz"
         restore_volume "$AGENT_VOL" "woodpecker-agent-config.tar.gz"
 
+        # Бэкап мог быть снят до появления TZ — доставляем его в восстановленные файлы.
+        ensure_woodpecker_tz
+
         cd "$WP_DIR"
 
         docker compose up -d
@@ -1339,6 +1383,8 @@ WOODPECKER_AGENT_SECRET=${WP_AGENT}
 
 WOODPECKER_OPEN=true
 WOODPECKER_ADMIN=mishgun64
+
+TIMEZONE=${TIMEZONE}
 EOF
 
         chmod 600 "$WP_DIR/.env"
@@ -1360,6 +1406,8 @@ services:
       - woodpecker-server-data:/var/lib/woodpecker
 
     environment:
+      TZ: ${TIMEZONE}
+
       WOODPECKER_HOST: ${WOODPECKER_HOST}
 
       WOODPECKER_GITHUB: ${WOODPECKER_GITHUB}
@@ -1385,6 +1433,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
     environment:
+      TZ: ${TIMEZONE}
+
       WOODPECKER_SERVER: woodpecker-server:9000
       WOODPECKER_AGENT_SECRET: ${WOODPECKER_AGENT_SECRET}
 

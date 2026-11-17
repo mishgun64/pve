@@ -120,11 +120,47 @@ check_order "$SETUP_SCRIPT" \
     'log "Woodpecker CI"' \
     'setup-control.sh: секция timezone раньше woodpecker'
 
-# --- 9. пользователи, sudo, пароли -----------------------------------------
-if grep -q '^USER_NAME="pi"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: USER_NAME="pi"'
+# Часовой пояс должен попадать и в контейнеры Woodpecker, иначе cron-задачи
+# сервера срабатывают в UTC (со сдвигом на 3 часа относительно MSK).
+if grep -q '^TIMEZONE=${TIMEZONE}$' "$SETUP_SCRIPT" &&
+    grep -q 'TZ: ${TIMEZONE}' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: TZ прокидывается в контейнеры Woodpecker'
 else
-    fail 'setup-control.sh: нет USER_NAME="pi"'
+    fail 'setup-control.sh: нет TIMEZONE в .env и/или TZ: ${TIMEZONE} в compose'
+fi
+
+if grep -q '^ensure_woodpecker_tz()' "$SETUP_SCRIPT" &&
+    grep -q '^ensure_woodpecker_tz$' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: ensure_woodpecker_tz для уже установленной инсталляции'
+else
+    fail 'setup-control.sh: нет идемпотентной доставки TZ в установленный Woodpecker'
+fi
+
+# --- 7b. cron-задачи Woodpecker --------------------------------------------
+# Плановые бэкапы запускаются событием cron, а не manual/push.
+for cron_pipeline in \
+    'media_vm_backup.yml:Media-backup' \
+    'nextcloud_backup.yml:Nextcloud-backup' \
+    'traefik_backup.yml:Traefik-backup' \
+    'valheim_backup.yml:Valheim-backup'; do
+    pipeline_file="${cron_pipeline%%:*}"
+    cron_name="${cron_pipeline##*:}"
+
+    if grep -q 'event: cron' "$SCRIPTS_DIR/../.woodpecker/$pipeline_file" &&
+        grep -q "cron: \"$cron_name\"" "$SCRIPTS_DIR/../.woodpecker/$pipeline_file"; then
+        pass ".woodpecker/$pipeline_file: event cron ($cron_name)"
+    else
+        fail ".woodpecker/$pipeline_file: нет event: cron с именем $cron_name"
+    fi
+done
+
+# --- 9. пользователи, sudo, пароли -----------------------------------------
+# Две учётки: pi (человек, sudo+ключи) и piweb (сервис Pi Web, без привилегий).
+if grep -q '^AGENT_USER_NAME="pi"' "$SETUP_SCRIPT" &&
+    grep -q '^WEB_USER_NAME="piweb"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: AGENT_USER_NAME="pi" + WEB_USER_NAME="piweb"'
+else
+    fail 'setup-control.sh: нет разделения AGENT_USER_NAME/WEB_USER_NAME'
 fi
 
 for frag in 'useradd --create-home' 'usermod --append --groups sudo' \

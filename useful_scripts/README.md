@@ -52,62 +52,46 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
 
 ## Пользователи и доступ по SSH
 
-Скрипт создаёт две учётки с разным уровнем доверия:
+Скрипт создаёт одну рабочую учётку `pi` (домашний каталог `/home/pi`, shell `/bin/bash`): от неё работают и интерактивный агент, и Pi Web.
 
-| Учётка | Роль | sudo | SSH-ключи | `/home/pi` |
-| --- | --- | --- | --- | --- |
-| `pi` | интерактивная работа человеком | да, с паролем | да | да |
-| `piweb` | процесс Pi Web и веб-агент | нет | нет | нет |
+Отдельная низкопривилегированная учётка `piweb` пробовалась, но отклонена: веб-агенту нужны те же возможности, что и агенту в терминале (свои проекты, SSH на другие машины, sudo-задачи), а агент живёт внутри процесса `pi-web` — второй пользователь лишь дублировал бы `pi` без этих прав. Ограничение ущерба держится на других слоях:
 
-Разделение нужно потому, что Pi Web — это удалённый shell (`/api/terminal`, `node-pty`) и агент с ключами провайдеров в том же процессе: компрометация UI раньше давала полный контроль над учёткой `pi` с `NOPASSWD: ALL`.
+- пароль Pi Web + TLS/CrowdSec/лимиты в Traefik;
+- nftables: порт `30141` только с доверенных адресов;
+- хардненинг юнита (`NoNewPrivileges`, `ProtectSystem=strict`, `SystemCallFilter`);
+- `/opt/pi-web` принадлежит `root:root` и не writable для сервиса (через UI нельзя править код своего же сервиса);
+- `sudo` у `pi` — с паролем, а не `NOPASSWD`.
+
+Если учётка `piweb` осталась от предыдущей установки, скрипт предлагает вернуть её служебное состояние в `/home/pi` и удалить: `userdel --remove piweb`.
 
 - Публичный ключ root добавляется в `/root/.ssh/authorized_keys` — root может залогиниться сам к себе по ключу.
 - Для `pi` создаётся `/home/pi/.ssh/authorized_keys` (`0700`/`0600`, `pi:pi`). Ключ скрипт спрашивает интерактивно (валидация через `ssh-keygen -l`), `Enter` — взять тот же ключ, что у root.
-- `sudo` ставится из apt; `pi` добавляется в группу `sudo` и в `/etc/sudoers.d/90-pi`. Правило — `ALL=(ALL:ALL) ALL` (**с паролем**, без `NOPASSWD`): процесс Pi Web больше не работает от `pi`, поэтому беспарольный sudo не нужен ни одной автоматизации. После записи файл проверяется `visudo -cf`, при ошибке удаляется и установка прерывается — битый sudoers не остаётся на диске.
-- `piweb` создаётся с shell `/usr/sbin/nologin`, пароль блокируется (`passwd -l`), домашний каталог `0700`. Скрипт явно убирает `piweb` из групп `sudo`, `docker`, `adm`, `systemd-journal` и удаляет `/home/piweb/.ssh`, если он есть.
+- `sudo` ставится из apt; `pi` добавляется в группу `sudo` и в `/etc/sudoers.d/90-pi`. Правило — `ALL=(ALL:ALL) ALL` (**с паролем**, без `NOPASSWD`): беспарольный sudo не нужен ни одной автоматизации, а доступ к порту Pi Web не должен превращаться в root. После записи файл проверяется `visudo -cf`, при ошибке удаляется и установка прерывается — битый sudoers не остаётся на диске.
+- Домашний каталог `pi` — `0700`; пароль сервиса Pi Web лежит в `/home/pi/.config/pi-web/service.env` (`0600`).
 - Пароли `root` и `pi` задаются интерактивно (дважды, без эха). Пароль передаётся только через stdin `chpasswd` — в аргументах командной строки его нет.
-- Все пользователи, которые могут залогиниться (UID 0 или 1000–60000 и реальный shell), кроме `root`, `pi` и `piweb`, показываются списком с запросом подтверждения и затем удаляются (`pkill -KILL -u` + `userdel --remove`, при неудаче — `userdel` без домашнего каталога).
+- Все пользователи, которые могут залогиниться (UID 0 или 1000–60000 и реальный shell), кроме `root` и `pi`, показываются списком с запросом подтверждения и затем удаляются (`pkill -KILL -u` + `userdel --remove`, при неудаче — `userdel` без домашнего каталога).
 
 ## pi agent и Pi Web
 
 - **pi agent**: требует Node.js ≥ 22.19. Если подходящего Node нет, ставится официальный бинарный дистрибутив с `nodejs.org` (latest-v22.x) в `/usr/local` с обязательной проверкой `sha256sum`; затем `npm install -g --ignore-scripts @earendil-works/pi-coding-agent`. Если `pi` уже стоит — предлагается `pi update`. Официальный `https://pi.dev/install.sh` не используется: он интерактивен и без tty не умеет ставить Node.
 - **Pi Web** — [agegr/pi-web](https://github.com/agegr/pi-web) (пакет `@agegr/pi-web`):
-  - ставится не глобально, а в отдельный каталог `/opt/pi-web` (`npm install --omit=dev --allow-scripts=node-pty @agegr/pi-web@latest` **от root**). Отдельный каталог нужен потому, что пакет предоставляет бинарник `pi-web`, и глобальная установка конфликтует с другими реализациями того же имени. `--allow-scripts=node-pty` разрешает install-скрипт только `node-pty` (на npm < 12 флага нет — там скрипты разрешены по умолчанию). На Linux `node-pty` собирается из исходников, поэтому дополнительно ставится `build-essential python3`; после установки скрипт проверяет, что модуль загружается. Каталог принадлежит `root:root` и не writable для `piweb`: иначе компрометация UI = правка кода своего же сервиса (персистентность).
-  - запускается **system-level** юнитом `/etc/systemd/system/pi-web.service` (`User=piweb`, `WorkingDirectory=/opt/pi-web`, `Environment=PI_CODING_AGENT_DIR=/home/piweb/.pi/agent`, `Restart=on-failure`, `enable`). Своего установщика сервисов у Pi Web нет, поэтому unit пишется скриптом.
-  - юнит содержит блок хардненинга: `NoNewPrivileges=yes`, пустые `CapabilityBoundingSet`/`AmbientCapabilities`, `ProtectSystem=strict` + `ReadWritePaths=/home/piweb /srv/work/piweb`, `InaccessiblePaths=-/home/pi`, `PrivateTmp`, `PrivateDevices`, `ProtectProc=invisible`, `RestrictNamespaces`, `SystemCallFilter=@system-service`, `UMask=0077`. `ProtectHome` не используется (иначе скрылся бы и `/home/piweb`); `MemoryDenyWriteExecute` не ставится — ломает JIT V8.
-  - `piweb` работает с настройками агента из `/home/piweb/.pi/agent` (`0700`), plugin-data — `/home/piweb/.pi-web` (`0700`), рабочие каталоги — `/srv/work/piweb` (`0750`). Переменная `PIWEB_WORK_DIR` задаёт последний.
-  - **Настройки не разделяются, а копируются.** `/home/pi` закрыт для `piweb` (`0700 pi:pi` + `InaccessiblePaths`), поэтому Pi Web не «видит» конфиг `pi` — это ожидаемо, а не поломка. Перенос делает `sync-piweb-config.sh` (его же вызывает `setup-control.sh` при установке). Подробнее — в разделе «Перенос настроек в piweb».
-  - единственная запись внутри `/opt/pi-web` — `.next/cache`, отдаётся `piweb` отдельным `install -d`.
+  - ставится не глобально, а в отдельный каталог `/opt/pi-web` (`npm install --omit=dev --allow-scripts=node-pty @agegr/pi-web@latest` **от root**). Отдельный каталог нужен потому, что пакет предоставляет бинарник `pi-web`, и глобальная установка конфликтует с другими реализациями того же имени. `--allow-scripts=node-pty` разрешает install-скрипт только `node-pty` (на npm < 12 флага нет — там скрипты разрешены по умолчанию). На Linux `node-pty` собирается из исходников, поэтому дополнительно ставится `build-essential python3`; после установки скрипт проверяет, что модуль загружается. Каталог принадлежит `root:root` и не writable для `pi`: иначе компрометация UI = правка кода своего же сервиса (персистентность).
+  - запускается **system-level** юнитом `/etc/systemd/system/pi-web.service` (`User=pi`, `WorkingDirectory=/opt/pi-web`, `Environment=PI_CODING_AGENT_DIR=/home/pi/.pi/agent`, `Restart=on-failure`, `enable`). Своего установщика сервисов у Pi Web нет, поэтому unit пишется скриптом.
+  - юнит содержит блок хардненинга: `NoNewPrivileges=yes`, пустые `CapabilityBoundingSet`/`AmbientCapabilities`, `ProtectSystem=strict` + `ReadWritePaths=/home/pi -/opt/pi-web/.next/cache`, `PrivateTmp`, `PrivateDevices`, `ProtectProc=invisible`, `RestrictNamespaces`, `SystemCallFilter=@system-service`, `UMask=0077`. `ProtectHome` не используется; `MemoryDenyWriteExecute` не ставится — ломает JIT V8.
+  - настройки агента — `/home/pi/.pi/agent` (`0700`), plugin-data Pi Web — `/home/pi/.pi-web` (`0700`). Это те же файлы, что использует агент в терминале: миграция и повторная синхронизация между учётками не нужны.
+  - единственная запись внутри `/opt/pi-web` — `.next/cache`, отдаётся учётке `pi` отдельным `install -d`.
   - обновления Pi Web выполняются от root: `sudo npm --prefix /opt/pi-web install --omit=dev --no-fund --no-audit --allow-scripts=node-pty @agegr/pi-web@latest && sudo systemctl restart pi-web`. Штатный `/api/app-update` внутри UI после разделения не работает — так и задумано.
   - адрес выбирается интерактивно: LAN-адрес машины (определяется через `ip route get 1.1.1.1`, по умолчанию) или `127.0.0.1` для доступа только через SSH-туннель. `0.0.0.0` не используется — бинд на конкретный интерфейс держит порт вне других сетей.
   - **Порт задаётся переменной `PORT`**, а не `PI_WEB_PORT`: Pi Web читает только `PORT` (и флаг `-p`), поэтому `Environment=PI_WEB_PORT=...` в юните игнорируется и сервер молча слушает 30141.
   - **Домен за reverse proxy обязателен в `PI_WEB_ALLOWED_HOSTS`.** Pi Web пропускает запрос, только если `Host` — это `localhost`, `*.localhost`, IP-литерал либо значение из `PI_WEB_ALLOWED_HOSTS`; для домена без этой настройки страница открывается, но все POST отвечают `403 Untrusted API request`. Скрипт спрашивает домены и пишет `Environment=PI_WEB_ALLOWED_HOSTS=...`. Пример: `PI_WEB_ALLOWED_HOSTS=pi.mishgun.com` при обращении через traefik.
-  - при бинде на не-loopback адрес включается **пароль**: `PI_WEB_PASSWORD` (логин `pi` / пароль, плюс Basic Auth для API). Пароль спрашивается без эха, Enter — сгенерировать случайный, и хранится в `/home/piweb/.config/pi-web/password` (`0600`). В юнит пароль не попадает: он лежит в `/home/piweb/.config/pi-web/service.env` (`0600`, владелец `piweb` — `EnvironmentFile` читает systemd от root), подключаемом через `EnvironmentFile=`.
+  - при бинде на не-loopback адрес включается **пароль**: `PI_WEB_PASSWORD` (логин `pi` / пароль, плюс Basic Auth для API). Пароль спрашивается без эха, Enter — сгенерировать случайный, и хранится в `/home/pi/.config/pi-web/password` (`0600`). В юнит пароль не попадает: он лежит в `/home/pi/.config/pi-web/service.env` (`0600`, владелец `pi`), подключаемом через `EnvironmentFile=`.
   - **Важно:** даже с паролем пароль и трафик по HTTP не шифруются — только доверенная LAN, VPN или HTTPS reverse proxy. Порт дополнительно закрывается nftables: таблица `piweb_guard` в `/etc/nftables.d/piweb.nft` (подключается из `/etc/nftables.conf`) пускает к `PORT` только loopback и адреса из `PIWEB_ALLOWED_SRC` (по умолчанию `192.168.1.0/24` — хост traefik). `PIWEB_ALLOWED_SRC="-"` отключает этот шаг. Правило применяется **инкрементально** (`nft -f`), без `systemctl restart nftables`: в `/etc/nftables.conf` первой строкой идёт `flush ruleset`, и рестарт сносит цепочки `DOCKER`/`DOCKER-USER`, созданные dockerd при старте. После этого работающий демон не может публиковать порты контейнеров (`iptables: No chain/target/match by that name`) — лечится `systemctl restart docker`.
   - Если выбрано `127.0.0.1`, работать с любой машины так:
     `ssh -N -L 30141:127.0.0.1:30141 pi@<host>`, затем `http://127.0.0.1:30141`.
   - Управление: `systemctl status|restart pi-web`, логи — `journalctl -u pi-web -f`. Сменить адрес/порт/домены: поправить `Environment=PI_WEB_HOSTNAME`/`PORT`/`PI_WEB_ALLOWED_HOSTS` в `/etc/systemd/system/pi-web.service` и `systemctl daemon-reload && systemctl restart pi-web`.
-  - Порт/хост/каталог/пакет вынесены в `PI_WEB_PORT`, `PI_WEB_HOST` (пустой = спросить), `PI_WEB_DIR`, `PI_WEB_BIN`, `PI_WEB_PKG`; учётки — `AGENT_USER_NAME` (`pi`) и `WEB_USER_NAME` (`piweb`).
+  - Порт/хост/каталог/пакет вынесены в `PI_WEB_PORT`, `PI_WEB_HOST` (пустой = спросить), `PI_WEB_DIR`, `PI_WEB_BIN`, `PI_WEB_PKG`; учётка — `AGENT_USER_NAME` (`pi`).
   - наружу — через Traefik: роутер `piweb` в `ansible/roles/traefik/config/files/traefik/dynamic/piweb.yml` (`Host(\`pi.mishgun.com\`)`, `crowdsec@file` + security-заголовки + `rateLimit` + `inFlightReq`).
-  - после запуска скрипт печатает результат `systemd-analyze security pi-web.service` и проверяет границы: `piweb` не видит `/home/pi`, не пишет в `/opt/pi-web`, не может `sudo -n true`.
-
-## Перенос настроек в piweb
-
-Pi Web работает от `piweb`, а домашний каталог `pi` для неё закрыт. Открывать `/home/pi` нельзя (там приватный SSH-ключ и история сессий), поэтому конфигурация **копируется** скриптом `sync-piweb-config.sh`. Тот же скрипт нужен после того, как настройки `pi` поменялись.
-
-```bash
-sudo ./sync-piweb-config.sh --dry-run      # показать план
-sudo ./sync-piweb-config.sh                # перенести (с бэкапом цели в /var/backups)
-sudo ./sync-piweb-config.sh --restart      # перенести и перезапустить pi-web
-```
-
-- Переносится: `settings.json`, `keybindings.json`, `models.json`, `models-store.json`, `auth.json`, `mcp.json`, `mcp-auth.json`, `AGENTS.md`/`AGENTS.override.md`/`CLAUDE.md`/`SYSTEM.md`/`APPEND_SYSTEM.md`, каталоги `data/`, `extensions/`, `skills/`, `prompts/`, `themes/`. Файлы ставятся `0600 piweb:piweb`.
-- **Не переносится:** `sessions/` (история переписок и `cwd` из `/home/pi`), `ssh-remote-memories/`, `ssh-remote-*.json`, `pi-subagents/`, `trust.json` (решения привязаны к путям `/home/pi`), `npm/` (переустанавливается), `bin/`, `pi-web-*.json`, `web-push.json`.
-- Из `settings.json` вырезается пакет `npm:pi-ssh-remote` — у веб-учётки не должно быть SSH-доступа.
-- Симлинки из копии удаляются: они указывали бы в `/home/pi`.
-- Существующий каталог не затирается целиком — недостающее досыпается (`cp --no-clobber`), поэтому повторный запуск безопасен.
-- Перед изменением цели делается `tar.gz` в `/var/backups/piweb-agent-config-<дата>.tar.gz` (`0600`), отключается `--no-backup`.
-- Ключи провайдеров и токены MCP копируются от `pi`; по плану стоит завести отдельные (с лимитом расходов), чтобы ротация после инцидента была дешёвой.
+  - после запуска скрипт печатает результат `systemd-analyze security pi-web.service`, проверяет что `/opt/pi-web` не writable и что процесс `pi-web` работает от `pi`.
 
 ## Бэкап и восстановление конфигурации pi agent
 

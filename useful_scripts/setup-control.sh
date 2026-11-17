@@ -5,13 +5,14 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-# Две учётки с разным уровнем доверия:
-#   AGENT_USER_NAME — интерактивная работа человеком (sudo, SSH-ключи, /home/pi);
-#   WEB_USER_NAME   — процесс Pi Web и веб-агент (без sudo, без SSH-ключей).
-# Pi Web по своей природе — удалённый shell, поэтому запускать его от учётки
-# с sudo/ключами нельзя: компрометация UI давала бы полный контроль над хостом.
+# Одна учётка на человека и на агента.
+# Отдельная низкопривилегированная учётка для Pi Web (piweb) пробовалась, но
+# отклонена: веб-агенту нужны те же возможности, что и агенту в терминале
+# (свои проекты, SSH на машины, sudo-задачи), а «агент живёт внутри процесса
+# pi-web» — значит второй пользователь лишь дублировал бы pi без этих прав.
+# Ограничение ущерба при компрометации UI держится на других слоях: пароль,
+# TLS + CrowdSec + лимиты в Traefik, nftables на порт, хардненинг юнита.
 AGENT_USER_NAME="pi"
-WEB_USER_NAME="piweb"
 TIMEZONE="Europe/Moscow"
 WP_DIR="/opt/woodpecker"
 PROJECT_NAME="woodpecker"
@@ -33,9 +34,6 @@ PI_WEB_HOST=""
 PI_WEB_DIR="/opt/pi-web"
 PI_WEB_BIN="$PI_WEB_DIR/node_modules/.bin/pi-web"
 PI_WEB_PKG="@agegr/pi-web"
-# Рабочие каталоги веб-агента: отдельно от /home/pi, чтобы низкодоверенный
-# процесс не мог подменить то, что потом исполнит человек (Makefile, CI-конфиги).
-PIWEB_WORK_DIR="/srv/work/piweb"
 # Имена, по которым к Pi Web обращаются снаружи (reverse proxy).
 # Нужны, когда Host за прокси не совпадает с адресом бинда: иначе POST-запросы
 # получают 403 «Untrusted API request». Пусто — спросить.
@@ -244,16 +242,14 @@ fi
 
 usermod --shell /bin/bash "$AGENT_USER_NAME"
 
-# Домашний каталог человека закрыт для остальных: $WEB_USER_NAME не должен
-# читать ключи и историю сессий агента.
+# Домашний каталог закрыт для остальных: там ключи и история сессий агента.
 chmod 0700 "$AGENT_HOME"
 
-# Группа sudo нужна только человеку ($AGENT_USER_NAME). Веб-учётка
-# ($WEB_USER_NAME) в sudo не попадает никогда.
+# Группа sudo + явный drop-in в sudoers. Pi Web и веб-агент работают от этой же
+# учётки, поэтому привилегии остаются — но с паролем, а не NOPASSWD: так
+# «просто доступ к порту» не превращается в root (нужен ещё пароль sudo).
 usermod --append --groups sudo "$AGENT_USER_NAME"
 
-# Pi Web работает от $WEB_USER_NAME, поэтому sudo больше не выдаётся без пароля:
-# ключ человека — единственное, что осталось у учётки с привилегиями.
 printf '%s ALL=(ALL:ALL) ALL\n' "$AGENT_USER_NAME" > "$SUDOERS_FILE"
 chmod 0440 "$SUDOERS_FILE"
 chown root:root "$SUDOERS_FILE"
@@ -267,44 +263,66 @@ fi
 
 echo "$AGENT_USER_NAME добавлен в sudoers (с паролем): $SUDOERS_FILE"
 
-# ------------------------------------------- сервисная учётка для Pi Web ---
-log "Сервисный пользователь $WEB_USER_NAME (Pi Web)"
+# ------------------------------------- уборка прежней веб-учётки piweb ---
+# Разделение на pi/piweb отменено: Pi Web и агент снова работают от $AGENT_USER_NAME.
+# Если piweb остался от предыдущей установки — переносим его состояние обратно и
+# удаляем учётку, иначе она просто висит без дела.
+if id "piweb" &>/dev/null; then
+    log "Найдена прежняя учётка piweb (разделение отменено)"
 
-WEB_HOME="/home/$WEB_USER_NAME"
+    LEGACY_HOME="$(getent passwd piweb | cut -d: -f6)"
 
-if id "$WEB_USER_NAME" &>/dev/null; then
-    echo "Пользователь $WEB_USER_NAME уже существует"
-    WEB_HOME="$(getent passwd "$WEB_USER_NAME" | cut -d: -f6)"
-else
-    # nologin: у учётки нет интерактивного входа и не должно быть;
-    # системный юнит работает и без шелла.
-    useradd --create-home --home-dir "$WEB_HOME" --shell /usr/sbin/nologin "$WEB_USER_NAME"
-    echo "Создан пользователь $WEB_USER_NAME ($WEB_HOME)"
+    read -rp "Удалить пользователя piweb и вернуть данные в $AGENT_HOME? [Y/n]: " DROP_PIWEB </dev/tty ||
+        DROP_PIWEB="y"
+
+    if [[ "$DROP_PIWEB" =~ ^[NnНн]$ ]]; then
+        echo "Учётка piweb оставлена как есть"
+    else
+        systemctl stop pi-web 2>/dev/null || true
+
+        # Служебное состояние Pi Web возвращаем, только если у pi его ещё нет:
+        # файлы агента у pi всегда были свои, копировать их обратно не нужно.
+        if [[ -d "$LEGACY_HOME/.pi-web" ]]; then
+            install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$AGENT_HOME/.pi-web"
+
+            if [[ -z "$(ls -A "$AGENT_HOME/.pi-web" 2>/dev/null)" ]]; then
+                cp -a "$LEGACY_HOME/.pi-web/." "$AGENT_HOME/.pi-web/" 2>/dev/null || true
+                chown -R "$AGENT_USER_NAME:$AGENT_USER_NAME" "$AGENT_HOME/.pi-web"
+                echo "Возвращён $AGENT_HOME/.pi-web"
+            fi
+        fi
+
+        if [[ -f "$LEGACY_HOME/.config/pi-web/service.env" ]] &&
+            [[ ! -f "$AGENT_HOME/.config/pi-web/service.env" ]]; then
+            install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" \
+                "$AGENT_HOME/.config/pi-web"
+            install -m 0600 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" \
+                "$LEGACY_HOME/.config/pi-web/service.env" \
+                "$AGENT_HOME/.config/pi-web/service.env"
+            echo "Возвращён $AGENT_HOME/.config/pi-web/service.env"
+        fi
+
+        # Рабочий каталог веб-агента больше не нужен.
+        if [[ -d /srv/work/piweb && -z "$(ls -A /srv/work/piweb 2>/dev/null)" ]]; then
+            rmdir /srv/work/piweb 2>/dev/null || true
+        fi
+
+        pkill -KILL -u piweb 2>/dev/null || true
+
+        if userdel --remove piweb 2>/dev/null; then
+            echo "Пользователь piweb удалён вместе с домашним каталогом"
+        elif userdel piweb 2>/dev/null; then
+            echo "Пользователь piweb удалён (домашний каталог не тронут)"
+        else
+            echo "ВНИМАНИЕ: не удалось удалить piweb" >&2
+        fi
+    fi
 fi
 
-# Пароля нет — вход в систему запрещён (systemd-юнит работает через uid).
-passwd -l "$WEB_USER_NAME" >/dev/null 2>&1 || true
-chmod 0700 "$WEB_HOME"
-
-# Никаких привилегированных групп и никаких SSH-ключей у веб-учётки.
-for grp in sudo docker adm systemd-journal; do
-    if id -nG "$WEB_USER_NAME" | tr ' ' '\n' | grep -qx "$grp"; then
-        gpasswd -d "$WEB_USER_NAME" "$grp" >/dev/null 2>&1 || true
-        echo "ВНИМАНИЕ: $WEB_USER_NAME удалён из группы $grp" >&2
-    fi
-done
-
-if [[ -d "$WEB_HOME/.ssh" ]]; then
-    rm -rf "$WEB_HOME/.ssh"
-    echo "ВНИМАНИЕ: удалён $WEB_HOME/.ssh (у веб-учётки не должно быть ключей)" >&2
+# Linger не нужен: Pi Web — system-level юнит, а не per-user.
+if loginctl show-user "$AGENT_USER_NAME" 2>/dev/null | grep -qi '^Linger=yes'; then
+    loginctl disable-linger "$AGENT_USER_NAME" && echo "Linger выключен для $AGENT_USER_NAME"
 fi
-
-# Linger нужен только per-user юнитам, а Pi Web — system-level сервис.
-for u in "$AGENT_USER_NAME" "$WEB_USER_NAME"; do
-    if loginctl show-user "$u" 2>/dev/null | grep -qi '^Linger=yes'; then
-        loginctl disable-linger "$u" && echo "Linger выключен для $u"
-    fi
-done
 
 # sshd должен быть включён, иначе вход по ключам (root/pi) не заработает.
 systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null || true
@@ -344,13 +362,13 @@ else
 fi
 
 # ----------------------------------- удаление прочих логинящихся юзеров ---
-log "Удаление пользователей, кроме root, $AGENT_USER_NAME и $WEB_USER_NAME"
+log "Удаление пользователей, кроме root и $AGENT_USER_NAME"
 
 # «Может залогиниться» — не системный аккаунт (UID 0 или 1000..60000)
 # с реальным шеллом (не nologin/false).
 mapfile -t LOGIN_USERS < <(
-    getent passwd | awk -F: -v keep="$AGENT_USER_NAME" -v keepweb="$WEB_USER_NAME" '
-        $1 == "root" || $1 == keep || $1 == keepweb || $1 == "nobody" { next }
+    getent passwd | awk -F: -v keep="$AGENT_USER_NAME" '
+        $1 == "root" || $1 == keep || $1 == "nobody" { next }
         (($3 >= 1000 && $3 <= 60000) || $3 == 0) && $7 != "" &&
             $7 !~ /(nologin|false|sync|shutdown|halt)$/ { print $1 }
     '
@@ -589,8 +607,9 @@ echo "node: $(node --version)"
 log "Установка Pi Web (https://github.com/agegr/pi-web)"
 
 # Pi Web — это удалённый shell (терминал через node-pty) плюс агент с ключами
-# провайдеров в том же процессе. Поэтому процесс работает от отдельной учётки
-# $WEB_USER_NAME без sudo и без SSH-ключей, а код в $PI_WEB_DIR принадлежит root.
+# провайдеров в том же процессе; он работает от $AGENT_USER_NAME, как и агент в
+# терминале. Код сервиса остаётся root-only, чтобы через UI нельзя было править
+# код своего же сервиса (персистентность).
 # Pi Web слушает loopback по умолчанию. Наружу — только вместе с паролем.
 PI_WEB_LAN_IP="$(ip -4 route get 1.1.1.1 2>/dev/null |
     awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}')"
@@ -677,9 +696,8 @@ if [[ -n "$PIWEB_ALLOWED_SRC" && "$PIWEB_ALLOWED_SRC" != "-" ]]; then
 fi
 
 echo ""
-echo "Pi Web ставится в $PI_WEB_DIR (root:root) и работает от пользователя $WEB_USER_NAME."
-echo "  домашний каталог учётки: $WEB_HOME"
-echo "  рабочие каталоги агента: $PIWEB_WORK_DIR"
+echo "Pi Web ставится в $PI_WEB_DIR (root:root) и работает от пользователя $AGENT_USER_NAME."
+echo "  настройки агента: $AGENT_HOME/.pi/agent"
 echo "Адрес: http://$PI_WEB_HOST:$PI_WEB_PORT"
 echo ""
 
@@ -691,7 +709,7 @@ else
     # node-pty (терминалы в браузере) собирается из исходников: нужен компилятор.
     apt-get install -y build-essential python3
 
-    # --- код сервиса: читает $WEB_USER_NAME, правит только root -------------
+    # --- код сервиса: читает $AGENT_USER_NAME, правит только root -----------
     # Иначе компрометация UI = правка кода своего же сервиса (персистентность).
     install -d -m 0755 -o root -g root "$PI_WEB_DIR"
     chown -R root:root "$PI_WEB_DIR"
@@ -727,78 +745,25 @@ else
         echo "ВНИМАНИЕ: node-pty не загружается — терминалы в UI будут недоступны." >&2
     fi
 
-    # --- каталоги веб-учётки ------------------------------------------------
-    # Родительские каталоги (`.pi`, `.config`) создаём явно: install -d делает
-    # промежуточные уровни по 0755, а конфигам агента нужен 0700.
-    install -d -m 0700 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$WEB_HOME/.pi"
-    install -d -m 0700 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$WEB_HOME/.pi/agent"
-    install -d -m 0700 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$WEB_HOME/.pi-web"
-    install -d -m 0700 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$WEB_HOME/.config"
-    install -d -m 0700 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$WEB_HOME/.config/pi-web"
-    install -d -m 0750 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$PIWEB_WORK_DIR"
+    # --- каталоги данных Pi Web (от $AGENT_USER_NAME) -----------------------
+    install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$AGENT_HOME/.pi"
+    install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$AGENT_HOME/.pi/agent"
+    install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$AGENT_HOME/.pi-web"
+    install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$AGENT_HOME/.config"
 
-    # --- перенос данных из $AGENT_USER_NAME (фаза 2 плана) ------------------
-    # Конфиги копируются, а не шарятся: /home/$AGENT_USER_NAME закрыт для
-    # $WEB_USER_NAME (0700 + InaccessiblePaths). Логика переноса живёт в
-    # sync-piweb-config.sh — он же используется для повторной синхронизации,
-    # когда настройки pi поменялись после установки.
-    PIWEB_SYNC_SCRIPT="/root/sync-piweb-config.sh"
-
-    curl -fsSL "$RAW_BASE/sync-piweb-config.sh" -o "$PIWEB_SYNC_SCRIPT" ||
-        echo "ВНИМАНИЕ: не удалось скачать $RAW_BASE/sync-piweb-config.sh" >&2
-
-    if [[ -s "$PIWEB_SYNC_SCRIPT" ]]; then
-        chmod 0755 "$PIWEB_SYNC_SCRIPT"
-        chown root:root "$PIWEB_SYNC_SCRIPT"
-
-        if bash "$PIWEB_SYNC_SCRIPT" \
-            --from "$AGENT_HOME/.pi/agent" \
-            --to "$WEB_HOME/.pi/agent" \
-            --agent-user "$AGENT_USER_NAME" \
-            --web-user "$WEB_USER_NAME" \
-            --no-backup; then
-            echo "Настройки агента перенесены в $WEB_HOME/.pi/agent"
-        else
-            echo "ВНИМАНИЕ: sync-piweb-config.sh завершился с ошибкой" >&2
-        fi
-    else
-        echo "ВНИМАНИЕ: настройки агента не перенесены — запусти sync-piweb-config.sh" >&2
-    fi
-
-    # plugin-data Pi Web (pins, unread и т.п.) — служебное состояние, не история.
-    if [[ -d "$AGENT_HOME/.pi-web" ]] &&
-        [[ -z "$(ls -A "$WEB_HOME/.pi-web" 2>/dev/null)" ]]; then
-        cp -a "$AGENT_HOME/.pi-web/." "$WEB_HOME/.pi-web/" 2>/dev/null || true
-        chown -R "$WEB_USER_NAME:$WEB_USER_NAME" "$WEB_HOME/.pi-web"
-        chmod -R go-rwx "$WEB_HOME/.pi-web"
-        echo "Перенесён: .pi-web/"
-    fi
-
-    # Пароль веб-UI переносится вместе с конфигом (сам пароль не печатаем).
-    if [[ -f "$AGENT_HOME/.config/pi-web/service.env" ]] &&
-        [[ ! -f "$WEB_HOME/.config/pi-web/service.env" ]]; then
-        if install -m 0600 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" \
-            "$AGENT_HOME/.config/pi-web/service.env" \
-            "$WEB_HOME/.config/pi-web/service.env"; then
-            echo "Перенесён: .config/pi-web/service.env"
-        else
-            echo "ВНИМАНИЕ: не удалось перенести .config/pi-web/service.env" >&2
-        fi
-    fi
-
-    for f in "$WEB_HOME/.pi/agent" "$WEB_HOME/.pi-web" "$WEB_HOME/.config/pi-web"; do
-        chown -R "$WEB_USER_NAME:$WEB_USER_NAME" "$f"
-        chmod -R go-rwx "$f"
+    # Каталоги могли остаться от прежней учётки piweb — возвращаем владельца.
+    for d in "$AGENT_HOME/.pi" "$AGENT_HOME/.pi/agent" "$AGENT_HOME/.pi-web"; do
+        [[ -d "$d" ]] && chown -R "$AGENT_USER_NAME:$AGENT_USER_NAME" "$d"
     done
 
     # ----------------------------------------------------- пароль ---
     # Пароль нужен при бинде на не-loopback. Храним в файле 0600, а не в юните:
     # unit читается всеми, а пароль — нет.
-    PI_WEB_CONF_DIR="$WEB_HOME/.config/pi-web"
+    PI_WEB_CONF_DIR="$AGENT_HOME/.config/pi-web"
     PI_WEB_PASS_FILE="$PI_WEB_CONF_DIR/password"
     PI_WEB_ENV_FILE="$PI_WEB_CONF_DIR/service.env"
 
-    install -d -m 0700 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$PI_WEB_CONF_DIR"
+    install -d -m 0700 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$PI_WEB_CONF_DIR"
 
     PI_WEB_PASSWORD=""
 
@@ -812,7 +777,7 @@ else
             echo "Использую существующий пароль Pi Web ($PI_WEB_ENV_FILE)"
 
             (umask 077 && printf '%s\n' "$PI_WEB_PASSWORD" > "$PI_WEB_PASS_FILE") &&
-                chown "$WEB_USER_NAME:$WEB_USER_NAME" "$PI_WEB_PASS_FILE" &&
+                chown "$AGENT_USER_NAME:$AGENT_USER_NAME" "$PI_WEB_PASS_FILE" &&
                 chmod 600 "$PI_WEB_PASS_FILE" || true
         else
             echo ""
@@ -835,7 +800,7 @@ else
                 exit 1
             }
 
-            chown "$WEB_USER_NAME:$WEB_USER_NAME" "$PI_WEB_PASS_FILE"
+            chown "$AGENT_USER_NAME:$AGENT_USER_NAME" "$PI_WEB_PASS_FILE"
             chmod 600 "$PI_WEB_PASS_FILE"
             echo "Пароль сохранён: $PI_WEB_PASS_FILE (0600)"
         fi
@@ -853,11 +818,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=$WEB_USER_NAME
-Group=$WEB_USER_NAME
+User=$AGENT_USER_NAME
+Group=$AGENT_USER_NAME
 WorkingDirectory=$PI_WEB_DIR
-Environment=HOME=$WEB_HOME
-Environment=PI_CODING_AGENT_DIR=$WEB_HOME/.pi/agent
+Environment=HOME=$AGENT_HOME
+Environment=PI_CODING_AGENT_DIR=$AGENT_HOME/.pi/agent
 Environment=NODE_ENV=production
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 Environment=PI_WEB_NO_OPEN=1
@@ -875,7 +840,7 @@ EOF
         # EnvironmentFile читается systemd от root; пароль в юнит не попадает.
         if [[ -n "$PI_WEB_PASSWORD" ]]; then
             (umask 077 && printf 'PI_WEB_PASSWORD=%s\n' "$PI_WEB_PASSWORD" > "$PI_WEB_ENV_FILE")
-            chown "$WEB_USER_NAME:$WEB_USER_NAME" "$PI_WEB_ENV_FILE"
+            chown "$AGENT_USER_NAME:$AGENT_USER_NAME" "$PI_WEB_ENV_FILE"
             chmod 600 "$PI_WEB_ENV_FILE"
 
             echo "EnvironmentFile=$PI_WEB_ENV_FILE"
@@ -891,8 +856,7 @@ NoNewPrivileges=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 ProtectSystem=strict
-ReadWritePaths=$WEB_HOME $PIWEB_WORK_DIR -$PI_WEB_DIR/.next/cache
-InaccessiblePaths=-$AGENT_HOME
+ReadWritePaths=$AGENT_HOME -$PI_WEB_DIR/.next/cache
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
@@ -921,7 +885,7 @@ EOF
 
     # Next.js пишет сюда при рендере, а ProtectSystem=strict делает остальной
     # /opt/pi-web только для чтения (каталог добавлен в ReadWritePaths).
-    install -d -m 0750 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$PI_WEB_DIR/.next/cache"
+    install -d -m 0750 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$PI_WEB_DIR/.next/cache"
 
     if ! systemd-analyze verify "$PI_WEB_UNIT" >/tmp/pi-web-verify.log 2>&1; then
         echo "ВНИМАНИЕ: systemd-analyze verify выдал замечания:" >&2
@@ -1047,25 +1011,26 @@ EOF
     fi
 
     # --- проверка границ ----------------------------------------------------
-    log "Проверка границ учётки $WEB_USER_NAME"
+    # --- проверка границ ----------------------------------------------------
+    # Отдельной веб-учётки больше нет, поэтому проверяем то, что осталось
+    # барьером: код сервиса не writable, процесс живёт от $AGENT_USER_NAME
+    # и юнит без лишних привилегий.
+    log "Проверка границ сервиса Pi Web"
 
-    # Вне юнита действуют обычные права файловой системы: /home/pi — 0700 pi:pi.
-    if sudo -u "$WEB_USER_NAME" ls "$AGENT_HOME" >/dev/null 2>&1; then
-        echo "ОШИБКА: $WEB_USER_NAME видит $AGENT_HOME (проверь chmod 0700 $AGENT_HOME)" >&2
-    else
-        echo "ok: $AGENT_HOME недоступен для $WEB_USER_NAME"
-    fi
-
-    if sudo -u "$WEB_USER_NAME" test -w "$PI_WEB_DIR"; then
-        echo "ОШИБКА: $WEB_USER_NAME может писать в $PI_WEB_DIR" >&2
+    if sudo -u "$AGENT_USER_NAME" test -w "$PI_WEB_DIR"; then
+        echo "ОШИБКА: $AGENT_USER_NAME может писать в $PI_WEB_DIR — код сервиса правится из-под него" >&2
     else
         echo "ok: $PI_WEB_DIR только для чтения"
     fi
 
-    if sudo -u "$WEB_USER_NAME" sudo -n true 2>/dev/null; then
-        echo "ОШИБКА: $WEB_USER_NAME выполняет sudo без пароля" >&2
-    else
-        echo "ok: sudo для $WEB_USER_NAME запрещён"
+    if pgrep -f 'bin/pi-web' >/dev/null 2>&1; then
+        PI_WEB_PROC_USER="$(ps -o user= -p "$(pgrep -f 'bin/pi-web' | head -1)" 2>/dev/null | tr -d ' ')"
+
+        if [[ "$PI_WEB_PROC_USER" == "$AGENT_USER_NAME" ]]; then
+            echo "ok: процесс pi-web работает от $AGENT_USER_NAME"
+        else
+            echo "ВНИМАНИЕ: процесс pi-web работает от '$PI_WEB_PROC_USER', а не $AGENT_USER_NAME" >&2
+        fi
     fi
 
     systemd-analyze security pi-web.service --no-pager 2>/dev/null | tail -3 || true
@@ -1851,14 +1816,10 @@ echo "  $AGE_RECIPIENT"
 echo ""
 echo "Пользователи и SSH:"
 id "$AGENT_USER_NAME"
-id "$WEB_USER_NAME"
 pwstatus -S root || true
 pwstatus -S "$AGENT_USER_NAME" || true
-# У веб-учётки пароля быть не должно — статус L (locked).
-pwstatus -S "$WEB_USER_NAME" || true
 echo "root authorized_keys: $ROOT_AUTH_KEYS"
 echo "$AGENT_USER_NAME authorized_keys: $AGENT_AUTH_KEYS"
-echo "$WEB_USER_NAME группы: $(id -nG "$WEB_USER_NAME" 2>/dev/null || echo 'нет')"
 sudo -n -l -U "$AGENT_USER_NAME" 2>/dev/null || true
 
 echo ""
@@ -1875,11 +1836,11 @@ if [[ -x "$PI_WEB_BIN" ]]; then
     echo "Pi Web:"
     echo "  $("$PI_WEB_BIN" --version 2>/dev/null || echo '?')"
     echo "  http://${PI_WEB_EFFECTIVE_HOST:-$PI_WEB_HOST}:$PI_WEB_PORT"
-    echo "  пользователь: $WEB_USER_NAME (код: root:root, каталог: $PIWEB_WORK_DIR)"
+    echo "  пользователь: $AGENT_USER_NAME (код: root:root в $PI_WEB_DIR)"
     systemctl is-active pi-web 2>/dev/null || true
 
-    if [[ -s "$WEB_HOME/.config/pi-web/service.env" ]]; then
-        echo "  пароль:       sudo cat $WEB_HOME/.config/pi-web/service.env"
+    if [[ -s "$AGENT_HOME/.config/pi-web/service.env" ]]; then
+        echo "  пароль:       sudo cat $AGENT_HOME/.config/pi-web/service.env"
     fi
 
     echo "  логи:         journalctl -u pi-web -f"

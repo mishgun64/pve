@@ -8,7 +8,6 @@ SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 BACKUP_SCRIPT="$SCRIPTS_DIR/backup-woodpecker.sh"
 SETUP_SCRIPT="$SCRIPTS_DIR/setup-control.sh"
-SYNC_PIWEB_SCRIPT="$SCRIPTS_DIR/sync-piweb-config.sh"
 RESTORE_PI_SCRIPT="$SCRIPTS_DIR/restore-pi-agent.sh"
 BACKUP_PI_SH="$SCRIPTS_DIR/backup-pi-agent.sh"
 BACKUP_PI_SCRIPT="$SCRIPTS_DIR/backup-pi-agent.ps1"
@@ -242,12 +241,17 @@ for cron_pipeline in \
 done
 
 # --- 9. пользователи, sudo, пароли -----------------------------------------
-# Две учётки: pi (человек, sudo+ключи) и piweb (сервис Pi Web, без привилегий).
-if grep -q '^AGENT_USER_NAME="pi"' "$SETUP_SCRIPT" &&
-    grep -q '^WEB_USER_NAME="piweb"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: AGENT_USER_NAME="pi" + WEB_USER_NAME="piweb"'
+# Одна учётка: Pi Web и агент работают от pi (разделение pi/piweb отменено).
+if grep -q '^AGENT_USER_NAME="pi"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: AGENT_USER_NAME="pi"'
 else
-    fail 'setup-control.sh: нет разделения AGENT_USER_NAME/WEB_USER_NAME'
+    fail 'setup-control.sh: нет AGENT_USER_NAME="pi"'
+fi
+
+if grep -q 'WEB_USER_NAME=' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: осталась отдельная веб-учётка WEB_USER_NAME'
+else
+    pass 'setup-control.sh: отдельной веб-учётки нет'
 fi
 
 for frag in 'useradd --create-home' 'usermod --append --groups sudo' \
@@ -378,22 +382,22 @@ else
     pass 'setup-control.sh: нет следов jmfederico/pi-web'
 fi
 
-# --- 11. разделение пользователей pi/piweb ---------------------------------
-# Юнит Pi Web должен работать от сервисной учётки и нести блок хардненинга.
-for frag in '^User=$WEB_USER_NAME$' '^Group=$WEB_USER_NAME$' \
-    'Environment=PI_CODING_AGENT_DIR=$WEB_HOME/.pi/agent' \
-    'NoNewPrivileges=yes' 'ProtectSystem=strict' 'InaccessiblePaths=-$AGENT_HOME' \
-    'ReadWritePaths=$WEB_HOME $PIWEB_WORK_DIR' 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' \
+# --- 11. одна учётка pi; код сервиса остаётся root-only --------------------
+for frag in '^User=$AGENT_USER_NAME$' '^Group=$AGENT_USER_NAME$' \
+    'Environment=PI_CODING_AGENT_DIR=$AGENT_HOME/.pi/agent' \
+    'NoNewPrivileges=yes' 'ProtectSystem=strict' \
+    'ReadWritePaths=$AGENT_HOME -$PI_WEB_DIR/.next/cache' \
+    'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' \
     'SystemCallFilter=@system-service' 'CapabilityBoundingSet=' 'UMask=0077'; do
 
     if grep -q -- "$frag" "$SETUP_SCRIPT"; then
-        pass "setup-control.sh: в юните/скрипте есть «$frag»"
+        pass "setup-control.sh: в юните есть «$frag»"
     else
         fail "setup-control.sh: нет «$frag»"
     fi
 done
 
-# Обязательно отсутствующие директивы: ProtectHome скрыл бы /home/piweb,
+# Обязательно отсутствующие директивы: ProtectHome скрыл бы /home/pi,
 # MemoryDenyWriteExecute ломает JIT V8.
 if grep -qE '^ProtectHome=|^MemoryDenyWriteExecute=' "$SETUP_SCRIPT"; then
     fail 'setup-control.sh: ProtectHome/MemoryDenyWriteExecute сломают Pi Web'
@@ -401,7 +405,7 @@ else
     pass 'setup-control.sh: нет ProtectHome и MemoryDenyWriteExecute'
 fi
 
-# Код сервиса принадлежит root: низкодоверенный процесс не правит свой же код.
+# Код сервиса принадлежит root: через UI нельзя править код своего же сервиса.
 if grep -q 'chown -R root:root "\$PI_WEB_DIR"' "$SETUP_SCRIPT" &&
     grep -q 'chmod -R go-w "\$PI_WEB_DIR"' "$SETUP_SCRIPT"; then
     pass 'setup-control.sh: /opt/pi-web принадлежит root и не writable'
@@ -409,15 +413,15 @@ else
     fail 'setup-control.sh: /opt/pi-web не защищён от записи сервисом'
 fi
 
-# npm install выполняется от root, а не от веб-учётки.
-if grep -qE 'sudo -u "\$(WEB|AGENT)_USER_NAME".*npm install' "$SETUP_SCRIPT"; then
+# npm install — от root, а не от учётки агента.
+if grep -qE 'sudo -u "\$AGENT_USER_NAME".*npm install' "$SETUP_SCRIPT"; then
     fail 'setup-control.sh: npm install выполняется от пользователя'
 else
     pass 'setup-control.sh: npm install выполняется от root'
 fi
 
-# sudo без пароля у pi остался бы риском: ключ человека = root.
-if grep -qE "NOPASSWD: ALL" "$SETUP_SCRIPT"; then
+# sudo у pi — с паролем: доступ к порту не превращается в root.
+if grep -qE 'NOPASSWD: ALL' "$SETUP_SCRIPT"; then
     fail 'setup-control.sh: остался NOPASSWD: ALL в sudoers'
 else
     pass 'setup-control.sh: sudoers без NOPASSWD: ALL'
@@ -429,120 +433,31 @@ else
     fail 'setup-control.sh: нет правила sudo с паролем для pi'
 fi
 
-# Веб-учётка не должна попадать в привилегированные группы.
-if grep -q 'usermod --append --groups sudo "\$WEB_USER_NAME"' "$SETUP_SCRIPT"; then
-    fail 'setup-control.sh: WEB_USER_NAME добавлен в sudo'
+# Уборка прежней веб-учётки: иначе piweb останется висеть без дела.
+if grep -q 'userdel --remove piweb' "$SETUP_SCRIPT" &&
+    grep -q 'LEGACY_HOME=' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: переносит состояние piweb обратно и удаляет учётку'
 else
-    pass 'setup-control.sh: WEB_USER_NAME не добавляется в sudo'
+    fail 'setup-control.sh: нет уборки прежней учётки piweb'
 fi
 
-if grep -q 'nologin "\$WEB_USER_NAME"\|--shell /usr/sbin/nologin "\$WEB_USER_NAME"' "$SETUP_SCRIPT" &&
-    grep -q 'passwd -l "\$WEB_USER_NAME"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: piweb с nologin и заблокированным паролем'
+# Отдельного рабочего каталога веб-агента больше нет.
+if grep -q 'PIWEB_WORK_DIR' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: остался отдельный рабочий каталог PIWEB_WORK_DIR'
 else
-    fail 'setup-control.sh: piweb без nologin/passwd -l'
+    pass 'setup-control.sh: отдельного рабочего каталога веб-агента нет'
 fi
 
-if grep -q 'install -d -m 0750 -o "\$WEB_USER_NAME" -g "\$WEB_USER_NAME" "\$PIWEB_WORK_DIR"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: рабочий каталог /srv/work/piweb создаётся 0750'
+# Настройки агента лежат в его же домашнем каталоге — миграции не нужно.
+if grep -q 'sync-piweb-config' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: остался вызов sync-piweb-config.sh'
 else
-    fail 'setup-control.sh: нет каталога /srv/work/piweb'
+    pass 'setup-control.sh: миграция настроек между учётками не нужна'
 fi
 
-# Перенос настроек живёт в отдельном скрипте: setup-control.sh его вызывает.
-if grep -q 'sync-piweb-config.sh' "$SETUP_SCRIPT" &&
-    grep -q -- '--from "$AGENT_HOME/.pi/agent"' "$SETUP_SCRIPT" &&
-    grep -q -- '--to "$WEB_HOME/.pi/agent"' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: перенос настроек делегирован sync-piweb-config.sh'
-else
-    fail 'setup-control.sh: нет вызова sync-piweb-config.sh'
-fi
-
-if bash -n "$SYNC_PIWEB_SCRIPT" 2>/dev/null; then
-    pass 'bash -n sync-piweb-config.sh'
-else
-    fail 'bash -n sync-piweb-config.sh'
-fi
-
-# Список переносимого ограничен конфигами: ни sessions, ни SSH-заметок.
-if grep -q '^FILES=(' "$SYNC_PIWEB_SCRIPT" &&
-    grep -q 'settings.json settings.jsonc keybindings.json' "$SYNC_PIWEB_SCRIPT"; then
-    pass 'sync-piweb-config.sh: список файлов агента ограничен конфигами'
-else
-    fail 'sync-piweb-config.sh: нет ограниченного списка файлов'
-fi
-
-if grep -qE '^FILES=\(|^DIRS=\(' "$SYNC_PIWEB_SCRIPT" &&
-    ! sed -n '/^FILES=(/,/^)/p;/^DIRS=(/,/^)/p' "$SYNC_PIWEB_SCRIPT" |
-        grep -qE 'sessions|ssh-remote|pi-subagents|trust\.json|npm'; then
-    pass 'sync-piweb-config.sh: sessions/ssh-remote/trust.json не переносятся'
-else
-    fail 'sync-piweb-config.sh: в списке переноса есть sessions/ssh-remote/trust.json'
-fi
-
-if grep -q 'pi-ssh-remote' "$SYNC_PIWEB_SCRIPT" &&
-    grep -q 'удалено из packages' "$SYNC_PIWEB_SCRIPT"; then
-    pass 'sync-piweb-config.sh: из settings.json вырезается pi-ssh-remote'
-else
-    fail 'sync-piweb-config.sh: pi-ssh-remote не вырезается из settings.json'
-fi
-
-# Симлинки в копию не попадают: они указывали бы в /home/pi.
-if grep -q 'find "$dst" -type l -delete' "$SYNC_PIWEB_SCRIPT"; then
-    pass 'sync-piweb-config.sh: симлинки удаляются из копии'
-else
-    fail 'sync-piweb-config.sh: симлинки не вычищаются из копии'
-fi
-
-# Цель не должна оказаться внутри домашнего каталога человека.
-if grep -q 'цель не должна быть внутри' "$SYNC_PIWEB_SCRIPT"; then
-    pass 'sync-piweb-config.sh: запрещена цель внутри /home/pi'
-else
-    fail 'sync-piweb-config.sh: нет проверки цели внутри /home/pi'
-fi
-
-# Файлы с правами 0600 и владельцем piweb.
-if grep -q 'install -m 0600 -o "$WEB_USER" -g "$WEB_USER"' "$SYNC_PIWEB_SCRIPT"; then
-    pass 'sync-piweb-config.sh: файлы ставятся 0600 piweb:piweb'
-else
-    fail 'sync-piweb-config.sh: файлы переносятся без владельца/прав'
-fi
-
-# Совместимость: setup-control.sh больше не правит settings.json сам.
-if grep -q 'PIWEB_SETTINGS=' "$SETUP_SCRIPT"; then
-    fail 'setup-control.sh: дублирует правку settings.json'
-else
-    pass 'setup-control.sh: правка settings.json не дублируется'
-fi
-
-# nftables: порт Pi Web только для доверенных источников.
-if grep -q 'PIWEB_ALLOWED_SRC' "$SETUP_SCRIPT" &&
-    grep -q 'nft -c -f' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: порт Pi Web ограничен через nftables'
-else
-    fail 'setup-control.sh: нет ограничения порта Pi Web через nftables'
-fi
-
-# Регрессия: restart nftables выполняет `flush ruleset` из /etc/nftables.conf
-# и сносит цепочки DOCKER, которые dockerd создал при старте. Демон после этого
-# не может публиковать порты: "iptables: No chain/target/match by that name".
-if grep -vE '^\s*#' "$SETUP_SCRIPT" | grep -qE 'systemctl (restart|reload) nftables'; then
-    fail 'setup-control.sh: restart nftables сносит цепочки Docker (flush ruleset)'
-else
-    pass 'setup-control.sh: nftables не перезапускается (цепочки Docker целы)'
-fi
-
-if grep -q 'nft -f /etc/nftables.d/piweb.nft' "$SETUP_SCRIPT" &&
-    grep -q 'nft delete table inet piweb_guard' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: правило Pi Web применяется инкрементально (nft -f)'
-else
-    fail 'setup-control.sh: правило Pi Web не применяется инкрементально'
-fi
-
-# Проверки границ после запуска.
-for frag in 'sudo -u "$WEB_USER_NAME" ls "$AGENT_HOME"' \
-    'sudo -u "$WEB_USER_NAME" test -w "$PI_WEB_DIR"' \
-    'sudo -u "$WEB_USER_NAME" sudo -n true' 'systemd-analyze security'; do
+# Проверки после запуска: код не writable и процесс от pi.
+for frag in 'sudo -u "$AGENT_USER_NAME" test -w "$PI_WEB_DIR"' \
+    'ps -o user= -p' 'systemd-analyze security'; do
 
     if grep -q -- "$frag" "$SETUP_SCRIPT"; then
         pass "setup-control.sh: проверка «$frag»"
@@ -550,12 +465,6 @@ for frag in 'sudo -u "$WEB_USER_NAME" ls "$AGENT_HOME"' \
         fail "setup-control.sh: нет проверки «$frag»"
     fi
 done
-
-# pi agent ставится раньше Pi Web.
-check_order "$SETUP_SCRIPT" \
-    'npm install -g --ignore-scripts' \
-    'PI_WEB_PKG@latest' \
-    'setup-control.sh: pi agent ставится раньше Pi Web'
 
 # --- 8. загрузка с ретраями, а не с жёсткими таймаутами ---------------------
 if grep -q 'rclone copyto' "$BACKUP_SCRIPT" &&

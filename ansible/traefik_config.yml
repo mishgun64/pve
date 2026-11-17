@@ -7,7 +7,7 @@
   roles:
     - common/basic
     - common/docker
-    - common/monitoring
-#    - traefik/backup
+#   - common/monitoring
+    - traefik/backup
     - traefik/config
-#    - traefik/restore
+    - traefik/restore

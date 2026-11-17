@@ -8,6 +8,7 @@ SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 
 BACKUP_SCRIPT="$SCRIPTS_DIR/backup-woodpecker.sh"
 SETUP_SCRIPT="$SCRIPTS_DIR/setup-control.sh"
+SYNC_PIWEB_SCRIPT="$SCRIPTS_DIR/sync-piweb-config.sh"
 RESTORE_PI_SCRIPT="$SCRIPTS_DIR/restore-pi-agent.sh"
 BACKUP_PI_SH="$SCRIPTS_DIR/backup-pi-agent.sh"
 BACKUP_PI_SCRIPT="$SCRIPTS_DIR/backup-pi-agent.ps1"
@@ -448,24 +449,70 @@ else
     fail 'setup-control.sh: нет каталога /srv/work/piweb'
 fi
 
-# Миграция: только конфиги, без истории сессий и SSH-заметок.
-if grep -q 'for f in settings.json models.json models-store.json auth.json' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: список переносимых файлов агента ограничен конфигами'
+# Перенос настроек живёт в отдельном скрипте: setup-control.sh его вызывает.
+if grep -q 'sync-piweb-config.sh' "$SETUP_SCRIPT" &&
+    grep -q -- '--from "$AGENT_HOME/.pi/agent"' "$SETUP_SCRIPT" &&
+    grep -q -- '--to "$WEB_HOME/.pi/agent"' "$SETUP_SCRIPT"; then
+    pass 'setup-control.sh: перенос настроек делегирован sync-piweb-config.sh'
 else
-    fail 'setup-control.sh: нет ограниченного списка переносимых файлов'
+    fail 'setup-control.sh: нет вызова sync-piweb-config.sh'
 fi
 
-if grep -q 'sessions/ (история' "$SETUP_SCRIPT" &&
-    grep -q 'ssh-remote-memories' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: sessions/ssh-remote-memories не копируются (явно)'
+if bash -n "$SYNC_PIWEB_SCRIPT" 2>/dev/null; then
+    pass 'bash -n sync-piweb-config.sh'
 else
-    fail 'setup-control.sh: нет явного отказа от sessions/ssh-remote-memories'
+    fail 'bash -n sync-piweb-config.sh'
 fi
 
-if grep -q 'pi-ssh-remote' "$SETUP_SCRIPT"; then
-    pass 'setup-control.sh: из settings.json веб-агента вырезается pi-ssh-remote'
+# Список переносимого ограничен конфигами: ни sessions, ни SSH-заметок.
+if grep -q '^FILES=(' "$SYNC_PIWEB_SCRIPT" &&
+    grep -q 'settings.json settings.jsonc keybindings.json' "$SYNC_PIWEB_SCRIPT"; then
+    pass 'sync-piweb-config.sh: список файлов агента ограничен конфигами'
 else
-    fail 'setup-control.sh: pi-ssh-remote не вырезается из settings.json'
+    fail 'sync-piweb-config.sh: нет ограниченного списка файлов'
+fi
+
+if grep -qE '^FILES=\(|^DIRS=\(' "$SYNC_PIWEB_SCRIPT" &&
+    ! sed -n '/^FILES=(/,/^)/p;/^DIRS=(/,/^)/p' "$SYNC_PIWEB_SCRIPT" |
+        grep -qE 'sessions|ssh-remote|pi-subagents|trust\.json|npm'; then
+    pass 'sync-piweb-config.sh: sessions/ssh-remote/trust.json не переносятся'
+else
+    fail 'sync-piweb-config.sh: в списке переноса есть sessions/ssh-remote/trust.json'
+fi
+
+if grep -q 'pi-ssh-remote' "$SYNC_PIWEB_SCRIPT" &&
+    grep -q 'удалено из packages' "$SYNC_PIWEB_SCRIPT"; then
+    pass 'sync-piweb-config.sh: из settings.json вырезается pi-ssh-remote'
+else
+    fail 'sync-piweb-config.sh: pi-ssh-remote не вырезается из settings.json'
+fi
+
+# Симлинки в копию не попадают: они указывали бы в /home/pi.
+if grep -q 'find "$dst" -type l -delete' "$SYNC_PIWEB_SCRIPT"; then
+    pass 'sync-piweb-config.sh: симлинки удаляются из копии'
+else
+    fail 'sync-piweb-config.sh: симлинки не вычищаются из копии'
+fi
+
+# Цель не должна оказаться внутри домашнего каталога человека.
+if grep -q 'цель не должна быть внутри' "$SYNC_PIWEB_SCRIPT"; then
+    pass 'sync-piweb-config.sh: запрещена цель внутри /home/pi'
+else
+    fail 'sync-piweb-config.sh: нет проверки цели внутри /home/pi'
+fi
+
+# Файлы с правами 0600 и владельцем piweb.
+if grep -q 'install -m 0600 -o "$WEB_USER" -g "$WEB_USER"' "$SYNC_PIWEB_SCRIPT"; then
+    pass 'sync-piweb-config.sh: файлы ставятся 0600 piweb:piweb'
+else
+    fail 'sync-piweb-config.sh: файлы переносятся без владельца/прав'
+fi
+
+# Совместимость: setup-control.sh больше не правит settings.json сам.
+if grep -q 'PIWEB_SETTINGS=' "$SETUP_SCRIPT"; then
+    fail 'setup-control.sh: дублирует правку settings.json'
+else
+    pass 'setup-control.sh: правка settings.json не дублируется'
 fi
 
 # nftables: порт Pi Web только для доверенных источников.

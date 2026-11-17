@@ -738,37 +738,31 @@ else
     install -d -m 0750 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" "$PIWEB_WORK_DIR"
 
     # --- перенос данных из $AGENT_USER_NAME (фаза 2 плана) ------------------
-    # Копируем только конфиги агента. sessions/ (история переписок + cwd
-    # /home/pi, недоступные $WEB_USER_NAME), ssh-remote-memories/ и trust.json
-    # (привязан к путям /home/pi) не переносим: веб-агент начинает с чистого листа.
-    PIWEB_MIGRATE_DIR="$AGENT_HOME/.pi/agent"
+    # Конфиги копируются, а не шарятся: /home/$AGENT_USER_NAME закрыт для
+    # $WEB_USER_NAME (0700 + InaccessiblePaths). Логика переноса живёт в
+    # sync-piweb-config.sh — он же используется для повторной синхронизации,
+    # когда настройки pi поменялись после установки.
+    PIWEB_SYNC_SCRIPT="/root/sync-piweb-config.sh"
 
-    for f in settings.json models.json models-store.json auth.json \
-        mcp.json mcp-auth.json AGENTS.md; do
-        [[ -f "$PIWEB_MIGRATE_DIR/$f" ]] || continue
+    curl -fsSL "$RAW_BASE/sync-piweb-config.sh" -o "$PIWEB_SYNC_SCRIPT" ||
+        echo "ВНИМАНИЕ: не удалось скачать $RAW_BASE/sync-piweb-config.sh" >&2
 
-        if [[ -f "$WEB_HOME/.pi/agent/$f" ]]; then
-            echo "Уже есть: $WEB_HOME/.pi/agent/$f (не перезаписываю)"
-            continue
-        fi
+    if [[ -s "$PIWEB_SYNC_SCRIPT" ]]; then
+        chmod 0755 "$PIWEB_SYNC_SCRIPT"
+        chown root:root "$PIWEB_SYNC_SCRIPT"
 
-        if install -m 0600 -o "$WEB_USER_NAME" -g "$WEB_USER_NAME" \
-            "$PIWEB_MIGRATE_DIR/$f" "$WEB_HOME/.pi/agent/$f"; then
-            echo "Перенесён: .pi/agent/$f"
+        if bash "$PIWEB_SYNC_SCRIPT" \
+            --from "$AGENT_HOME/.pi/agent" \
+            --to "$WEB_HOME/.pi/agent" \
+            --agent-user "$AGENT_USER_NAME" \
+            --web-user "$WEB_USER_NAME" \
+            --no-backup; then
+            echo "Настройки агента перенесены в $WEB_HOME/.pi/agent"
         else
-            echo "ВНИМАНИЕ: не удалось перенести .pi/agent/$f" >&2
+            echo "ВНИМАНИЕ: sync-piweb-config.sh завершился с ошибкой" >&2
         fi
-    done
-
-    # Токены MCP и провайдерские ключи скопированы от $AGENT_USER_NAME — по
-    # плану это временно: у веб-агента должны быть свои, с лимитом расходов,
-    # чтобы ротация после инцидента была дешёвой. Содержимое не печатаем.
-    if [[ -f "$WEB_HOME/.pi/agent/mcp.json" || -f "$WEB_HOME/.pi/agent/mcp-auth.json" ]]; then
-        echo "ВНИМАНИЕ: MCP-токены веб-агента совпадают с $AGENT_USER_NAME — выпусти отдельные" >&2
-    fi
-
-    if [[ -f "$WEB_HOME/.pi/agent/auth.json" ]]; then
-        echo "ВНИМАНИЕ: ключи провайдеров веб-агента совпадают с $AGENT_USER_NAME — заведи отдельные с лимитом" >&2
+    else
+        echo "ВНИМАНИЕ: настройки агента не перенесены — запусти sync-piweb-config.sh" >&2
     fi
 
     # plugin-data Pi Web (pins, unread и т.п.) — служебное состояние, не история.
@@ -796,52 +790,6 @@ else
         chown -R "$WEB_USER_NAME:$WEB_USER_NAME" "$f"
         chmod -R go-rwx "$f"
     done
-
-    # --- правка settings.json веб-агента ------------------------------------
-    # npm:pi-ssh-remote даёт веб-агенту SSH-доступ — у $WEB_USER_NAME его быть
-    # не должно. Ключи провайдеров не печатаем: только фильтруем список пакетов.
-    PIWEB_SETTINGS="$WEB_HOME/.pi/agent/settings.json"
-
-    if [[ -f "$PIWEB_SETTINGS" ]]; then
-        node - "$PIWEB_SETTINGS" <<'NODE' || echo "ВНИМАНИЕ: settings.json не разобран как JSON — оставлен как есть" >&2
-const fs = require("fs");
-const file = process.argv[2];
-const drop = (entry) => {
-    const src = typeof entry === "string" ? entry : entry && entry.source;
-    return typeof src === "string" && /pi-ssh-remote/.test(src);
-};
-
-let cfg;
-try {
-    cfg = JSON.parse(fs.readFileSync(file, "utf8"));
-} catch {
-    process.exit(1);
-}
-
-if (!Array.isArray(cfg.packages)) process.exit(0);
-
-const kept = cfg.packages.filter((entry) => !drop(entry));
-const removed = cfg.packages.length - kept.length;
-if (removed === 0) process.exit(0);
-
-cfg.packages = kept;
-fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
-fs.chmodSync(file, 0o600);
-console.log(`удалено из packages: ${removed}`);
-NODE
-
-        # Считаем по факту, а не по выводу node: повторный запуск ничего не меняет.
-        if grep -q 'pi-ssh-remote' "$PIWEB_SETTINGS" 2>/dev/null; then
-            echo "ВНИМАНИЕ: в $PIWEB_SETTINGS остался pi-ssh-remote — убери вручную" >&2
-        else
-            echo "settings.json веб-агента: pi-ssh-remote отсутствует"
-        fi
-
-        chown "$WEB_USER_NAME:$WEB_USER_NAME" "$PIWEB_SETTINGS"
-        chmod 0600 "$PIWEB_SETTINGS"
-    else
-        echo "settings.json агента не найден — веб-агент создаст его при старте"
-    fi
 
     # ----------------------------------------------------- пароль ---
     # Пароль нужен при бинде на не-loopback. Храним в файле 0600, а не в юните:

@@ -75,7 +75,8 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
   - ставится не глобально, а в отдельный каталог `/opt/pi-web` (`npm install --omit=dev --allow-scripts=node-pty @agegr/pi-web@latest` **от root**). Отдельный каталог нужен потому, что пакет предоставляет бинарник `pi-web`, и глобальная установка конфликтует с другими реализациями того же имени. `--allow-scripts=node-pty` разрешает install-скрипт только `node-pty` (на npm < 12 флага нет — там скрипты разрешены по умолчанию). На Linux `node-pty` собирается из исходников, поэтому дополнительно ставится `build-essential python3`; после установки скрипт проверяет, что модуль загружается. Каталог принадлежит `root:root` и не writable для `piweb`: иначе компрометация UI = правка кода своего же сервиса (персистентность).
   - запускается **system-level** юнитом `/etc/systemd/system/pi-web.service` (`User=piweb`, `WorkingDirectory=/opt/pi-web`, `Environment=PI_CODING_AGENT_DIR=/home/piweb/.pi/agent`, `Restart=on-failure`, `enable`). Своего установщика сервисов у Pi Web нет, поэтому unit пишется скриптом.
   - юнит содержит блок хардненинга: `NoNewPrivileges=yes`, пустые `CapabilityBoundingSet`/`AmbientCapabilities`, `ProtectSystem=strict` + `ReadWritePaths=/home/piweb /srv/work/piweb`, `InaccessiblePaths=-/home/pi`, `PrivateTmp`, `PrivateDevices`, `ProtectProc=invisible`, `RestrictNamespaces`, `SystemCallFilter=@system-service`, `UMask=0077`. `ProtectHome` не используется (иначе скрылся бы и `/home/piweb`); `MemoryDenyWriteExecute` не ставится — ломает JIT V8.
-  - `piweb` работает с настройками агента из `/home/piweb/.pi/agent` (`0700`), plugin-data — `/home/piweb/.pi-web` (`0700`), рабочие каталоги — `/srv/work/piweb` (`0750`). Переменная `PIWEB_WORK_DIR` задаёт последний. При миграции с прежней одноюзерской схемы переносятся только `settings.json`, `models*.json`, `auth.json`, `mcp*.json`, `AGENTS.md` и `service.env`; `sessions/`, `ssh-remote-memories/`, `trust.json` и `npm/` не копируются (история с cwd из `/home/pi`, привязка trust к путям, SSH-заметки). Из `settings.json` веб-агента вырезается пакет `npm:pi-ssh-remote` — у `piweb` не должно быть SSH.
+  - `piweb` работает с настройками агента из `/home/piweb/.pi/agent` (`0700`), plugin-data — `/home/piweb/.pi-web` (`0700`), рабочие каталоги — `/srv/work/piweb` (`0750`). Переменная `PIWEB_WORK_DIR` задаёт последний.
+  - **Настройки не разделяются, а копируются.** `/home/pi` закрыт для `piweb` (`0700 pi:pi` + `InaccessiblePaths`), поэтому Pi Web не «видит» конфиг `pi` — это ожидаемо, а не поломка. Перенос делает `sync-piweb-config.sh` (его же вызывает `setup-control.sh` при установке). Подробнее — в разделе «Перенос настроек в piweb».
   - единственная запись внутри `/opt/pi-web` — `.next/cache`, отдаётся `piweb` отдельным `install -d`.
   - обновления Pi Web выполняются от root: `sudo npm --prefix /opt/pi-web install --omit=dev --no-fund --no-audit --allow-scripts=node-pty @agegr/pi-web@latest && sudo systemctl restart pi-web`. Штатный `/api/app-update` внутри UI после разделения не работает — так и задумано.
   - адрес выбирается интерактивно: LAN-адрес машины (определяется через `ip route get 1.1.1.1`, по умолчанию) или `127.0.0.1` для доступа только через SSH-туннель. `0.0.0.0` не используется — бинд на конкретный интерфейс держит порт вне других сетей.
@@ -89,6 +90,24 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
   - Порт/хост/каталог/пакет вынесены в `PI_WEB_PORT`, `PI_WEB_HOST` (пустой = спросить), `PI_WEB_DIR`, `PI_WEB_BIN`, `PI_WEB_PKG`; учётки — `AGENT_USER_NAME` (`pi`) и `WEB_USER_NAME` (`piweb`).
   - наружу — через Traefik: роутер `piweb` в `ansible/roles/traefik/config/files/traefik/dynamic/piweb.yml` (`Host(\`pi.mishgun.com\`)`, `crowdsec@file` + security-заголовки + `rateLimit` + `inFlightReq`).
   - после запуска скрипт печатает результат `systemd-analyze security pi-web.service` и проверяет границы: `piweb` не видит `/home/pi`, не пишет в `/opt/pi-web`, не может `sudo -n true`.
+
+## Перенос настроек в piweb
+
+Pi Web работает от `piweb`, а домашний каталог `pi` для неё закрыт. Открывать `/home/pi` нельзя (там приватный SSH-ключ и история сессий), поэтому конфигурация **копируется** скриптом `sync-piweb-config.sh`. Тот же скрипт нужен после того, как настройки `pi` поменялись.
+
+```bash
+sudo ./sync-piweb-config.sh --dry-run      # показать план
+sudo ./sync-piweb-config.sh                # перенести (с бэкапом цели в /var/backups)
+sudo ./sync-piweb-config.sh --restart      # перенести и перезапустить pi-web
+```
+
+- Переносится: `settings.json`, `keybindings.json`, `models.json`, `models-store.json`, `auth.json`, `mcp.json`, `mcp-auth.json`, `AGENTS.md`/`AGENTS.override.md`/`CLAUDE.md`/`SYSTEM.md`/`APPEND_SYSTEM.md`, каталоги `data/`, `extensions/`, `skills/`, `prompts/`, `themes/`. Файлы ставятся `0600 piweb:piweb`.
+- **Не переносится:** `sessions/` (история переписок и `cwd` из `/home/pi`), `ssh-remote-memories/`, `ssh-remote-*.json`, `pi-subagents/`, `trust.json` (решения привязаны к путям `/home/pi`), `npm/` (переустанавливается), `bin/`, `pi-web-*.json`, `web-push.json`.
+- Из `settings.json` вырезается пакет `npm:pi-ssh-remote` — у веб-учётки не должно быть SSH-доступа.
+- Симлинки из копии удаляются: они указывали бы в `/home/pi`.
+- Существующий каталог не затирается целиком — недостающее досыпается (`cp --no-clobber`), поэтому повторный запуск безопасен.
+- Перед изменением цели делается `tar.gz` в `/var/backups/piweb-agent-config-<дата>.tar.gz` (`0600`), отключается `--no-backup`.
+- Ключи провайдеров и токены MCP копируются от `pi`; по плану стоит завести отдельные (с лимитом расходов), чтобы ротация после инцидента была дешёвой.
 
 ## Бэкап и восстановление конфигурации pi agent
 

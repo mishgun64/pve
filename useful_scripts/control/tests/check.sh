@@ -387,7 +387,7 @@ fi
 for frag in '^User=$AGENT_USER_NAME$' '^Group=$AGENT_USER_NAME$' \
     'Environment=PI_CODING_AGENT_DIR=$AGENT_HOME/.pi/agent' \
     'NoNewPrivileges=yes' 'ProtectSystem=strict' \
-    'ReadWritePaths=$AGENT_HOME -$PI_WEB_DIR/.next/cache' \
+    'ReadWritePaths=$AGENT_HOME $PI_WEB_DIR/.next/cache $PI_WEB_DIR/node_modules/@agegr/pi-web/.next' \
     'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' \
     'SystemCallFilter=@system-service' 'CapabilityBoundingSet=' 'UMask=0077'; do
 

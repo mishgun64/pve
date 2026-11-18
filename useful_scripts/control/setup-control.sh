@@ -42,6 +42,11 @@ PI_WEB_ALLOWED_HOSTS=""
 # Traefik ходит с 192.168.1.0/24 (см. clientTrustedIPs в роли traefik).
 # Пусто — спросить; значение «-» — не настраивать firewall.
 PIWEB_ALLOWED_SRC=""
+# П.4 плана аудита: nftables control_guard — доступ по SSH (22) только с этих
+# адресов. После проверки, откуда реально ходит администратор, сузить список!
+CONTROL_GUARD_SSH_SOURCES="192.168.1.0/24,192.168.2.0/24"
+# Единственный клиент порта 8000 (Woodpecker UI/API) — хост Traefik (п.3).
+CONTROL_GUARD_WP_SRC="192.168.2.3"
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control"
@@ -326,6 +331,20 @@ fi
 
 # sshd должен быть включён, иначе вход по ключам (root/pi) не заработает.
 systemctl enable --now ssh 2>/dev/null || systemctl enable --now sshd 2>/dev/null || true
+
+# П.6.1 плана аудита: root — только по ключу, X11 forwarding выключен.
+# (root по ключу нужен: CI/автоматизация ходит по SSH под root.)
+if grep -qE '^(PermitRootLogin yes|X11Forwarding yes)' /etc/ssh/sshd_config; then
+    cp -a /etc/ssh/sshd_config /etc/ssh/sshd_config.bak-setup-control
+    sed -i 's|^PermitRootLogin yes$|PermitRootLogin prohibit-password|; s|^X11Forwarding yes$|X11Forwarding no|' /etc/ssh/sshd_config
+    if sshd -t 2>&1; then
+        systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+        echo "sshd: PermitRootLogin prohibit-password, X11Forwarding no"
+    else
+        cp -a /etc/ssh/sshd_config.bak-setup-control /etc/ssh/sshd_config
+        echo "ВНИМАНИЕ: sshd -t не прошёл — конфиг откатан, ssh не перезапущен" >&2
+    fi
+fi
 
 # ----------------------------------------------- pi: authorized_keys ---
 log "SSH-ключ для $AGENT_USER_NAME"
@@ -856,7 +875,9 @@ NoNewPrivileges=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 ProtectSystem=strict
-ReadWritePaths=$AGENT_HOME -$PI_WEB_DIR/.next/cache
+# П.1.2 плана аудита: каталоги с preview-секретами Next.js должны быть writable,
+# иначе rotate-preview-secrets не может обновить previewModeId (обход авторизации).
+ReadWritePaths=$AGENT_HOME $PI_WEB_DIR/.next/cache $PI_WEB_DIR/node_modules/@agegr/pi-web/.next
 PrivateTmp=yes
 PrivateDevices=yes
 ProtectKernelTunables=yes
@@ -884,8 +905,14 @@ EOF
     chmod 0644 "$PI_WEB_UNIT"
 
     # Next.js пишет сюда при рендере, а ProtectSystem=strict делает остальной
-    # /opt/pi-web только для чтения (каталог добавлен в ReadWritePaths).
+    # /opt/pi-web только для чтения (каталоги добавлены в ReadWritePaths).
     install -d -m 0750 -o "$AGENT_USER_NAME" -g "$AGENT_USER_NAME" "$PI_WEB_DIR/.next/cache"
+
+    # П.1.2 плана аудита: владелец каталога с preview-секретами — pi,
+    # иначе rotate-preview-secrets (запускается от pi) не сможет их обновить.
+    if [[ -d "$PI_WEB_DIR/node_modules/@agegr/pi-web/.next" ]]; then
+        chown -R "$AGENT_USER_NAME:$AGENT_USER_NAME" "$PI_WEB_DIR/node_modules/@agegr/pi-web/.next"
+    fi
 
     if ! systemd-analyze verify "$PI_WEB_UNIT" >/tmp/pi-web-verify.log 2>&1; then
         echo "ВНИМАНИЕ: systemd-analyze verify выдал замечания:" >&2
@@ -1010,7 +1037,68 @@ EOF
         fi
     fi
 
-    # --- проверка границ ----------------------------------------------------
+    # --- control_guard (п.4 плана аудита) -----------------------------------
+    # Отдельная таблица с приоритетом -15: 22 — только с админ-адресов,
+    # 8000 (Woodpecker) — только с Traefik. 30141 уже закрыт piweb_guard.
+    # Полный policy drop на input/forward не ставим: снесёт docker-цепочки
+    # и требует ревизии всех сервисов (п.4/п.10 плана).
+    log "Ограничение доступа к 22 и 8000 (nftables control_guard)"
+
+    install -d -m 0755 /etc/nftables.d
+
+    {
+        echo '#!/usr/sbin/nft -f'
+        echo '# Сгенерировано setup-control.sh: 22 — только с админ-адресов, 8000 — только с Traefik.'
+        echo 'table inet control_guard {'
+        echo '    set ssh_sources {'
+        echo '        type ipv4_addr'
+        echo '        flags interval'
+        echo "        elements = { $(tr ',' ',' <<<"$CONTROL_GUARD_SSH_SOURCES") }"
+        echo '    }'
+        echo ''
+        echo '    chain input {'
+        echo '        type filter hook input priority -15; policy accept;'
+        echo ''
+        echo '        iif "lo" accept'
+        echo '        ct state established,related accept'
+        echo '        ip protocol icmp accept'
+        echo '        ip6 nexthdr ipv6-icmp accept'
+        echo ''
+        echo '        tcp dport 22 ip saddr @ssh_sources accept'
+        echo '        tcp dport 22 drop'
+        echo ''
+        echo "        tcp dport 8000 ip saddr $CONTROL_GUARD_WP_SRC accept"
+        echo '        tcp dport 8000 drop'
+        echo '    }'
+        echo '}'
+    } > /etc/nftables.d/control-guard.nft
+
+    chmod 0644 /etc/nftables.d/control-guard.nft
+
+    NFT_CG_CHECK="$(mktemp /tmp/nft-cg-check.XXXXXX)"
+    { printf 'flush ruleset\n'; cat /etc/nftables.d/control-guard.nft; } > "$NFT_CG_CHECK"
+
+    if ! nft -c -f "$NFT_CG_CHECK"; then
+        rm -f "$NFT_CG_CHECK"
+        echo "ОШИБКА: /etc/nftables.d/control-guard.nft не прошёл nft -c" >&2
+        exit 1
+    fi
+    rm -f "$NFT_CG_CHECK"
+
+    # Применяем только свою таблицу (без flush ruleset — DOCKER-* не трогаем).
+    nft delete table inet control_guard 2>/dev/null || true
+
+    if ! nft -f /etc/nftables.d/control-guard.nft; then
+        echo "ОШИБКА: не удалось загрузить control_guard" >&2
+        exit 1
+    fi
+
+    if nft list table inet control_guard >/dev/null 2>&1; then
+        echo "22 открыт для: $CONTROL_GUARD_SSH_SOURCES; 8000 — для: $CONTROL_GUARD_WP_SRC"
+    else
+        echo "ОШИБКА: таблица control_guard не загружена" >&2
+    fi
+
     # --- проверка границ ----------------------------------------------------
     # Отдельной веб-учётки больше нет, поэтому проверяем то, что осталось
     # барьером: код сервиса не writable, процесс живёт от $AGENT_USER_NAME
@@ -1050,6 +1138,16 @@ chown root:root /root/cleanup_backups.sh
 
 echo "Установлен:"
 ls -l /root/cleanup_backups.sh
+
+# --- права на каталог бэкапов (п.5 плана аудита) --------------------------
+# Бэкапы содержат внутренности сервисов — читать их должен только root.
+if [[ -d /srv/backups ]]; then
+    chmod 0700 /srv/backups
+    find /srv/backups -xdev -type f -perm /022 -exec chmod go-w {} \;
+    echo "/srv/backups: 0700, с файлов снята запись group/other"
+else
+    echo "/srv/backups пока нет — права выставит первый бэкап-прогон/роль"
+fi
 
 # ------------------------------------------------------------------ sops ---
 log "Установка sops"
@@ -1486,6 +1584,47 @@ ensure_woodpecker_tz() {
 
 ensure_woodpecker_tz
 
+# П.3 плана аудита: на уже установленной инсталляции идемпотентно приводим
+# compose к безопасному виду (открытая регистрация/Swagger выключены,
+# порт только на LAN-IP control). Работает и после восстановления из бэкапа,
+# в котором compose ещё со старыми настройками.
+ensure_woodpecker_security() {
+    local compose_file="$WP_DIR/docker-compose.yml"
+
+    [[ -f "$compose_file" ]] || return 0
+
+    local changed=0
+
+    # Порт: только на LAN-адрес машины (клиент — Traefik).
+    if [[ -n "${PI_WEB_LAN_IP:-}" ]] && grep -qF '"8000:8000"' "$compose_file"; then
+        sed -i "s|^      - \"8000:8000\"$|      - \"${PI_WEB_LAN_IP}:8000:8000\"|" "$compose_file"
+        changed=1
+    fi
+
+    # Явные флаги безопасности в environment сервера.
+    if ! grep -q 'WOODPECKER_ENABLE_SWAGGER' "$compose_file"; then
+        sed -i 's|^      WOODPECKER_OPEN: .*|      WOODPECKER_OPEN: "false"\n      WOODPECKER_ENABLE_SWAGGER: "false"\n      WOODPECKER_USER_REGISTERED_AGENTS: "false"|' "$compose_file"
+        changed=1
+    elif ! grep -q 'WOODPECKER_OPEN: "false"' "$compose_file"; then
+        sed -i 's|^      WOODPECKER_OPEN: .*|      WOODPECKER_OPEN: "false"|' "$compose_file"
+        changed=1
+    fi
+
+    if [[ "$changed" -eq 1 ]]; then
+        cp -a "$compose_file" "${compose_file}.bak-setup-control"
+        echo "Woodpecker compose приведён к безопасному виду (бэкап: ${compose_file}.bak-setup-control)"
+        if command -v docker >/dev/null; then
+            ( cd "$WP_DIR" && docker compose up -d ) || \
+                echo "ВНИМАНИЕ: docker compose up -d вернул ошибку" >&2
+        fi
+    fi
+
+    # TODO (п.3.2 плана аудита): убрать монтирование /var/run/docker.sock у
+    # агента — нужен dind или отдельная VM/LXC под воркер.
+}
+
+ensure_woodpecker_security
+
 # Повторный запуск скрипта не должен перезаписывать рабочие .env и volume:
 # если .env уже есть, только поднимаем сервисы.
 if [[ -f "$WP_DIR/.env" ]]; then
@@ -1673,7 +1812,11 @@ WOODPECKER_GITHUB_SECRET=${WP_SECRET}
 
 WOODPECKER_AGENT_SECRET=${WP_AGENT}
 
-WOODPECKER_OPEN=true
+# П.3 плана аудита: открытая регистрация закрыта (WOODPECKER_ADMIN
+# сохраняет доступ для mishgun64), Swagger выключен.
+WOODPECKER_OPEN=false
+WOODPECKER_ENABLE_SWAGGER=false
+WOODPECKER_USER_REGISTERED_AGENTS=false
 WOODPECKER_ADMIN=mishgun64
 
 TIMEZONE=${TIMEZONE}
@@ -1708,7 +1851,10 @@ services:
 
       WOODPECKER_AGENT_SECRET: ${WOODPECKER_AGENT_SECRET}
 
-      WOODPECKER_OPEN: ${WOODPECKER_OPEN}
+      # П.3 плана аудита: явные значения — не зависят от .env.
+      WOODPECKER_OPEN: "false"
+      WOODPECKER_ENABLE_SWAGGER: "false"
+      WOODPECKER_USER_REGISTERED_AGENTS: "false"
       WOODPECKER_ADMIN: ${WOODPECKER_ADMIN}
 
   woodpecker-agent:
@@ -1734,6 +1880,17 @@ volumes:
   woodpecker-server-data:
   woodpecker-agent-config:
 EOF
+
+        # П.3 плана аудита: порт Woodpecker биндим только на LAN-адрес control
+        # (клиент — Traefik; дополнительно закрывается nftables control_guard).
+        if [[ -n "${PI_WEB_LAN_IP:-}" ]]; then
+            sed -i "s|^      - \"8000:8000\"$|      - \"${PI_WEB_LAN_IP}:8000:8000\"|" \
+                "$WP_DIR/docker-compose.yml"
+            echo "Woodpecker биндится на ${PI_WEB_LAN_IP}:8000"
+        else
+            echo "ВНИМАНИЕ: LAN-адрес не определён — Woodpecker слушает 0.0.0.0:8000" >&2
+            echo "ограничение остаётся за nftables control_guard (8000: только Traefik)." >&2
+        fi
 
         cd "$WP_DIR"
 

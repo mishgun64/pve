@@ -7,6 +7,16 @@
 `wp_cli.ps1` использует `woodpecker-cli`: бинарник должен быть в `PATH`, а сервер и токен — в конфиге CLI
 (`woodpecker-cli` читает `WOODPECKER_SERVER`/`WOODPECKER_TOKEN` или свой конфиг-файл).
 
+`wp_cli.sh` — bash-аналог для Linux/WSL: без аргументов открывает интерактивное меню (стрелки/цифры, Enter, Esc),
+а с аргументами работает неинтерактивно: `wp_cli.sh <service> <pipeline>` (например `wp_cli.sh media backup`),
+`wp_cli.sh list` — список всех сервисов и пайплайнов. Опции: `--repo`, `--branch`, `--var KEY=VALUE`,
+`--dry-run`, `-y` (без подтверждения), `--no-install` (запрет автоустановки CLI).
+Перед каждым запуском скрипт проверяет наличие `woodpecker-cli` и при отсутствии сам скачивает его с GitHub Releases
+(версия подстраивается под сервер; установка в `/usr/local/bin` или `~/.local/bin`). Путь к бинарнику: `$WOODPECKER_CLI`.
+Сервер: всегда `https://ci.mishgun.com` (задаётся скриптом, переопределение из окружения игнорируется).
+Токен: `$WOODPECKER_TOKEN` или файл `~/.config/woodpecker/env` (chmod 600, строка `WOODPECKER_TOKEN=...`;
+путь переопределяется `$WOODPECKER_ENV_FILE`, шаблон — `~/.config/woodpecker/env.example`). Сам токен: Web UI → User settings → Token.
+
 ## common
 
 Базовые роли раскатываются на группу `docker_hosts` (VM/LXC с Docker-сервисами).

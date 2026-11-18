@@ -1,4 +1,3 @@
-
 $ErrorActionPreference = "Stop"
 
 # ============================================================
@@ -13,6 +12,39 @@ $Branch = "main"
 # ============================================================
 
 $services = @(
+    @{
+        Name = "Common"
+        Pipelines = @(
+            @{
+                Name = "Basic"
+                Role = "common/basic"
+                Pipeline = "common/basic"
+                Target = "docker_hosts"
+                Message = "Common Basic"
+            },
+            @{
+                Name = "Docker"
+                Role = "common/docker"
+                Pipeline = "common/docker"
+                Target = "docker_hosts"
+                Message = "Common Docker"
+            }
+        )
+    },
+
+    @{
+        Name = "PVE"
+        Pipelines = @(
+            @{
+                Name = "Firewall"
+                Role = "pve/firewall"
+                Pipeline = "pve/firewall"
+                Target = "pve"
+                Message = "PVE Firewall"
+            }
+        )
+    },
+
     @{
         Name = "Media"
         Pipelines = @(
@@ -36,6 +68,13 @@ $services = @(
                 Pipeline = "media/restore"
                 Target = "media_vm"
                 Message = "Media Restore"
+            },
+            @{
+                Name = "Firewall"
+                Role = "media_vm/firewall"
+                Pipeline = "media_vm/firewall"
+                Target = "pve"
+                Message = "Media Firewall"
             },
             @{
                 Name = "Full"
@@ -72,6 +111,13 @@ $services = @(
                 Message = "Nextcloud Restore"
             },
             @{
+                Name = "Firewall"
+                Role = "nextcloud/firewall"
+                Pipeline = "nextcloud/firewall"
+                Target = "pve"
+                Message = "Nextcloud Firewall"
+            },
+            @{
                 Name = "Full"
                 Role = $null
                 Pipeline = "nextcloud/full"
@@ -104,6 +150,13 @@ $services = @(
                 Pipeline = "pvpgn/restore"
                 Target = "pvpgn_lxc"
                 Message = "PvPGN Restore"
+            },
+            @{
+                Name = "Firewall"
+                Role = "pvpgn/firewall"
+                Pipeline = "pvpgn/firewall"
+                Target = "pve"
+                Message = "PvPGN Firewall"
             },
             @{
                 Name = "Full"
@@ -140,6 +193,13 @@ $services = @(
                 Message = "Traefik Restore"
             },
             @{
+                Name = "Firewall"
+                Role = "traefik/firewall"
+                Pipeline = "traefik/firewall"
+                Target = "pve"
+                Message = "Traefik Firewall"
+            },
+            @{
                 Name = "Full"
                 Role = $null
                 Pipeline = "traefik/full"
@@ -174,6 +234,13 @@ $services = @(
                 Message = "Valheim Restore"
             },
             @{
+                Name = "Firewall"
+                Role = "valheim/firewall"
+                Pipeline = "valheim/firewall"
+                Target = "pve"
+                Message = "Valheim Firewall"
+            },
+            @{
                 Name = "Full"
                 Role = $null
                 Pipeline = "valheim/full"
@@ -187,18 +254,11 @@ $services = @(
         Name = "WireGuard"
         Pipelines = @(
             @{
-                Name = "Config"
-                Role = "wireguard/config"
-                Pipeline = "wireguard/config"
-                Target = "wg_lxc"
-                Message = "WireGuard Config"
-            },
-            @{
-                Name = "Full"
-                Role = $null
-                Pipeline = "wireguard/full"
-                Target = $null
-                Message = "WireGuard Full"
+                Name = "Firewall"
+                Role = "wireguard/firewall"
+                Pipeline = "wireguard/firewall"
+                Target = "pve"
+                Message = "WireGuard Firewall"
             }
         )
     },
@@ -226,6 +286,13 @@ $services = @(
                 Pipeline = "santa_bot/restore"
                 Target = "santa_bot_lxc"
                 Message = "Santa Bot Restore"
+            },
+            @{
+                Name = "Firewall"
+                Role = "santa_bot/firewall"
+                Pipeline = "santa_bot/firewall"
+                Target = "pve"
+                Message = "Santa Bot Firewall"
             },
             @{
                 Name = "Full"

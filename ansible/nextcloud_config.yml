@@ -10,4 +10,5 @@
     - common/monitoring
 #    - nextcloud/backup
     - nextcloud/config
+    - nextcloud/firewall
 #    - nextcloud/restore

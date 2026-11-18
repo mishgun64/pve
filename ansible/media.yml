@@ -9,4 +9,5 @@
       - common/docker
 #      - common/monitoring
       - media_vm/config
+      - media_vm/firewall
       - media_vm/restore

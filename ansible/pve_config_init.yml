@@ -11,6 +11,7 @@
     ansible_password: "12345678"
   roles:
     - pve/config_soft
+    - pve/firewall
     - pve/config_hard
     - pve/firstboot_clean
     - pve/get_api_token

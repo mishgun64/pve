@@ -10,4 +10,5 @@
 #      - common/monitoring
       - santa_bot/backup
       - santa_bot/config
+      - santa_bot/firewall
       - santa_bot/restore

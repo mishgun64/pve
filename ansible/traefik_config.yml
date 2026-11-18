@@ -10,4 +10,5 @@
 #   - common/monitoring
     - traefik/backup
     - traefik/config
+    - traefik/firewall
     - traefik/restore

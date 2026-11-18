@@ -10,4 +10,5 @@
 #    - common/monitoring
     - pvpgn/backup
     - pvpgn/config
+    - pvpgn/firewall
     - pvpgn/restore

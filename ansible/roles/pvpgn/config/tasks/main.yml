@@ -13,29 +13,6 @@
     name: docker
     shell: /bin/bash
 
-#--------------------------Firewall rules----------------------------------
-
-- name: Decrypt locally
-  ansible.builtin.command:
-    cmd: sops -d {{ playbook_dir }}/roles/pvpgn/config/files/145.fw.enc
-  delegate_to: localhost
-  register: fw_decrypted
-  changed_when: false
-  no_log: true
-
-- name: Write to pmxcfs
-  ansible.builtin.shell:
-    cmd: "cat > /etc/pve/firewall/145.fw"
-    stdin: "{{ fw_decrypted.stdout | replace('\r\n', '\n') }}"
-  become: true
-  delegate_to: pve
-  no_log: true
-
-- name: Convert to ASCII
-  ansible.builtin.shell: >
-    sed -i 's/\r//' /etc/pve/firewall/145.fw
-  delegate_to: pve
-
 #--------------------------Copy PVPGN config files----------------------------------
 
 - name: Create required directories

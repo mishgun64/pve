@@ -13,26 +13,6 @@
     name: docker
     shell: /bin/bash
 
-#--------------------------Firewall rules----------------------------------
-
-- name: Decrypt locally
-  ansible.builtin.set_fact:
-    fw_content: "{{ lookup('pipe', 'sops -d ' + role_path + '/files/143.fw.enc') }}"
-  delegate_to: localhost
-  no_log: true
-
-- name: Write to pmxcfs
-  ansible.builtin.shell: cat > /etc/pve/firewall/143.fw
-  args:
-    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
-  become: true
-  delegate_to: pve
-  no_log: true
-
-- name: Convert to ASCII
-  ansible.builtin.shell: >
-    sed -i 's/\r//' /etc/pve/firewall/143.fw
-  delegate_to: pve
 #-----------------------Copy config files----------------------------------
 
 - name: Copy traefik directory

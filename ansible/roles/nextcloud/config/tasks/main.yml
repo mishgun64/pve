@@ -19,28 +19,6 @@
     - { name: "kernel.io_uring_disabled", value: "0" }
     - { name: "vm.overcommit_memory", value: "1" }
 
-#--------------------------Firewall rules----------------------------------
-
-- name: Decrypt locally
-  ansible.builtin.set_fact:
-    fw_content: "{{ lookup('pipe', 'sops -d ' + role_path + '/files/125.fw.enc') }}"
-  delegate_to: localhost
-  no_log: true
-
-- name: Write to pmxcfs
-  ansible.builtin.shell: cat > /etc/pve/firewall/125.fw
-  args:
-    stdin: "{{ fw_content | replace('\r\n', '\n') }}"
-  become: true
-  delegate_to: pve
-  no_log: true
-
-
-- name: Convert to ASCII
-  ansible.builtin.shell: >
-    sed -i 's/\r//' /etc/pve/firewall/125.fw
-  delegate_to: pve
-
 # -----------------------Mount md0----------------------------------
 
 - name: Attach md0 RAID to VM 125

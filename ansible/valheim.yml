@@ -10,4 +10,5 @@
       #- common/monitoring
       - valheim/backup
       - valheim/config
+      - valheim/firewall
       - valheim/restore

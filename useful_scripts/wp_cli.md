@@ -5,11 +5,16 @@
 Запуск ролей выполняется плейбуком `ansible/run_role.yml`, `full` — отдельным плейбуком сервиса.
 
 `wp_cli.ps1` работает без внешнего бинарника `woodpecker-cli` — он вызывает REST API Woodpecker напрямую.
-Перед запуском задайте переменные окружения:
+Сервер и токен можно передать параметрами или через переменные окружения; если их нет — скрипт спросит интерактивно.
 
 ```powershell
-$env:WOODPECKER_SERVER = "https://woodpecker.example.com"
+# параметры
+.\wp_cli.ps1 -Server http://192.168.2.200:8000 -Token "<personal access token>"
+
+# или переменные окружения
+$env:WOODPECKER_SERVER = "http://192.168.2.200:8000"
 $env:WOODPECKER_TOKEN  = "<personal access token>"
+.\wp_cli.ps1
 ```
 
 ## common

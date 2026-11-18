@@ -1,3 +1,8 @@
+param(
+    [string]$Server = $env:WOODPECKER_SERVER,
+    [string]$Token  = $env:WOODPECKER_TOKEN
+)
+
 $ErrorActionPreference = "Stop"
 
 # ============================================================
@@ -380,21 +385,35 @@ function Select-MenuItem {
 # WOODPECKER API CONFIG
 # ============================================================
 
-$Server = $env:WOODPECKER_SERVER
-$Token = $env:WOODPECKER_TOKEN
+if ([string]::IsNullOrWhiteSpace($Server)) {
+    Write-Host ""
+    Write-Host "Woodpecker server is not set." -ForegroundColor Yellow
+    Write-Host "Enter URL, e.g. http://192.168.2.200:8000" -ForegroundColor Gray
+    $Server = Read-Host "Server"
+}
 
 if ([string]::IsNullOrWhiteSpace($Server)) {
     Write-Host ""
-    Write-Host "ERROR: WOODPECKER_SERVER is not set." -ForegroundColor Red
-    Write-Host "Example: $env:WOODPECKER_SERVER = 'https://woodpecker.example.com'" -ForegroundColor Gray
+    Write-Host "ERROR: server URL is required." -ForegroundColor Red
+    Write-Host "Set it with: `$env:WOODPECKER_SERVER = 'http://192.168.2.200:8000'" -ForegroundColor Gray
+    Write-Host "Or pass:    .\wp_cli.ps1 -Server http://192.168.2.200:8000" -ForegroundColor Gray
     Write-Host ""
     exit 1
 }
 
 if ([string]::IsNullOrWhiteSpace($Token)) {
     Write-Host ""
-    Write-Host "ERROR: WOODPECKER_TOKEN is not set." -ForegroundColor Red
-    Write-Host "Create a personal access token in Woodpecker UI and set it to $env:WOODPECKER_TOKEN" -ForegroundColor Gray
+    Write-Host "Woodpecker API token is not set." -ForegroundColor Yellow
+    Write-Host "Create a personal access token in Woodpecker UI (User settings -> API)." -ForegroundColor Gray
+    $secureToken = Read-Host "Token" -AsSecureString
+    $Token = [System.Net.NetworkCredential]::new("", $secureToken).Password
+}
+
+if ([string]::IsNullOrWhiteSpace($Token)) {
+    Write-Host ""
+    Write-Host "ERROR: API token is required." -ForegroundColor Red
+    Write-Host "Set it with: `$env:WOODPECKER_TOKEN = '<token>'" -ForegroundColor Gray
+    Write-Host "Or pass:    .\wp_cli.ps1 -Token '<token>'" -ForegroundColor Gray
     Write-Host ""
     exit 1
 }

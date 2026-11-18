@@ -1,8 +1,3 @@
-param(
-    [string]$Server = $env:WOODPECKER_SERVER,
-    [string]$Token  = $env:WOODPECKER_TOKEN
-)
-
 $ErrorActionPreference = "Stop"
 
 # ============================================================
@@ -382,44 +377,18 @@ function Select-MenuItem {
 }
 
 # ============================================================
-# WOODPECKER API CONFIG
+# CHECK WOODPECKER CLI
 # ============================================================
 
-if ([string]::IsNullOrWhiteSpace($Server)) {
-    Write-Host ""
-    Write-Host "Woodpecker server is not set." -ForegroundColor Yellow
-    Write-Host "Enter URL, e.g. http://192.168.2.200:8000" -ForegroundColor Gray
-    $Server = Read-Host "Server"
+try {
+    $null = Get-Command woodpecker-cli -ErrorAction Stop
 }
-
-if ([string]::IsNullOrWhiteSpace($Server)) {
+catch {
     Write-Host ""
-    Write-Host "ERROR: server URL is required." -ForegroundColor Red
-    Write-Host "Set it with: `$env:WOODPECKER_SERVER = 'http://192.168.2.200:8000'" -ForegroundColor Gray
-    Write-Host "Or pass:    .\wp_cli.ps1 -Server http://192.168.2.200:8000" -ForegroundColor Gray
+    Write-Host "ERROR: woodpecker-cli not found." -ForegroundColor Red
     Write-Host ""
     exit 1
 }
-
-if ([string]::IsNullOrWhiteSpace($Token)) {
-    Write-Host ""
-    Write-Host "Woodpecker API token is not set." -ForegroundColor Yellow
-    Write-Host "Create a personal access token in Woodpecker UI (User settings -> API)." -ForegroundColor Gray
-    $secureToken = Read-Host "Token" -AsSecureString
-    $Token = [System.Net.NetworkCredential]::new("", $secureToken).Password
-}
-
-if ([string]::IsNullOrWhiteSpace($Token)) {
-    Write-Host ""
-    Write-Host "ERROR: API token is required." -ForegroundColor Red
-    Write-Host "Set it with: `$env:WOODPECKER_TOKEN = '<token>'" -ForegroundColor Gray
-    Write-Host "Or pass:    .\wp_cli.ps1 -Token '<token>'" -ForegroundColor Gray
-    Write-Host ""
-    exit 1
-}
-
-$Server = $Server.TrimEnd('/')
-$Headers = @{ Authorization = "Bearer $Token" }
 
 # ============================================================
 # SELECT SERVICE
@@ -455,19 +424,27 @@ Write-Host " Creating pipeline..." -ForegroundColor Yellow
 Write-Host ""
 
 # ============================================================
-# BUILD PIPELINE VARIABLES
+# BUILD WOODPECKER CLI ARGUMENTS
 # ============================================================
 
-$Variables = @{
-    PIPELINE = $selectedPipeline.Pipeline
-}
+$args = @(
+    "pipeline"
+    "create"
+    $Repo
+    "--branch"
+    $Branch
+    "--var"
+    "PIPELINE=$($selectedPipeline.Pipeline)"
+)
 
 if (-not [string]::IsNullOrWhiteSpace($selectedPipeline.Role)) {
-    $Variables["ROLE"] = $selectedPipeline.Role
+    $args += "--var"
+    $args += "ROLE=$($selectedPipeline.Role)"
 }
 
 if (-not [string]::IsNullOrWhiteSpace($selectedPipeline.Target)) {
-    $Variables["TARGET"] = $selectedPipeline.Target
+    $args += "--var"
+    $args += "TARGET=$($selectedPipeline.Target)"
 }
 
 # ============================================================
@@ -480,44 +457,19 @@ Write-Host " TARGET   = [$($selectedPipeline.Target)]" -ForegroundColor DarkGray
 Write-Host ""
 
 # ============================================================
-# CREATE PIPELINE VIA WOODPECKER API
+# CREATE PIPELINE
 # ============================================================
 
-try {
-    $repoInfo = Invoke-RestMethod `
-        -Method Get `
-        -Uri "$Server/api/repos/lookup/$Repo" `
-        -Headers $Headers `
-        -ErrorAction Stop
+& woodpecker-cli @args
 
-    $body = @{
-        branch    = $Branch
-        variables = $Variables
-    } | ConvertTo-Json -Depth 5
-
-    $pipeline = Invoke-RestMethod `
-        -Method Post `
-        -Uri "$Server/api/repos/$($repoInfo.id)/pipelines" `
-        -Headers $Headers `
-        -ContentType "application/json" `
-        -Body $body `
-        -ErrorAction Stop
-}
-catch {
+if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Red
     Write-Host "║         PIPELINE CREATION ERROR      ║" -ForegroundColor Red
     Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
-    Write-Host " $($_.Exception.Message)" -ForegroundColor Red
-
-    if ($_.ErrorDetails.Message) {
-        Write-Host ""
-        Write-Host " $($_.ErrorDetails.Message)" -ForegroundColor DarkGray
-    }
-
-    Write-Host ""
-    exit 1
+    Write-Host " Exit code: $LASTEXITCODE" -ForegroundColor Red
+    exit $LASTEXITCODE
 }
 
 # ============================================================
@@ -532,7 +484,6 @@ Write-Host ""
 
 Write-Host " Service:  $($selectedService.Name)" -ForegroundColor White
 Write-Host " Pipeline: $($selectedPipeline.Pipeline)" -ForegroundColor White
-Write-Host " Number:   $($pipeline.number)" -ForegroundColor White
 
 if (-not [string]::IsNullOrWhiteSpace($selectedPipeline.Role)) {
     Write-Host " Role:     $($selectedPipeline.Role)" -ForegroundColor White

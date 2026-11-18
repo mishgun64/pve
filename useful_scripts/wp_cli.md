@@ -4,18 +4,8 @@
 ролевые пайплайны дополнительно принимают `ROLE` и `TARGET` (если не заданы — используются значения по умолчанию из раздела ниже).
 Запуск ролей выполняется плейбуком `ansible/run_role.yml`, `full` — отдельным плейбуком сервиса.
 
-`wp_cli.ps1` работает без внешнего бинарника `woodpecker-cli` — он вызывает REST API Woodpecker напрямую.
-Сервер и токен можно передать параметрами или через переменные окружения; если их нет — скрипт спросит интерактивно.
-
-```powershell
-# параметры
-.\wp_cli.ps1 -Server http://192.168.2.200:8000 -Token "<personal access token>"
-
-# или переменные окружения
-$env:WOODPECKER_SERVER = "http://192.168.2.200:8000"
-$env:WOODPECKER_TOKEN  = "<personal access token>"
-.\wp_cli.ps1
-```
+`wp_cli.ps1` использует `woodpecker-cli`: бинарник должен быть в `PATH`, а сервер и токен — в конфиге CLI
+(`woodpecker-cli` читает `WOODPECKER_SERVER`/`WOODPECKER_TOKEN` или свой конфиг-файл).
 
 ## common
 

@@ -1,0 +1,39 @@
+when:
+  - event: push
+    branch: main
+    path:
+      include:
+        - ansible/roles/common/docker/**
+
+  - event: manual
+    evaluate: 'PIPELINE == "common/docker"'
+
+steps:
+  deploy:
+    image: alpine/ansible:latest
+
+    environment:
+      SSH_KEY:
+        from_secret: ssh_key
+
+    commands:
+      - |
+        ROLE="$${ROLE:-common/docker}"
+        TARGET="$${TARGET:-local_hosts}"
+
+        echo "ROLE=$ROLE"
+        echo "TARGET=$TARGET"
+
+        apk add --no-cache rsync sops
+
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+
+        export ANSIBLE_CONFIG=ansible/ansible.cfg
+
+        ansible-playbook \
+          -i ansible/hosts_prod \
+          ansible/run_role.yml \
+          -e "role_name=$${ROLE}" \
+          -e "target_hosts=$${TARGET}"

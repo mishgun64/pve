@@ -175,22 +175,6 @@ pipeline {
             }
         }
 
-        stage('known_hosts') {
-            when {
-                expression { env.EVENT == 'known_hosts' }
-            }
-            steps {
-                script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Update-known_hosts"
-                }
-                git branch: 'main', url: "${ANSIBLE_REPO}"
-
-                sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/update_known_hosts_test.yml
-                '''
-            }
-        }
-
         stage('wireguard') {
             when {
                 expression { env.EVENT == 'wireguard' }
@@ -218,7 +202,7 @@ pipeline {
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_config.yml
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/run_role.yml -e "role_name=traefik/config" -e "target_hosts=traefik_lxc"
                 '''
             }
         }
@@ -234,7 +218,7 @@ pipeline {
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_backup.yml
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/run_role.yml -e "role_name=traefik/backup" -e "target_hosts=traefik_lxc"
                 '''
             }
         }
@@ -250,7 +234,39 @@ pipeline {
                 git branch: 'main', url: "${ANSIBLE_REPO}"
 
                 sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik_restore.yml
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/run_role.yml -e "role_name=traefik/restore" -e "target_hosts=traefik_lxc"
+                '''
+            }
+        }
+
+        stage('traefik-firewall') {
+            when {
+                expression { env.EVENT == 'traefik-firewall' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik firewall"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/run_role.yml -e "role_name=traefik/firewall" -e "target_hosts=pve"
+                '''
+            }
+        }
+
+        stage('traefik-full') {
+            when {
+                expression { env.EVENT == 'traefik-full' }
+            }
+            steps {
+                script {
+                    currentBuild.displayName = "#${BUILD_NUMBER} - Traefik full"
+                }
+                git branch: 'main', url: "${ANSIBLE_REPO}"
+
+                sh '''
+                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/traefik.yml
                 '''
             }
         }
@@ -415,20 +431,5 @@ pipeline {
             }
         }
 
-        stage('cron-debug') {
-            when {
-                expression { env.EVENT == 'cron-debug' }
-            }
-            steps {
-                script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Cron-debug"
-                }
-                git branch: 'main', url: "${ANSIBLE_REPO}"
-
-                sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/cron_debug.yml
-                '''
-            }
-        }
     }
 }

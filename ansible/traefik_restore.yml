@@ -1,8 +1,0 @@
----
-
-- name: Traefik LXC restore
-  hosts: traefik_lxc
-  remote_user: root
-  gather_facts: true
-  roles:
-    - traefik/restore

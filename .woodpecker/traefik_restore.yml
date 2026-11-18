@@ -12,20 +12,8 @@ steps:
 
     commands:
       - |
-        if [ "$CI_PIPELINE_EVENT" = "manual" ]; then
-          if [ -z "$ROLE" ]; then
-            echo "ERROR: ROLE parameter is required"
-            exit 1
-          fi
-
-          if [ -z "$TARGET" ]; then
-            echo "ERROR: TARGET parameter is required"
-            exit 1
-          fi
-        else
-          ROLE="traefik/restore"
-          TARGET="traefik_lxc"
-        fi
+        ROLE="$${ROLE:-traefik/restore}"
+        TARGET="$${TARGET:-traefik_lxc}"
 
         echo "ROLE=$ROLE"
         echo "TARGET=$TARGET"

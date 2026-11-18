@@ -26,7 +26,7 @@
 ansible-playbook -i your_inventory inventory.ini your_service_config.yml
 ```
 
-Роль `monitoring` уже включена в каждый сервисный плейбук (например, `nextcloud_config.yml`, `traefik_config.yml`).
+Роль `monitoring` уже включена в каждый сервисный плейбук (например, `nextcloud_config.yml`, `traefik.yml`).
 
 ### 2. Отключение мониторинга на каком-то узле
 

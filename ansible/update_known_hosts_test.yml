@@ -1,6 +1,0 @@
----
-
-- hosts: media_vm
-  gather_facts: false
-  roles:
-    - common/update_known_hosts

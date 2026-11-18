@@ -18,20 +18,8 @@ steps:
 
     commands:
       - |
-        if [ "$CI_PIPELINE_EVENT" = "manual" ]; then
-          if [ -z "$ROLE" ]; then
-            echo "ERROR: ROLE parameter is required"
-            exit 1
-          fi
-
-          if [ -z "$TARGET" ]; then
-            echo "ERROR: TARGET parameter is required"
-            exit 1
-          fi
-        else
-          ROLE="traefik/firewall"
-          TARGET="pve"
-        fi
+        ROLE="$${ROLE:-traefik/firewall}"
+        TARGET="$${TARGET:-pve}"
 
         echo "ROLE=$ROLE"
         echo "TARGET=$TARGET"

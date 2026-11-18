@@ -1,8 +1,16 @@
 # Services and Pipelines
 
-Все ручные пайплайны запускаются через `woodpecker-cli` с переменной `PIPELINE`;
+Все ручные пайплайны запускаются с переменной `PIPELINE`;
 ролевые пайплайны дополнительно принимают `ROLE` и `TARGET` (если не заданы — используются значения по умолчанию из раздела ниже).
 Запуск ролей выполняется плейбуком `ansible/run_role.yml`, `full` — отдельным плейбуком сервиса.
+
+`wp_cli.ps1` работает без внешнего бинарника `woodpecker-cli` — он вызывает REST API Woodpecker напрямую.
+Перед запуском задайте переменные окружения:
+
+```powershell
+$env:WOODPECKER_SERVER = "https://woodpecker.example.com"
+$env:WOODPECKER_TOKEN  = "<personal access token>"
+```
 
 ## common
 

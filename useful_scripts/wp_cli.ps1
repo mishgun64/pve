@@ -377,18 +377,30 @@ function Select-MenuItem {
 }
 
 # ============================================================
-# CHECK WOODPECKER CLI
+# WOODPECKER API CONFIG
 # ============================================================
 
-try {
-    $null = Get-Command woodpecker-cli -ErrorAction Stop
-}
-catch {
+$Server = $env:WOODPECKER_SERVER
+$Token = $env:WOODPECKER_TOKEN
+
+if ([string]::IsNullOrWhiteSpace($Server)) {
     Write-Host ""
-    Write-Host "ERROR: woodpecker-cli not found." -ForegroundColor Red
+    Write-Host "ERROR: WOODPECKER_SERVER is not set." -ForegroundColor Red
+    Write-Host "Example: $env:WOODPECKER_SERVER = 'https://woodpecker.example.com'" -ForegroundColor Gray
     Write-Host ""
     exit 1
 }
+
+if ([string]::IsNullOrWhiteSpace($Token)) {
+    Write-Host ""
+    Write-Host "ERROR: WOODPECKER_TOKEN is not set." -ForegroundColor Red
+    Write-Host "Create a personal access token in Woodpecker UI and set it to $env:WOODPECKER_TOKEN" -ForegroundColor Gray
+    Write-Host ""
+    exit 1
+}
+
+$Server = $Server.TrimEnd('/')
+$Headers = @{ Authorization = "Bearer $Token" }
 
 # ============================================================
 # SELECT SERVICE
@@ -424,27 +436,19 @@ Write-Host " Creating pipeline..." -ForegroundColor Yellow
 Write-Host ""
 
 # ============================================================
-# BUILD WOODPECKER CLI ARGUMENTS
+# BUILD PIPELINE VARIABLES
 # ============================================================
 
-$args = @(
-    "pipeline"
-    "create"
-    $Repo
-    "--branch"
-    $Branch
-    "--var"
-    "PIPELINE=$($selectedPipeline.Pipeline)"
-)
+$Variables = @{
+    PIPELINE = $selectedPipeline.Pipeline
+}
 
 if (-not [string]::IsNullOrWhiteSpace($selectedPipeline.Role)) {
-    $args += "--var"
-    $args += "ROLE=$($selectedPipeline.Role)"
+    $Variables["ROLE"] = $selectedPipeline.Role
 }
 
 if (-not [string]::IsNullOrWhiteSpace($selectedPipeline.Target)) {
-    $args += "--var"
-    $args += "TARGET=$($selectedPipeline.Target)"
+    $Variables["TARGET"] = $selectedPipeline.Target
 }
 
 # ============================================================
@@ -457,19 +461,44 @@ Write-Host " TARGET   = [$($selectedPipeline.Target)]" -ForegroundColor DarkGray
 Write-Host ""
 
 # ============================================================
-# CREATE PIPELINE
+# CREATE PIPELINE VIA WOODPECKER API
 # ============================================================
 
-& woodpecker-cli @args
+try {
+    $repoInfo = Invoke-RestMethod `
+        -Method Get `
+        -Uri "$Server/api/repos/lookup/$Repo" `
+        -Headers $Headers `
+        -ErrorAction Stop
 
-if ($LASTEXITCODE -ne 0) {
+    $body = @{
+        branch    = $Branch
+        variables = $Variables
+    } | ConvertTo-Json -Depth 5
+
+    $pipeline = Invoke-RestMethod `
+        -Method Post `
+        -Uri "$Server/api/repos/$($repoInfo.id)/pipelines" `
+        -Headers $Headers `
+        -ContentType "application/json" `
+        -Body $body `
+        -ErrorAction Stop
+}
+catch {
     Write-Host ""
     Write-Host "╔══════════════════════════════════════╗" -ForegroundColor Red
     Write-Host "║         PIPELINE CREATION ERROR      ║" -ForegroundColor Red
     Write-Host "╚══════════════════════════════════════╝" -ForegroundColor Red
     Write-Host ""
-    Write-Host " Exit code: $LASTEXITCODE" -ForegroundColor Red
-    exit $LASTEXITCODE
+    Write-Host " $($_.Exception.Message)" -ForegroundColor Red
+
+    if ($_.ErrorDetails.Message) {
+        Write-Host ""
+        Write-Host " $($_.ErrorDetails.Message)" -ForegroundColor DarkGray
+    }
+
+    Write-Host ""
+    exit 1
 }
 
 # ============================================================
@@ -484,6 +513,7 @@ Write-Host ""
 
 Write-Host " Service:  $($selectedService.Name)" -ForegroundColor White
 Write-Host " Pipeline: $($selectedPipeline.Pipeline)" -ForegroundColor White
+Write-Host " Number:   $($pipeline.number)" -ForegroundColor White
 
 if (-not [string]::IsNullOrWhiteSpace($selectedPipeline.Role)) {
     Write-Host " Role:     $($selectedPipeline.Role)" -ForegroundColor White

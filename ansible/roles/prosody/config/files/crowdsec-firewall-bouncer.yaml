@@ -1,7 +1,0 @@
-mode: nftables
-update_frequency: 10s
-log_mode: file
-log_dir: /var/log/crowdsec/
-log_level: info
-api_url: http://172.18.0.3:8080
-api_key: <ключ от cscli bouncers add>

@@ -20,3 +20,8 @@
 # IDE project files accidentally created inside .woodpecker
 /.woodpecker/*.xml
 /.woodpecker/*.iml
+
+# ansible-vault (п.2 плана аудита) и внутренние документы аудита с деталями инфраструктуры
+/ansible/group_vars/all/vault.yml
+/SECURITY-AUDIT-PLAN.md
+/useful_scripts/plan-pi-web-user-split.md

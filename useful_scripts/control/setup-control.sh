@@ -194,8 +194,8 @@ fi
 # ------------------------------------------------------------------- apt ---
 log "apt update && upgrade"
 
-apt-get update
-apt-get upgrade -y
+DEBIAN_FRONTEND=noninteractive apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confold"
 
 log "Установка пакетов"
 
@@ -1781,7 +1781,7 @@ add_cron() {
 }
 
 add_cron "#Ansible: Update, upgrade and reboot" \
-    "0 6 * * * apt update && apt upgrade -y"
+    "0 6 * * * { DEBIAN_FRONTEND=noninteractive apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -q -o Dpkg::Options::=\"--force-confold\" && DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -q && apt-get autoclean -q; newest_kernel=\$(ls -1 /lib/modules 2>/dev/null | sort -V | tail -1); [ \"\$(uname -r)\" = \"\$newest_kernel\" ] || echo \"REBOOT REQUIRED: running \$(uname -r), newest installed \$newest_kernel\"; } >> /var/log/apt-upgrade.log 2>&1"
 
 add_cron "#Ansible: Update ISO files daily" \
     "0 5 * * * /usr/bin/ansible-playbook /root/control_node_update_iso.yml >> /var/log/control_node_update_iso.log 2>&1"

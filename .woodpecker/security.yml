@@ -1,0 +1,16 @@
+# П.2 плана аудита: сканирование рабочего дерева на секреты (gitleaks).
+# Режим --no-git: не сканирует старую историю (она содержит известные
+# скомпрометированные значения до git filter-repo/приватности репозитория).
+# После очистки истории заменить на полный скан:
+#   gitleaks detect --source . --redact --exit-code 1 --verbose
+when:
+  - event: push
+    branch: main
+  - event: manual
+    evaluate: 'PIPELINE == "security/gitleaks"'
+
+steps:
+  gitleaks:
+    image: zricethezav/gitleaks:latest
+    commands:
+      - gitleaks detect --no-git --source . --redact --exit-code 1 --verbose --config .gitleaks.toml

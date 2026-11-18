@@ -541,6 +541,43 @@ STUB
 
 run_stub_backup_test
 
+# --- права на критичные файлы (п.5 плана аудита) ---------------------------
+# Любой процесс от pi (в т.ч. RCE) не должен уметь незаметно править конфиг
+# агента и его инструкции (персистентность + prompt injection).
+check_mode_no_write() {
+    local file="$1" label="$2"
+
+    if [[ ! -e "$file" ]]; then
+        fail "права: $label — файл не найден: $file"
+        return
+    fi
+
+    if [[ $(stat -c '%a' "$file") =~ [2367]$ ]]; then
+        fail "права: $label разрешает запись group/other: $(stat -c '%a %n' "$file")"
+    else
+        pass "права: $label (mode $(stat -c '%a' "$file"))"
+    fi
+}
+
+check_mode_no_write "$HOME/.pi/agent/settings.json" 'settings.json'
+check_mode_no_write "$HOME/.pi/agent/AGENTS.md" 'AGENTS.md'
+check_mode_no_write "$HOME/.ssh/authorized_keys" 'authorized_keys'
+
+if [[ -d /srv/backups ]]; then
+    if [[ $(stat -c '%a %U' /srv/backups) != '700 root' ]]; then
+        fail "права: /srv/backups должен быть 0700 root:root, сейчас: $(stat -c '%a %U:%G' /srv/backups)"
+    else
+        pass 'права: /srv/backups (0700 root:root)'
+    fi
+fi
+
+# незашифрованные бэкапы santa_bot (п.5: должны быть только *.tar.gz.enc)
+if compgen -G '/srv/backups/santa_bot/santa_bot_*.tar.gz' >/dev/null 2>&1; then
+    fail 'бэкапы: найден незашифрованный santa_bot_*.tar.gz в /srv/backups/santa_bot (п.5)'
+else
+    pass 'бэкапы: незашифрованных santa_bot_*.tar.gz нет'
+fi
+
 # --- итог -------------------------------------------------------------------
 echo ""
 

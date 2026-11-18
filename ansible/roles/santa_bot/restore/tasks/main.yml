@@ -5,7 +5,7 @@
   delegate_to: control_node
   run_once: true
   ansible.builtin.shell: |
-    ls -1t {{ santa_bot_backup_dir }}/santa_bot_*.tar.gz 2>/dev/null | head -n 1 || true
+    ls -1t {{ santa_bot_backup_dir }}/santa_bot_*.tar.gz.enc 2>/dev/null | head -n 1 || true
   register: latest_backup
   changed_when: false
 
@@ -36,6 +36,21 @@
   run_once: true
   when: backup_exists
 
+# П.5 плана аудита: бэкапы santa_bot хранятся зашифрованными (sops/age).
+# Расшифровка ключом деплоя CI (приватная половина recipient из backup-роли).
+
+- name: Decrypt backup on CI container
+  ansible.builtin.shell: >
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE=/root/.ssh/id_ed25519 sops
+    --input-type binary --output-type binary
+    -d /tmp/{{ backup_file }}
+    > /tmp/{{ backup_file | regex_replace('\\.enc$', '') }}
+  delegate_to: localhost
+  no_log: true
+  changed_when: true
+  run_once: true
+  when: backup_exists
+
 # -------------------------- Stop container --------------------------
 
 - name: Stop docker compose
@@ -48,7 +63,7 @@
 
 - name: Extract backup
   ansible.builtin.unarchive:
-    src: "/tmp/{{ backup_file }}"
+    src: "/tmp/{{ backup_file | regex_replace('\\.enc$', '') }}"
     dest: "{{ santa_bot_dir }}/"
     remote_src: false
   when: backup_exists

@@ -231,7 +231,7 @@
 - name: Change root password
   ansible.builtin.user:
     name: root
-    password: '$6$fokOJwJ6nph/rD3.$x7MfhDHlm2lnWdDcne0cbWWx3.IBg6Kx5G2YVrFEQO/VCkPzOcpHz8nzIbxWJcIZQmTT1LIxUN6VmSq.hb1sI0'
+    password: '{{ vault_media_vm_root_password_hash | mandatory }}'  # значение из ansible-vault (group_vars/all/vault.yml); хеш НЕ коммитить в репозиторий
     # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
 
 #-----------------------Autobackup----------------------------------

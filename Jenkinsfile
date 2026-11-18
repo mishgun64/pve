@@ -255,54 +255,6 @@ pipeline {
             }
         }
 
-        stage('prosody-config') {
-            when {
-                expression { env.EVENT == 'prosody-config' }
-            }
-            steps {
-                script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Prosody-config"
-                }
-                git branch: 'main', url: "${ANSIBLE_REPO}"
-
-                sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/prosody_config.yml
-                '''
-            }
-        }
-
-        stage('prosody-backup') {
-            when {
-                expression { env.EVENT == 'prosody-backup' }
-            }
-            steps {
-                script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Prosody-backup"
-                }
-                git branch: 'main', url: "${ANSIBLE_REPO}"
-
-                sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/prosody_backup.yml
-                '''
-            }
-        }
-
-        stage('prosody-restore') {
-            when {
-                expression { env.EVENT == 'prosody-restore' }
-            }
-            steps {
-                script {
-                    currentBuild.displayName = "#${BUILD_NUMBER} - Prosody-restore"
-                }
-                git branch: 'main', url: "${ANSIBLE_REPO}"
-
-                sh '''
-                    ANSIBLE_CONFIG=./ansible/ansible.cfg ansible-playbook -i ./ansible/hosts_prod ./ansible/prosody_restore.yml
-                '''
-            }
-        }
-
         stage('pvpgn-config') {
             when {
                 expression { env.EVENT == 'pvpgn-config' }

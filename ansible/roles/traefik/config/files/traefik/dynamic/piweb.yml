@@ -5,6 +5,15 @@
 # только через TLS + CrowdSec + лимиты, а сам порт закрыт nftables на control.
 http:
   middlewares:
+    # П.1 плана аудита: Next.js пропускает middleware при заголовке
+    # x-prerender-revalidate = previewModeId из .next/prerender-manifest.json
+    # (опубликован в npm-тарболе). Гасим оба заголовка на периметре —
+    # middleware стоит ПЕРВЫМ в списке роутера piweb.
+    piweb-strip-preview:
+      headers:
+        customRequestHeaders:
+          x-prerender-revalidate: ""
+          x-prerender-revalidate-if-generated: ""
     piweb-headers:
       headers:
         stsSeconds: 31536000
@@ -14,6 +23,12 @@ http:
         contentTypeNosniff: true
         referrerPolicy: "no-referrer"
         permissionsPolicy: "geolocation=(), microphone=(), camera=()"
+        # П.7 плана аудита: CSP и скрытие стека (x-powered-by: Next.js).
+        # script-src 'unsafe-inline' нужен Next.js (инлайн-гидратация);
+        # при усилении — nonce/hash через next.config.
+        contentSecurityPolicy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        customResponseHeaders:
+          X-Powered-By: ""
     piweb-ratelimit:
       rateLimit:
         average: 10
@@ -30,6 +45,7 @@ http:
       tls:
         certResolver: letsencrypt
       middlewares:
+        - piweb-strip-preview
         - crowdsec@file
         - piweb-headers
         - piweb-ratelimit

@@ -27,7 +27,7 @@
   ansible.builtin.file:
     path: "{{ santa_bot_backup_dir }}"
     state: directory
-    mode: '0755'
+    mode: '0700'
   delegate_to: control_node
   when: santa_bot_results_stat.stat.exists
 
@@ -53,12 +53,26 @@
   when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Copy to control node------------------------------------------
+# П.5 плана аудита: бэкап шифруется (sops/age, recipient = ключ деплоя CI),
+# на control кладётся только *.tar.gz.enc.
+
+- name: Encrypt backup on CI container
+  ansible.builtin.shell: >
+    sops
+    --age 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOrAkVqWbPt82Bc0CRPjzGgvpVqmuqkdAQLjZQwxgoVd'
+    --input-type binary --output-type binary
+    -e /tmp/santa_bot_{{ backup_time }}.tar.gz
+    > /tmp/santa_bot_{{ backup_time }}.tar.gz.enc
+  delegate_to: localhost
+  no_log: true
+  changed_when: true
+  when: santa_bot_results_stat.stat.exists
 
 - name: Copy backup to control node
   ansible.builtin.copy:
-    src: "/tmp/santa_bot_{{ backup_time }}.tar.gz"
-    dest: "{{ santa_bot_backup_dir }}/santa_bot_{{ backup_time }}.tar.gz"
-    mode: '0644'
+    src: "/tmp/santa_bot_{{ backup_time }}.tar.gz.enc"
+    dest: "{{ santa_bot_backup_dir }}/santa_bot_{{ backup_time }}.tar.gz.enc"
+    mode: '0640'
   delegate_to: control_node
   when: santa_bot_results_stat.stat.exists
 
@@ -72,9 +86,12 @@
 
 - name: Cleanup fetched backup on CI container
   ansible.builtin.file:
-    path: "/tmp/santa_bot_{{ backup_time }}.tar.gz"
+    path: "{{ item }}"
     state: absent
   delegate_to: localhost
+  loop:
+    - "/tmp/santa_bot_{{ backup_time }}.tar.gz"
+    - "/tmp/santa_bot_{{ backup_time }}.tar.gz.enc"
   when: santa_bot_results_stat.stat.exists
 
 #------------------------------------------Nothing to do------------------------------------------

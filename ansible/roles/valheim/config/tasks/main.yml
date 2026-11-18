@@ -5,7 +5,7 @@
 - name: Change root password
   ansible.builtin.user:
     name: root
-    password: '$6$.N4dzkYE2rB1JFVX$dYVcr029SVux1Tfue5UI2Ek3TvqDIkj9xZTCJzrkTFNd4U272e9JG3kTNL7Gk6gdUgvEw4ifpgS9rAU0v.Pi8/'
+    password: '{{ vault_valheim_root_password_hash | mandatory }}'  # значение из ansible-vault (group_vars/all/vault.yml); хеш НЕ коммитить в репозиторий
     # python3 -c "import crypt; print(crypt.crypt('pass', crypt.mksalt(crypt.METHOD_SHA512)))"
 
 - name: Set shell for docker user

@@ -1,8 +1,0 @@
----
-
-- name: prosody LXC backup
-  hosts: prosody_lxc
-  remote_user: root
-  gather_facts: true
-  roles:
-    - prosody/backup

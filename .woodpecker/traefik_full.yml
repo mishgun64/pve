@@ -21,6 +21,12 @@ steps:
 
         export ANSIBLE_CONFIG=ansible/ansible.cfg
 
+        # Vault: значения из sops (age-получатель = root SSH-ключ control-node,
+        # он же SSH_KEY). Плейнтекст vault.yml в git не попадает.
+        SOPS_AGE_SSH_PRIVATE_KEY_FILE="$HOME/.ssh/id_ed25519" \
+          sops -d ansible/vault.sops.yml > /tmp/vault.yml
+        install -m 0600 /tmp/vault.yml ansible/group_vars/all/vault.yml
+
         ansible-playbook \
           -i ansible/hosts_prod \
           ansible/traefik.yml

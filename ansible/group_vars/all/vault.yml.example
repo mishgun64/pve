@@ -1,13 +1,22 @@
-# Шаблон: скопировать в vault.yml, зашифровать ansible-vault и заполнить НОВЫМИ
-# значениями после ротации (п.2 и п.3 плана аудита — старые считать скомпрометированными:
-# они были в публичной истории git). vault.yml не коммитится (см. .gitignore).
+# Шаблон: заполнить НОВЫМИ значениями после ротации (п.2 и п.3 плана аудита —
+# старые считать скомпрометированными: они были в публичной истории git).
 #
-# Создание хеша пароля:
-#   python3 -c "import crypt; print(crypt.crypt('НОВЫЙ-ПАРОЛЬ', crypt.mksalt(crypt.METHOD_SHA512)))"
+# Как это работает:
+#   ansible/group_vars/all/vault.yml       — plaintext, НЕ коммитится (.gitignore),
+#                                            нужен только для локальных прогонов;
+#   ansible/vault.sops.yml                 — шифртекст sops, коммитится;
+#   CI (Woodpecker) расшифровывает ansible/vault.sops.yml ключом из секрета
+#   ssh_key (age-получатель = root SSH-ключ control-node) в vault.yml перед запуском.
 #
-# Шифрование: ansible-vault encrypt ansible/group_vars/all/vault.yml
-# Прогон пайплайнов Woodpecker: добавить переменную ANSIBLE_VAULT_PASSWORD (secret)
-# и экспортировать её как ANSIBLE_VAULT_PASSWORD в шаге deploy.
+# Создание/обновление (control-node, root):
+#   ./useful_scripts/control/init-ansible-vault.sh --new
+#   git add ansible/vault.sops.yml && git commit && git push
+#
+# Ручной вариант:
+#   cp vault.yml.example vault.yml  # заполнить хеши
+#   openssl passwd -6 -stdin        # хеш пароля (salt генерится сам)
+#   SOPS_AGE_RECIPIENTS="$(ssh-keygen -y -f /root/.ssh/id_ed25519)" \
+#     sops -e ansible/group_vars/all/vault.yml > ansible/vault.sops.yml
 
 vault_pve_root_password_hash: "CHANGE_ME"
 vault_wireguard_root_password_hash: "CHANGE_ME"

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Статические тесты для useful_scripts: без docker, rclone и root.
-# Запуск: bash useful_scripts/tests/check.sh
+# Запуск: bash useful_scripts/control/tests/check.sh
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
+CONTROL_DIR="$(cd "$TESTS_DIR/.." && pwd)"
+SCRIPTS_DIR="$(cd "$CONTROL_DIR/.." && pwd)"
 
-BACKUP_SCRIPT="$SCRIPTS_DIR/backup-woodpecker.sh"
-SETUP_SCRIPT="$SCRIPTS_DIR/setup-control.sh"
-RESTORE_PI_SCRIPT="$SCRIPTS_DIR/restore-pi-agent.sh"
-BACKUP_PI_SH="$SCRIPTS_DIR/backup-pi-agent.sh"
+BACKUP_SCRIPT="$CONTROL_DIR/backup-woodpecker.sh"
+SETUP_SCRIPT="$CONTROL_DIR/setup-control.sh"
+RESTORE_PI_SCRIPT="$CONTROL_DIR/restore-pi-agent.sh"
+BACKUP_PI_SH="$CONTROL_DIR/backup-pi-agent.sh"
 BACKUP_PI_SCRIPT="$SCRIPTS_DIR/backup-pi-agent.ps1"
 
 FAILED=0

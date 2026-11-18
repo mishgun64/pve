@@ -3,13 +3,13 @@
 ## Первичная настройка control node
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/setup-control.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/setup-control.sh | sudo bash
 ```
 
 ## Бэкап Woodpecker CI на Google Drive (разово / вручную)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-woodpecker.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/backup-woodpecker.sh | sudo bash
 ```
 
 Скрипт настройки интерактивный: доступ к Google Drive он настраивает сам (мастер rclone), отдельный `rclone config` запускать не нужно.
@@ -101,22 +101,22 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/b
 
 ```bash
 # бэкап /home/pi/.pi/agent -> gdrive:pi-agent-backups (перезапись)
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/backup-pi-agent.sh | sudo bash
 
 # только план, без tar/sops/upload
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash -s -- --dry-run
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/backup-pi-agent.sh | sudo bash -s -- --dry-run
 
 # бэкап без загрузки (локальная копия в /tmp/pibk)
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash -s -- --no-upload --out /tmp/pibk
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/backup-pi-agent.sh | sudo bash -s -- --no-upload --out /tmp/pibk
 
 # восстановление из последнего бэкапа на Drive
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --yes
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/restore-pi-agent.sh | sudo bash -s -- --yes
 
 # восстановление конкретного объекта + перезапуск Pi Web
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --name pi-agent-config-control.tar.gz.sops --restart-service --yes
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/restore-pi-agent.sh | sudo bash -s -- --name pi-agent-config-control.tar.gz.sops --restart-service --yes
 
 # восстановление из локального файла
-curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --file /root/pi-agent-config.tar.gz.sops --yes
+curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/restore-pi-agent.sh | sudo bash -s -- --file /root/pi-agent-config.tar.gz.sops --yes
 ```
 
 > Параметры после `bash -s --` передаются скрипту; без них `restore-pi-agent.sh` спросит подтверждение (нужен tty) и выберет бэкап из списка. Для cron/без tty используйте `--yes`.
@@ -163,7 +163,7 @@ sudo ./backup-pi-agent.sh --dry-run
 - Загруженный объект сверяется по размеру и `sha256` (рядом кладётся `.sha256`). Шифрованная копия всегда остаётся в `/var/backups/pi-agent/`, чтобы неудачная загрузка не уничтожила прогон.
 - Список изменяется флагами: `--with-sessions`, `--without-missions`, `--with-data`; исключаются `*.bak*`, `*.tgz`, `*.html`, `node_modules`.
 - Параметры: `--user`, `--src`, `--name`, `--recipient`, `--remote`, `--remote-dir`, `--rclone-config`, `--with-sessions`, `--without-missions`, `--with-data`, `--no-upload`, `--out`, `--require-verify`, `--skip-verify`, `--dry-run`.
-- Cron: `17 4 * * * /root/useful_scripts/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1`.
+- Cron: `17 4 * * * /root/useful_scripts/control/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1`.
 
 `restore-pi-agent.sh` скачивает архив с Drive, расшифровывает приватным SSH-ключом пользователя `pi` и раскладывает файлы в `/home/pi/.pi/agent`:
 
@@ -192,5 +192,5 @@ tar -xzf cfg.tar.gz -C ~/.pi/agent
 Статический тест без docker/rclone/root:
 
 ```bash
-bash useful_scripts/tests/check.sh
+bash useful_scripts/control/tests/check.sh
 ```

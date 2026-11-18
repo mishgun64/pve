@@ -8,8 +8,8 @@
 #
 # Запуск: sudo ./backup-pi-agent.sh
 #         sudo ./backup-pi-agent.sh --no-upload --out /tmp/pibk
-#         curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash
-#         cron:  17 4 * * * /root/useful_scripts/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1
+#         curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/backup-pi-agent.sh | sudo bash
+#         cron:  17 4 * * * /root/useful_scripts/control/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1
 #
 # Восстановление — restore-pi-agent.sh (лежит рядом), формат совместим.
 # ============================================================================
@@ -78,8 +78,8 @@ backup-pi-agent.sh — бэкап настроек pi agent на Google Drive.
 через rclone. Объект всегда один и тот же — он перезаписывается.
 
 Запуск: sudo ./backup-pi-agent.sh
-        curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/backup-pi-agent.sh | sudo bash -s -- --dry-run
-        cron:  17 4 * * * /root/useful_scripts/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1
+        curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/backup-pi-agent.sh | sudo bash -s -- --dry-run
+        cron:  17 4 * * * /root/useful_scripts/control/backup-pi-agent.sh >/var/log/pi-agent-backup.log 2>&1
 
 Восстановление — restore-pi-agent.sh (лежит рядом), формат совместим.
 ============================================================================

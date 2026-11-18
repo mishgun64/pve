@@ -44,7 +44,7 @@ PI_WEB_ALLOWED_HOSTS=""
 PIWEB_ALLOWED_SRC=""
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
-RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts"
+RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control"
 
 log() {
     printf '\n\033[1;32m==> %s\033[0m\n' "$*"

@@ -9,7 +9,7 @@
 # Запуск: sudo ./restore-pi-agent.sh
 #         sudo ./restore-pi-agent.sh --name pi-agent-config-pi.tar.gz.sops
 #         sudo ./restore-pi-agent.sh --file /root/pi-agent-config.tar.gz.sops
-#         curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --yes
+#         curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/restore-pi-agent.sh | sudo bash -s -- --yes
 #
 # Архив создаётся на Windows скриптом backup-pi-agent.ps1 (лежит рядом):
 #   tar.gz -> sops -e (binary, age-получатель = SSH-ключ) -> rclone copyto
@@ -74,7 +74,7 @@ restore-pi-agent.sh — восстановление конфигурации pi
 /home/pi/.pi/agent (каталог agent-dir pi).
 
 Запуск: sudo ./restore-pi-agent.sh
-        curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/restore-pi-agent.sh | sudo bash -s -- --yes
+        curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control/restore-pi-agent.sh | sudo bash -s -- --yes
         sudo ./restore-pi-agent.sh --file /root/pi-agent-config.tar.gz.sops
 
 Архив создаётся скриптом backup-pi-agent.sh (лежит рядом, Windows-версия —

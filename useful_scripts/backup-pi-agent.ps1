@@ -4,10 +4,24 @@
     Archive is encrypted with sops + age and uploaded to Google Drive via rclone.
 
 .DESCRIPTION
-    Collecst the pi agent config files (~/.pi/agent by default), packs them into
-    tar.gz, encrypts the archive with sops using an age recipient (age1...
-    or an ssh public key). The recipient / encryption key is requested
+    Collects a minimal subset of the pi agent directory (~/.pi/agent by default),
+    packs it into tar.gz, encrypts the archive with sops using an age recipient
+    (age1... or an ssh public key). The recipient / encryption key is requested
     interactively unless -Recipient is supplied.
+
+    Backed up by default (minimal set):
+      models.json, models-store.json, settings.json/.jsonc  (settings.json also
+      holds the plugin registry: "packages": ["npm:..."]), extensions/
+
+    Never backed up unless explicitly requested:
+      sessions/            - only with -WithSessions
+      ssh-remote-config.json, ssh-remote-known-hosts.json,
+      ssh-remote-memories  - only with -WithSsh
+      auth.json, mcp.json, mcp-auth.json (credentials)
+                           - only with -WithSecrets
+      missions/, data/     - only with -WithMissions / -WithData
+      skills/, prompts/, themes/ - only with -WithContent
+      AGENTS.md, keybindings.json, pi-subagents - only with -WithConfig
 
     Upload uses rclone copyto with --ignore-times, so an already existing
     remote object is overwritten. After upload the remote size and SHA256 are
@@ -33,8 +47,29 @@
 .PARAMETER SkipVerify
     Do not attempt the round-trip decryption check at all.
 
+.PARAMETER WithConfig
+    Also include keybindings.json, AGENTS*.md, CLAUDE.md, SYSTEM.md,
+    APPEND_SYSTEM.md and pi-subagents.
+
+.PARAMETER WithContent
+    Also include skills/, prompts/ and themes/.
+
+.PARAMETER WithSecrets
+    Also include auth.json, mcp.json and mcp-auth.json (API keys / tokens).
+
+.PARAMETER WithSsh
+    Also include the remote SSH connection state: ssh-remote-config.json,
+    ssh-remote-known-hosts.json and ssh-remote-memories/.
+
+.PARAMETER WithSessions
+    Also include sessions/ (conversation history).
+
+.PARAMETER WithMissions / WithData
+    Also include missions/ or data/ (caches).
+
 .EXAMPLE
     .\backup-pi-agent.ps1
+    .\backup-pi-agent.ps1 -WithContent -WithConfig
     .\backup-pi-agent.ps1 -WithSessions -Remote gdrive:pi-agent-backups
     .\backup-pi-agent.ps1 -NoUpload -Out C:\temp\pibackup
     .\backup-pi-agent.ps1 -Command Restore -Yes
@@ -52,8 +87,13 @@ param(
     [string] $Out,
     [string] $Source,          # restore: remote path or local .sops file
     [switch] $WithSessions,
-    [switch] $NoMissions,
+    [switch] $WithMissions,
+    [switch] $NoMissions,      # deprecated no-op: missions are opt-in now
     [switch] $WithData,
+    [switch] $WithConfig,
+    [switch] $WithContent,
+    [switch] $WithSecrets,
+    [switch] $WithSsh,
     [switch] $NoUpload,
     [switch] $DryRun,
     [switch] $SkipVerify,
@@ -413,14 +453,23 @@ function Initialize-Tools {
     $script:Out = (Get-Item -LiteralPath $script:Out).FullName
 }
 
-$IncludeFiles = @(
-    'settings.json', 'settings.jsonc', 'keybindings.json',
-    'mcp.json', 'mcp-auth.json', 'models.json', 'models-store.json', 'auth.json',
+# --- minimal set (always backed up): models + plugins ----------------------
+# settings.json is part of the minimal set because it holds the installed
+# package list ("packages": ["npm:..."]), i.e. the plugin registry.
+$MinimalFiles = @('models.json', 'models-store.json', 'settings.json', 'settings.jsonc')
+$MinimalDirs  = @('extensions')
+
+# --- opt-in groups ---------------------------------------------------------
+$ConfigFiles   = @(
+    'keybindings.json',
     'AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'SYSTEM.md', 'APPEND_SYSTEM.md',
-    'ssh-remote-config.json', 'ssh-remote-known-hosts.json',
-    'ssh-remote-memories', 'pi-subagents'
+    'pi-subagents'
 )
-$IncludeDirs = @('extensions', 'skills', 'prompts', 'themes')
+$ContentDirs   = @('skills', 'prompts', 'themes')
+# credentials / API keys - only with -WithSecrets
+$SecretFiles   = @('auth.json', 'mcp.json', 'mcp-auth.json')
+# remote connection state - only with -WithSsh, never by default
+$SshFiles      = @('ssh-remote-config.json', 'ssh-remote-known-hosts.json', 'ssh-remote-memories')
 
 $ExcludeArgs = @(
     '--exclude=*.bak', '--exclude=*.bak.*', '--exclude=*.orig', '--exclude=*.rej',
@@ -429,15 +478,31 @@ $ExcludeArgs = @(
     '--exclude=.DS_Store', '--exclude=Thumbs.db'
 )
 
+function Add-Members {
+    param(
+        [System.Collections.Generic.List[string]] $Members,
+        [string[]] $Files,
+        [string[]] $Dirs
+    )
+    foreach ($m in $Files) {
+        if (Test-Path -LiteralPath (Join-Path $Dir $m)) { $Members.Add($m) }
+    }
+    foreach ($m in $Dirs) {
+        if (Test-Path -LiteralPath (Join-Path $Dir $m) -PathType Container) { $Members.Add($m) }
+    }
+}
+
 function Get-Members {
     $members = New-Object System.Collections.Generic.List[string]
-    foreach ($m in $IncludeFiles) {
-        if (Test-Path -LiteralPath (Join-Path $Dir $m)) { $members.Add($m) }
-    }
-    foreach ($m in $IncludeDirs) {
-        if (Test-Path -LiteralPath (Join-Path $Dir $m) -PathType Container) { $members.Add($m) }
-    }
-    if (-not $NoMissions -and (Test-Path -LiteralPath (Join-Path $Dir 'missions') -PathType Container)) {
+
+    # minimal set: models + plugins
+    Add-Members -Members $members -Files $MinimalFiles -Dirs $MinimalDirs
+
+    if ($WithConfig)  { Add-Members -Members $members -Files $ConfigFiles }
+    if ($WithContent) { Add-Members -Members $members -Dirs  $ContentDirs }
+    if ($WithSecrets) { Add-Members -Members $members -Files $SecretFiles }
+    if ($WithSsh)     { Add-Members -Members $members -Files $SshFiles }
+    if ($WithMissions -and (Test-Path -LiteralPath (Join-Path $Dir 'missions') -PathType Container)) {
         $members.Add('missions')
     }
     if ($WithSessions -and (Test-Path -LiteralPath (Join-Path $Dir 'sessions') -PathType Container)) {
@@ -446,6 +511,19 @@ function Get-Members {
     if ($WithData -and (Test-Path -LiteralPath (Join-Path $Dir 'data') -PathType Container)) {
         $members.Add('data')
     }
+
+    # hard guard: never pick up sessions / ssh state / credentials implicitly
+    $Forbidden = @()
+    if (-not $WithSessions) { $Forbidden += 'sessions' }
+    if (-not $WithMissions) { $Forbidden += 'missions' }
+    if (-not $WithData)     { $Forbidden += 'data' }
+    if (-not $WithSsh)      { $Forbidden += $SshFiles }
+    if (-not $WithSecrets)  { $Forbidden += $SecretFiles }
+    if (-not $WithConfig)   { $Forbidden += $ConfigFiles }
+    foreach ($m in @($members)) {
+        if ($Forbidden -contains $m) { [void]$members.Remove($m) }
+    }
+
     if ($members.Count -eq 0) { Stop-Script "nothing to back up in $Dir" }
     return $members.ToArray()
 }
@@ -462,6 +540,9 @@ function Invoke-Backup {
 
     $members = Get-Members
     Write-Log ("members   : " + ($members -join ' '))
+    if ($WithSsh)     { Write-Warn 'including remote SSH connection state (-WithSsh)' }
+    if ($WithSecrets) { Write-Warn 'including credentials / API keys (-WithSecrets): auth.json, mcp.json, mcp-auth.json' }
+    if ($WithSessions) { Write-Warn 'including conversation history (-WithSessions)' }
 
     $archive = Join-Path $Out 'pi-agent-config.tar.gz'
     $enc     = Join-Path $Out $Name

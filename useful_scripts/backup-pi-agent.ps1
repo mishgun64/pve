@@ -32,7 +32,8 @@
 
 .PARAMETER Recipient
     age recipient used for encryption: "age1..." or "ssh-ed25519 AAAA..." or a
-    path to an ssh public key file. If omitted, you are prompted.
+    path to an ssh public key file. Defaults to $env:SOPS_AGE_RECIPIENT, else
+    to the built-in ssh-ed25519 key of root@control (see $DefaultRecipient).
 
 .PARAMETER Identity
     Private key used to verify the archive and to decrypt it on restore.
@@ -82,7 +83,7 @@ param(
     [string] $Name,
     [string] $Remote = $(if ($env:RCLONE_REMOTE) { $env:RCLONE_REMOTE } else { 'gdrive:pi-agent-backups' }),
     [string] $Dir,
-    [string] $Recipient = $env:SOPS_AGE_RECIPIENT,
+    [string] $Recipient = $(if ($env:SOPS_AGE_RECIPIENT) { $env:SOPS_AGE_RECIPIENT } else { 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMy5WqCB0OqW9WuzzHWVegy5oWFH1tRBZALxKOvkr8GB root@control' }),
     [string] $Identity,
     [string] $Out,
     [string] $Source,          # restore: remote path or local .sops file
@@ -240,6 +241,11 @@ function Resolve-Recipient {
 
     if ($Value -and $Value -notmatch '^(age1[a-z0-9]+|ssh-(ed25519|rsa)\s+\S+)') {
         Stop-Script "not a valid age recipient: '$Value' (expected age1..., ssh-ed25519 AAAA..., ssh-rsa AAAA... or a .pub file path)"
+    }
+    # sops/age only needs "<type> <base64>"; drop a trailing comment such as
+    # "root@control" so the recipient is canonical
+    if ($Value -match '^(ssh-(?:ed25519|rsa))\s+(\S+)(?:\s+.*)?$') {
+        $Value = "$($Matches[1]) $($Matches[2])"
     }
     return $Value
 }

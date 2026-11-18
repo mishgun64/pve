@@ -19,7 +19,7 @@ steps:
     commands:
       - |
         ROLE="$${ROLE:-common/docker}"
-        TARGET="$${TARGET:-local_hosts}"
+        TARGET="$${TARGET:-docker_hosts}"
 
         echo "ROLE=$ROLE"
         echo "TARGET=$TARGET"

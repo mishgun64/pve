@@ -2,12 +2,12 @@
 
 ## common
 
-Базовые роли раскатываются на все серверы из инвентаря (`local_hosts`).
+Базовые роли раскатываются на группу `docker_hosts` (VM/LXC с Docker-сервисами).
 
 | Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |
 |---|---|---|---|---|
-| basic | `common/basic` | `common/basic` | `local_hosts` | `Common Basic` |
-| docker | `common/docker` | `common/docker` | `local_hosts` | `Common Docker` |
+| basic | `common/basic` | `common/basic` | `docker_hosts` | `Common Basic` |
+| docker | `common/docker` | `common/docker` | `docker_hosts` | `Common Docker` |
 
 Pipeline files: `.woodpecker/common_basic.yml`, `common_docker.yml`.
 Обновляются автоматически при push в `ansible/roles/common/basic/**` и `ansible/roles/common/docker/**`.

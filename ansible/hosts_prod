@@ -1,25 +1,38 @@
-local_hosts:
-  hosts:
-    pve:
-      ansible_host: 192.168.2.2
-    pve_iso_server:
-      ansible_host: 192.168.1.72
-    media_vm:
-      ansible_host: 192.168.2.4
-    nextcloud_vm:
-      ansible_host: 192.168.2.5
-    wg_lxc:
-      ansible_host: 192.168.2.6
-    traefik_lxc:
-      ansible_host: 192.168.2.3
-    pvpgn_lxc:
-      ansible_host: 192.168.2.8
-    valheim_lxc:
-      ansible_host: 192.168.2.9
-    prometheus_lxc:
-      ansible_host: 192.168.2.10
-    santa_bot_lxc:
-      ansible_host: 192.168.2.11
-
+all:
   vars:
     ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+  children:
+    # Proxmox-хосты и control node
+    pve_hosts:
+      hosts:
+        pve:
+          ansible_host: 192.168.2.2
+        control_node:
+          ansible_host: 192.168.2.200
+        pve_iso_server:
+          ansible_host: 192.168.1.72
+
+    # VM/LXC с Docker-сервисами
+    docker_hosts:
+      hosts:
+        media_vm:
+          ansible_host: 192.168.2.4
+        nextcloud_vm:
+          ansible_host: 192.168.2.5
+        wg_lxc:
+          ansible_host: 192.168.2.6
+        traefik_lxc:
+          ansible_host: 192.168.2.3
+        pvpgn_lxc:
+          ansible_host: 192.168.2.8
+        valheim_lxc:
+          ansible_host: 192.168.2.9
+        santa_bot_lxc:
+          ansible_host: 192.168.2.11
+
+    # Мониторинг
+    monitoring_hosts:
+      hosts:
+        prometheus_lxc:
+          ansible_host: 192.168.2.10

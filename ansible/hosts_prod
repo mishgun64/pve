@@ -1,6 +1,11 @@
 all:
   vars:
     ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+    # Пиннинг host-ключей: контейнеры CI эфемерны, ~/.ssh/known_hosts в них пуст,
+    # из-за чего при host_key_checking=True падало "Host key verification failed".
+    # Файл лежит в репозитории и содержит только публичные host-ключи.
+    ansible_ssh_common_args: >-
+      -o UserKnownHostsFile={{ inventory_dir | default('ansible') }}/known_hosts
 
   children:
     # Proxmox-хосты и control node

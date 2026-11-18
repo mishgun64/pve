@@ -3,7 +3,10 @@ global:
   sendAnonymousUsage: false
 
 api:
-  dashboard: true
+  # Dashboard выведен из эксплуатации: роутер traefik.mishgun.com и
+  # basic-auth удалены (dynamic/dashboard.yml). API остаётся доступен только
+  # изнутри контейнера/по loopback, наружу не публикуется.
+  dashboard: false
   insecure: false
 
 entryPoints:

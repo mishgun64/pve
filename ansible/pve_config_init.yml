@@ -4,10 +4,11 @@
   hosts: pve
   remote_user: root
   gather_facts: false
-  # П.2 плана аудита: литеральный ansible_password удалён из репозитория
-  # (был в публичной истории). Пароль root на PVE-хостах сменить!
-  # Подключение при первом прогоне: --ask-pass (или Ansible Vault),
-  # далее — по ключу (roles/pve/config_soft ставит authorized_keys2).
+  vars:
+    # Используется ТОЛЬКО при первичной настройке PVE (bootstrap): роль
+    # pve/config_soft сразу ставит authorized_keys2 и меняет пароль root,
+    # дальнейшие прогоны идут по ключу. Пароль на хостах сменить.
+    ansible_password: "12345678"
   roles:
     - pve/config_soft
     - pve/config_hard

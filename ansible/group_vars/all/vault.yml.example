@@ -4,8 +4,7 @@
 #
 # Создание хеша пароля:
 #   python3 -c "import crypt; print(crypt.crypt('НОВЫЙ-ПАРОЛЬ', crypt.mksalt(crypt.METHOD_SHA512)))"
-# Basic-auth для Traefik dashboard (пользователь admin):
-#   htpasswd -nBC 10 '' 'НОВЫЙ-ПАРОЛЬ'
+#
 # Шифрование: ansible-vault encrypt ansible/group_vars/all/vault.yml
 # Прогон пайплайнов Woodpecker: добавить переменную ANSIBLE_VAULT_PASSWORD (secret)
 # и экспортировать её как ANSIBLE_VAULT_PASSWORD в шаге deploy.
@@ -13,7 +12,6 @@
 vault_pve_root_password_hash: "CHANGE_ME"
 vault_wireguard_root_password_hash: "CHANGE_ME"
 vault_traefik_root_password_hash: "CHANGE_ME"
-vault_traefik_dashboard_basic_auth: "CHANGE_ME"
 vault_media_vm_root_password_hash: "CHANGE_ME"
 vault_nextcloud_root_password_hash: "CHANGE_ME"
 vault_pvpgn_root_password_hash: "CHANGE_ME"

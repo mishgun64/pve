@@ -6,6 +6,10 @@
 # расшифровывает приватным SSH-ключом пользователя и раскладывает файлы в
 # /home/pi/.pi/agent (каталог agent-dir pi).
 #
+# Распаковка идёт поверх существующего каталога (merge): файлы из архива
+# заменяют одноимённые, все остальные файлы в agent-dir остаются на месте.
+# Копия в *.bak.<дата> делается только для тех путей, которые перезаписываются.
+#
 # Запуск: sudo ./restore-pi-agent.sh
 #         sudo ./restore-pi-agent.sh --name pi-agent-config-pi.tar.gz.sops
 #         sudo ./restore-pi-agent.sh --file /root/pi-agent-config.tar.gz.sops
@@ -93,7 +97,7 @@ backup-pi-agent.ps1):
   --rclone-config PATH путь к rclone.conf
   --ssh-key PATH       приватный ключ для расшифровки (ssh или age identity)
   -y, --yes            без подтверждений
-  --no-backup          не сохранять текущий agent-dir в *.bak.<дата>
+  --no-backup          не сохранять заменяемые файлы в *.bak.<дата>
   --restart-service    перезапустить pi-web.service после установки
   --keep-staging       не удалять временный каталог (для отладки)
   -h, --help           эта справка
@@ -291,51 +295,80 @@ grep -qE '(^|/)(settings|models|auth|mcp)\.json$' "$STAGING/entries.txt" ||
 # Сначала подтверждаем, потом копируем: отказ не должен оставлять мусор.
 if [[ $ASSUME_YES -eq 0 ]]; then
     printf '\nБудет установлено в %s (владелец %s:%s)\n' "$TARGET_DIR" "$PI_USER" "$PI_GROUP" >&2
-    if [[ -e "$TARGET_DIR" && $NO_BACKUP -eq 0 ]]; then
-        printf 'Текущий каталог будет сохранён как %s.bak.<дата>\n' "$TARGET_DIR" >&2
+    if [[ -d "$TARGET_DIR" && $NO_BACKUP -eq 0 ]]; then
+        printf 'Файлы, которые будут перезаписаны, сохранятся в %s.bak.<дата>\n' "$TARGET_DIR" >&2
+        printf 'Остальные файлы в %s останутся без изменений\n' "$TARGET_DIR" >&2
     fi
     answer=""
     prompt_read 'Продолжить? [y/N] ' answer
     [[ "$answer" =~ ^([yY]|[yY][eE][sS])$ ]] || fail 'прервано пользователем'
 fi
 
+# Merge-режим: распаковка перезаписывает только те файлы, что есть в архиве,
+# все остальные файлы в TARGET_DIR остаются на месте. Поэтому и бэкапим только
+# перезаписываемые пути, а не весь каталог целиком.
 BACKUP_PATH=""
-if [[ -e "$TARGET_DIR" ]]; then
-    if [[ $NO_BACKUP -eq 0 ]]; then
-        BACKUP_PATH="${TARGET_DIR}.bak.$(date '+%Y%m%d-%H%M%S')"
-        log "сохраняю текущий каталог: $BACKUP_PATH"
-        cp -a "$TARGET_DIR" "$BACKUP_PATH" ||
-            fail "не удалось сохранить $TARGET_DIR в $BACKUP_PATH (используй --no-backup, чтобы пропустить)"
-    else
-        log 'текущий каталог не сохраняю (--no-backup)'
-    fi
-fi
+if [[ -d "$TARGET_DIR" && $NO_BACKUP -eq 0 ]]; then
+    backup_root="${TARGET_DIR}.bak.$(date '+%Y%m%d-%H%M%S')"
+    backed=0
 
-# Полный replace, а не merge: старые файлы, которых нет в бэкапе, не должны
-# оставаться рядом с новыми. Копия уже сделана выше (BACKUP_PATH).
-if [[ -n "$BACKUP_PATH" ]]; then
-    rm -rf "$TARGET_DIR" || fail "не удалось очистить $TARGET_DIR"
+    while IFS= read -r entry; do
+        [[ -z "$entry" ]] && continue
+        rel="${entry#./}"
+        rel="${rel%/}"
+        [[ -z "$rel" ]] && continue
+        src="$TARGET_DIR/$rel"
+        [[ -e "$src" || -L "$src" ]] || continue
+
+        mkdir -p "$backup_root/$(dirname "$rel")" &&
+            cp -a "$src" "$backup_root/$rel" ||
+            fail "не удалось сохранить $src в $backup_root/$rel (используй --no-backup, чтобы пропустить)"
+        backed=1
+    done <"$STAGING/entries.txt"
+
+    if ((backed)); then
+        BACKUP_PATH="$backup_root"
+        log "перезаписываемые файлы сохранены: $BACKUP_PATH"
+    else
+        rmdir -p --ignore-fail-on-non-empty "$backup_root" 2>/dev/null || true
+        rm -rf "$backup_root" 2>/dev/null || true
+        log "перезаписываемых файлов нет — бэкап не нужен"
+    fi
 elif [[ -d "$TARGET_DIR" ]]; then
-    log "файлы будут перезаписаны, лишние останутся на месте (--no-backup)"
+    log 'заменяемые файлы не сохраняю (--no-backup)'
 fi
 
 install -d -m 0755 -o "$PI_USER" -g "$PI_GROUP" "$TARGET_DIR" ||
     fail "не удалось создать $TARGET_DIR"
 
-# Копируем содержимое архива в целевой каталог
+# Распаковка поверх: файлы архива заменяют одноимённые, остальные не трогаются
 tar -xzf "$ARCHIVE" -C "$TARGET_DIR" --no-same-owner --no-same-permissions ||
     fail "не удалось распаковать архив в $TARGET_DIR"
 
-# Права: каталоги 0755, обычные файлы 0644, секреты 0600
-find "$TARGET_DIR" -type d -exec chmod 0755 {} +
-find "$TARGET_DIR" -type f -exec chmod 0644 {} +
-for secret in auth.json mcp-auth.json models-store.json ssh-remote-config.json; do
-    if [[ -f "$TARGET_DIR/$secret" ]]; then
-        chmod 0600 "$TARGET_DIR/$secret"
-    fi
-done
-chown -R "$PI_USER:$PI_GROUP" "$TARGET_DIR" ||
-    fail "не удалось выставить владельца $PI_USER:$PI_GROUP"
+# Права выставляем только для путей из архива, чтобы не менять посторонние файлы.
+# Каталоги 0755, обычные файлы 0644, секреты 0600.
+while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    rel="${entry#./}"
+    rel="${rel%/}"
+    [[ -z "$rel" ]] && continue
+    dst="$TARGET_DIR/$rel"
+    [[ -e "$dst" || -L "$dst" ]] || continue
+
+    case "$(basename "$rel")" in
+        auth.json|mcp-auth.json|models-store.json|ssh-remote-config.json)
+            chmod 0600 "$dst" 2>/dev/null || true
+            ;;
+        *)
+            if [[ -d "$dst" ]]; then
+                chmod 0755 "$dst" 2>/dev/null || true
+            else
+                chmod 0644 "$dst" 2>/dev/null || true
+            fi
+            ;;
+    esac
+    chown -h "$PI_USER:$PI_GROUP" "$dst" 2>/dev/null || true
+done <"$STAGING/entries.txt"
 
 log "установлено в $TARGET_DIR"
 log "верхний уровень:"
@@ -359,5 +392,5 @@ fi
 
 log "готово: $BACKUP_NAME -> $TARGET_DIR"
 if [[ -n "$BACKUP_PATH" ]]; then
-    log "откат при необходимости: rm -rf '$TARGET_DIR' && mv '$BACKUP_PATH' '$TARGET_DIR'"
+    log "откат перезаписанных файлов: cp -a '$BACKUP_PATH'/. '$TARGET_DIR'/"
 fi

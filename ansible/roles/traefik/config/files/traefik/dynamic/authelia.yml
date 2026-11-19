@@ -30,14 +30,30 @@ http:
         referrerPolicy: "no-referrer"
         permissionsPolicy: "geolocation=(), microphone=(), camera=()"
 
-    # Ограничение темпа на портал: сам брутфорс пароля/OTP гасит regulation
-    # внутри Authelia, здесь — защита от флуда.
+    # Ограничение темпа только на API портала (/api/...): сам брутфорс пароля
+    # и OTP гасит regulation внутри Authelia, здесь — защита от флуда.
+    # ВАЖНО: на статику лимит вешать нельзя — SPA грузит ~80 JS/CSS-чанков
+    # одним залпом, лимит отдавал часть из них 429 и страница оставалась пустой.
     authelia-ratelimit:
       rateLimit:
         average: 20
         burst: 40
 
   routers:
+    # API портала — под rate-limit и теми же заголовками.
+    authelia-api:
+      rule: "Host(`login.mishgun.com`) && PathPrefix(`/api/`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      tls: {}
+      middlewares:
+        - crowdsec@file
+        - authelia-headers
+        - authelia-ratelimit
+      service: authelia
+
+    # Сам портал (HTML, /static/*, /locales/*) — без rate-limit.
     authelia:
       rule: "Host(`login.mishgun.com`)"
       entryPoints:
@@ -46,7 +62,6 @@ http:
       middlewares:
         - crowdsec@file
         - authelia-headers
-        - authelia-ratelimit
       service: authelia
 
   services:

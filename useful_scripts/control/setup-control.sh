@@ -1126,6 +1126,35 @@ EOF
     unset PI_WEB_PASSWORD
 fi
 
+# ---------------------------------------------------- LLMNR/mDNS off ---
+# Аудит 2026-11-19: LLMNR (5355/tcp+udp на всех интерфейсах) серверу не нужен —
+# лишняя поверхность атаки и вектор spoofing в LAN. mDNS тоже выключаем.
+log "Отключение LLMNR/mDNS (systemd-resolved)"
+
+if systemctl list-unit-files systemd-resolved.service >/dev/null 2>&1 &&
+    systemctl is-enabled systemd-resolved.service >/dev/null 2>&1; then
+    install -d -m 0755 /etc/systemd/resolved.conf.d
+
+    cat > /etc/systemd/resolved.conf.d/99-audit-no-llmnr.conf <<'LLMNR_EOF'
+# Сгенерировано setup-control.sh (аудит 2026-11-19): LLMNR/mDNS серверу не нужны.
+[Resolve]
+LLMNR=no
+MulticastDNS=no
+LLMNR_EOF
+    chmod 0644 /etc/systemd/resolved.conf.d/99-audit-no-llmnr.conf
+
+    systemctl restart systemd-resolved
+
+    # Проверяем, что 5355 больше не слушается.
+    if ss -lntu 2>/dev/null | grep -q ':5355 '; then
+        echo "ВНИМАНИЕ: порт 5355 (LLMNR) всё ещё слушается после рестарта resolved" >&2
+    else
+        echo "ok: LLMNR/mDNS отключены, 5355 закрыт"
+    fi
+else
+    echo "systemd-resolved не используется — пропускаем отключение LLMNR"
+fi
+
 # ------------------------------------------------ cleanup_backups.sh ---
 log "Установка cleanup_backups.sh"
 

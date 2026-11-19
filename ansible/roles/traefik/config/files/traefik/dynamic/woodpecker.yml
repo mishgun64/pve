@@ -1,0 +1,21 @@
+---
+
+# Woodpecker CI (control node, 192.168.2.200:8000).
+# Раньше роут жил только на хосте (ручной файл в dynamic/) и не был в
+# репозитории; теперь управляется ролью — очистка dynamic его не потеряет.
+# tls: {} — сертификат берётся из wildcard *.mishgun.com (dynamic/wildcard.yml).
+http:
+  routers:
+    woodpecker:
+      rule: "Host(`ci.mishgun.com`)"
+      entryPoints: websecure
+      tls: {}
+      service: woodpecker
+      middlewares:
+        - crowdsec@file
+
+  services:
+    woodpecker:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.200:8000"

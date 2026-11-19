@@ -21,7 +21,10 @@
 #
 # Тип хеша выбирается по имени ключа:
 #   * vault_*_root_password_hash        -> SHA-512 crypt (openssl passwd -6);
-#   * vault_authelia_*_password_hash    -> argon2id (утилита argon2, apt-get install -y argon2).
+#   * vault_authelia_*_password_hash    -> argon2id (утилита argon2).
+#
+# Зависимости: sops, openssl, argon2 (ставится автоматически через apt-get,
+# если запущено от root), ssh-ключ root для age.
 #
 # Пароли/хеши в вывод не попадают.
 
@@ -48,10 +51,28 @@ esac
 [[ -f "$EXAMPLE" ]] || die "нет шаблона $EXAMPLE"
 command -v sops >/dev/null || die "нет sops (установите: setup-control.sh или github.com/getsops/sops)"
 command -v openssl >/dev/null || die "нет openssl"
-# argon2 нужен для argon2id-хешей Authelia (vault_authelia_*): проверяем сразу,
+# argon2 нужен для argon2id-хешей Authelia (vault_authelia_*). Ставим сразу,
 # чтобы не заставлять вводить остальные пароли до падения на последнем ключе.
-if grep -qE '^vault_authelia_' "$EXAMPLE" && ! command -v argon2 >/dev/null; then
-    die "нет утилиты argon2 (нужна для vault_authelia_*_password_hash): apt-get install -y argon2"
+ensure_argon2() {
+    command -v argon2 >/dev/null && return 0
+
+    if ! id -u | grep -qx 0; then
+        die "нет утилиты argon2, а скрипт не от root: sudo apt-get install -y argon2 (или запустите через sudo)"
+    fi
+    command -v apt-get >/dev/null || die "нет argon2 и нет apt-get: установите argon2 вручную"
+
+    log "Установка argon2 (нужен для argon2id-хеша Authelia)"
+    if ! DEBIAN_FRONTEND=noninteractive apt-get install -y argon2 >/dev/null 2>&1; then
+        DEBIAN_FRONTEND=noninteractive apt-get update -qq \
+            || die "apt-get update не удался"
+        DEBIAN_FRONTEND=noninteractive apt-get install -y argon2 >/dev/null \
+            || die "не удалось установить argon2"
+    fi
+    command -v argon2 >/dev/null || die "argon2 установлен, но не найден в PATH"
+}
+
+if grep -qE '^vault_authelia_' "$EXAMPLE"; then
+    ensure_argon2
 fi
 [[ -f "$AGE_KEY" ]] || die "нет age-ключа $AGE_KEY (это root SSH-ключ control-node)"
 id -u | grep -qx 0 || echo "ВНИМАНИЕ: скрипт не от root; ключ должен быть читаем текущему пользователю." >&2

@@ -190,8 +190,41 @@
      'Recreated' in traefik_compose_up.stderr or
      'Created' in traefik_compose_up.stderr)
 
-#-----------------------Autoupdate Crowdsec hub----------------------------------
+# Authelia падает на невалидном configuration.yml (лишний/удалённый ключ),
+# а Traefik в этом случае отдаёт на login.mishgun.com голый 504. Проверяем
+# статус и печатаем логи, чтобы причина была видна прямо в выводе роли.
+- name: Check authelia container state
+  ansible.builtin.command: docker inspect --format '{{ '{{' }}.State.Status{{ '}}' }}' authelia
+  become: true
+  become_method: su
+  become_user: docker
+  register: authelia_state
+  changed_when: false
+  failed_when: false
+  retries: 12
+  delay: 5
+  until: authelia_state.stdout is search('running')
 
+- name: Fail with authelia logs when it is not running
+  when: authelia_state.stdout is not search('running')
+  block:
+    - name: Collect authelia logs
+      ansible.builtin.command: docker logs authelia --tail 40
+      become: true
+      become_method: su
+      become_user: docker
+      register: authelia_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Report authelia startup failure
+      ansible.builtin.fail:
+        msg: >-
+          Контейнер authelia не запущен (state: {{ authelia_state.stdout | default('unknown') }}).
+          Traefik на login.mishgun.com отдаёт 504. Логи: {{ authelia_logs.stdout }}
+          {{ authelia_logs.stderr }}
+
+#-----------------------Autoupdate Crowdsec hub----------------------------------
 - name: Update and upgrade CrowdSec hub daily
   ansible.builtin.cron:
     name: "Crowdsec hub update/upgrade"

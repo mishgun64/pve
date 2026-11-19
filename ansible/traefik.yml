@@ -8,7 +8,11 @@
     - common/basic
     - common/docker
 #    - common/monitoring
-    - traefik/backup
+    # Бэкапов здесь нет намеренно: их делает отдельный пайплайн
+    # .woodpecker/traefik_backup.yml (manual + cron "Traefik-backup").
+    # Если снимать бэкап в этом же прогоне, restore ниже откатит
+    # состояние на только что созданный снимок — на пересозданном хосте
+    # это затрёт восстанавливаемые данные пустым состоянием.
     - traefik/config
     - traefik/firewall
     - traefik/restore

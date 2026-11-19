@@ -238,3 +238,130 @@
   ansible.builtin.shell: |
     ls -1t {{ traefik_backup_dir }}/crowdsec_*.tar.gz.enc 2>/dev/null | tail -n +{{ traefik_backup_keep + 1 }} | xargs -r rm -f
   when: crowdsec_stat.stat.exists
+#------------------------------------------Authelia backup------------------------------------------
+
+# Что здесь настоящее состояние (всё остальное восстанавливается из репозитория):
+#   db.sqlite3                        — TOTP-сиды, WebAuthn/passkey, сессии,
+#                                       regulation (баны), одноразовые коды;
+#   secrets/storage_encryption_key    — БЕЗ него БД не расшифровать, т.е. бэкап БД
+#                                       без ключа бесполезен — бэкапить только вместе;
+#   secrets/session_secret            — иначе после восстановления все сессии невалидны;
+#   secrets/reset_password_jwt_secret — флоу сброса пароля;
+#   users_database.yml                — argon2-хеш пароля pi (в репо только шаблон + vault).
+# configuration.yml не бэкапим (роль рендерит его из репозитория),
+# notifications.txt — одноразовые уведомления, README.md — документация.
+
+- name: Check authelia data directory exists
+  ansible.builtin.stat:
+    path: /home/docker/authelia
+  register: authelia_stat
+
+- name: Check authelia database exists
+  ansible.builtin.stat:
+    path: /home/docker/authelia/db.sqlite3
+  register: authelia_db_stat
+  when: authelia_stat.stat.exists
+
+- name: Check authelia state files to back up
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: authelia_state_files
+  loop:
+    - /home/docker/authelia/secrets
+    - /home/docker/authelia/users_database.yml
+  when: authelia_stat.stat.exists
+
+- name: Set authelia backup paths
+  ansible.builtin.set_fact:
+    authelia_stage: /home/docker/authelia-backup
+    authelia_archive: "/home/docker/authelia_{{ backup_time }}.tar.gz"
+    authelia_encrypted: "/home/docker/authelia_{{ backup_time }}.tar.gz.enc"
+
+# staging пересоздаём каждый раз, чтобы в архив не попали файлы прошлого прогона.
+- name: Recreate authelia staging directory
+  ansible.builtin.file:
+    path: "{{ authelia_stage }}"
+    state: "{{ item }}"
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - absent
+    - directory
+  when: authelia_stat.stat.exists
+
+# Онлайн-снимок sqlite (backup API учитывает WAL): копировать db.sqlite3 на ходу
+# нельзя — Authelia пишет в WAL, получится битый или устаревший файл.
+- name: Make consistent sqlite snapshot of authelia database
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        import sqlite3, sys
+        src, dst = sys.argv[1], sys.argv[2]
+        with sqlite3.connect(src) as s, sqlite3.connect(dst) as d:
+            s.backup(d)
+      - /home/docker/authelia/db.sqlite3
+      - "{{ authelia_stage }}/db.sqlite3"
+  when: authelia_db_stat.stat.exists
+  changed_when: false
+
+- name: Copy authelia secrets and users database to staging
+  ansible.builtin.copy:
+    src: "{{ item.stat.path }}"
+    dest: "{{ authelia_stage }}/{{ item.stat.path | basename }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0600'
+    directory_mode: '0700'
+  loop: "{{ authelia_state_files.results | default([]) }}"
+  when: item.stat.exists
+  no_log: true
+
+- name: Archive authelia state
+  ansible.builtin.archive:
+    path: "{{ authelia_stage }}"
+    dest: "{{ authelia_archive }}"
+    format: gz
+    remove: no
+  when: authelia_stat.stat.exists
+
+- name: Encrypt authelia archive with SOPS
+  ansible.builtin.shell: >
+    sops -e --input-type binary --output-type binary {{ authelia_archive }} > {{ authelia_encrypted }}
+  args:
+    chdir: /home/docker
+  when: authelia_stat.stat.exists
+
+- name: Fetch encrypted authelia backup to the CI container
+  ansible.builtin.fetch:
+    src: "{{ authelia_encrypted }}"
+    dest: /tmp/
+    flat: true
+  when: authelia_stat.stat.exists
+
+- name: Copy encrypted authelia backup to the control node
+  ansible.builtin.copy:
+    src: "/tmp/authelia_{{ backup_time }}.tar.gz.enc"
+    dest: "{{ traefik_backup_dir }}/authelia_{{ backup_time }}.tar.gz.enc"
+    mode: '0600'
+  delegate_to: control_node
+  when: authelia_stat.stat.exists
+
+- name: Remove authelia staging and archives from the traefik host
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ authelia_stage }}"
+    - "{{ authelia_archive }}"
+    - "{{ authelia_encrypted }}"
+  when: authelia_stat.stat.exists
+
+- name: Keep only last {{ traefik_backup_keep }} Authelia backups
+  delegate_to: control_node
+  ansible.builtin.shell: |
+    ls -1t {{ traefik_backup_dir }}/authelia_*.tar.gz.enc 2>/dev/null | tail -n +{{ traefik_backup_keep + 1 }} | xargs -r rm -f
+  when: authelia_stat.stat.exists

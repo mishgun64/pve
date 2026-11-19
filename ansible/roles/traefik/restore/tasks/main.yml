@@ -196,6 +196,119 @@
     state: absent
   when: backup_exists_crowdsec
 
+#--------------------------Authelia restore------------------------------------------
+
+# Восстанавливаем только состояние (БД + секреты). configuration.yml и
+# users_database.yml рендерятся ролью config из репозитория/vault — их из
+# бэкапа не тянем, иначе откатим правки конфига из коммита.
+# Секреты обязаны совпадать с БД: без storage_encryption_key из того же архива
+# sqlite не расшифруется.
+
+- name: Find latest Authelia backup
+  delegate_to: control_node
+  run_once: true
+  ansible.builtin.shell: |
+    ls -1t {{ traefik_backup_dir }}/authelia_*.tar.gz.enc 2>/dev/null | head -n 1 || true
+  register: latest_backup_authelia
+
+- name: Set fact - authelia backup exists
+  set_fact:
+    backup_exists_authelia: "{{ latest_backup_authelia.stdout | length > 0 }}"
+
+- name: Skip restore if no authelia backup found
+  debug:
+    msg: "No Authelia backups found on control node. Skipping restore."
+  when: not backup_exists_authelia
+
+- name: Fetch Authelia backup from the control node
+  ansible.builtin.fetch:
+    src: "{{ latest_backup_authelia.stdout }}"
+    dest: "/tmp/"
+    flat: true
+  delegate_to: control_node
+  run_once: true
+  when: backup_exists_authelia
+
+- name: Decrypt Authelia backup
+  ansible.builtin.shell: |
+    sops -d /tmp/{{ latest_backup_authelia.stdout | basename }} > /tmp/{{ (latest_backup_authelia.stdout | basename) | regex_replace('.enc$', '') }}
+  when: backup_exists_authelia
+
+- name: Set local decrypted authelia path
+  set_fact:
+    local_tar_authelia: "/tmp/{{ (latest_backup_authelia.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_authelia
+
+- name: Copy decrypted Authelia backup to remote host
+  ansible.builtin.copy:
+    src: "{{ local_tar_authelia }}"
+    dest: "/home/docker/"
+    owner: root
+    group: root
+    mode: '0600'
+  when: backup_exists_authelia
+
+- name: Set remote authelia tar path
+  set_fact:
+    remote_tar_authelia: "/home/docker/{{ (latest_backup_authelia.stdout | basename) | regex_replace('.enc$', '') }}"
+  when: backup_exists_authelia
+
+- name: Extract Authelia backup
+  ansible.builtin.unarchive:
+    src: "{{ remote_tar_authelia }}"
+    dest: /home/docker/
+    owner: root
+    group: root
+    remote_src: true
+  when: backup_exists_authelia
+
+- name: Check restored authelia state files
+  ansible.builtin.stat:
+    path: "/home/docker/authelia-backup/{{ item }}"
+  register: authelia_restore_files
+  loop:
+    - db.sqlite3
+    - secrets
+    - users_database.yml
+  when: backup_exists_authelia
+
+- name: Restore authelia database, secrets and users database
+  ansible.builtin.copy:
+    src: "{{ item.stat.path }}"
+    dest: "/home/docker/authelia/{{ item.stat.path | basename }}"
+    remote_src: true
+    owner: docker
+    group: docker
+    mode: '0600'
+    directory_mode: '0700'
+  loop: "{{ authelia_restore_files.results | default([]) }}"
+  when: backup_exists_authelia and item.stat.exists
+  no_log: true
+
+- name: Remove stale sqlite WAL/SHM after restore
+  ansible.builtin.file:
+    path: "/home/docker/authelia/db.sqlite3-{{ item }}"
+    state: absent
+  loop:
+    - wal
+    - shm
+  when: backup_exists_authelia
+
+- name: Remove authelia restore staging and tar on remote
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /home/docker/authelia-backup
+    - "{{ remote_tar_authelia }}"
+  when: backup_exists_authelia
+
+- name: Remove decrypted authelia tar locally
+  ansible.builtin.file:
+    path: "{{ local_tar_authelia }}"
+    state: absent
+  when: backup_exists_authelia
+
 #--------------------------Run container---------------------------------------
 
 - name: Pull docker compose

@@ -15,6 +15,12 @@
 
 #-----------------------Copy config files----------------------------------
 
+- name: Remove old dynamic routes
+  ansible.builtin.file:
+    path: /home/docker/traefik/dynamic
+    state: absent
+  # чтобы маршруты, удалённые из репозитория, не оставались на хосте
+
 - name: Copy traefik directory
   copy:
     src: traefik/

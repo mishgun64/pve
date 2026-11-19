@@ -78,10 +78,14 @@ if grep -q 'CHANGE_ME' "$PLAIN"; then
     die "в $PLAIN остались CHANGE_ME — заполните значения"
 fi
 
-tmp_enc="$(mktemp)"
+# Временный файл обязан иметь .yml: sops определяет формат по расширению,
+# без него он считает входные данные JSON и падает на YAML.
+tmp_enc="$(mktemp "${TMPDIR:-/tmp}/vault.sops.XXXXXX.yml")"
 trap 'rm -f "$tmp_enc"' EXIT
-SOPS_AGE_RECIPIENTS="$AGE_RECIPIENT" sops -e "$PLAIN" > "$tmp_enc"
-SOPS_AGE_SSH_PRIVATE_KEY_FILE="$AGE_KEY" sops -d "$tmp_enc" >/dev/null || die "расшифровка тестовым ключом не удалась"
+SOPS_AGE_RECIPIENTS="$AGE_RECIPIENT" \
+    sops -e --input-type yaml --output-type yaml "$PLAIN" > "$tmp_enc"
+SOPS_AGE_SSH_PRIVATE_KEY_FILE="$AGE_KEY" \
+    sops -d --input-type yaml "$tmp_enc" >/dev/null || die "расшифровка тестовым ключом не удалась"
 
 install -m 0644 "$tmp_enc" "$ENC"
 

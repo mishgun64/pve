@@ -10,8 +10,18 @@
 #     в Woodpecker), поэтому CI расшифровывает файл тем же ключом, без новых секретов.
 #
 # Запуск на control-node от root (нужен приватный ключ /root/.ssh/id_ed25519 и sops):
-#   ./useful_scripts/control/init-ansible-vault.sh            # из готового vault.yml
-#   ./useful_scripts/control/init-ansible-vault.sh --new      # задать пароли заново
+#   ./useful_scripts/control/init-ansible-vault.sh            # по каждому ключу:
+#                                                             # заменить пароль или оставить
+#   ./useful_scripts/control/init-ansible-vault.sh --new      # пересоздать всё с нуля
+#
+# Для каждого ключа из vault.yml.example скрипт спрашивает:
+#   * пароль уже задан  -> "Заменить пароль? [y/N]" (по умолчанию — оставить);
+#   * пароля нет/CHANGE_ME -> просит ввести новый.
+# Ключи, которых нет в шаблоне, сохраняются как есть.
+#
+# Тип хеша выбирается по имени ключа:
+#   * vault_*_root_password_hash        -> SHA-512 crypt (openssl passwd -6);
+#   * vault_authelia_*_password_hash    -> argon2id (утилита argon2, apt-get install -y argon2).
 #
 # Пароли/хеши в вывод не попадают.
 
@@ -29,9 +39,20 @@ MODE="${1:-}"
 log() { printf '\n\033[1;32m==> %s\033[0m\n' "$*"; }
 die() { printf 'ОШИБКА: %s\n' "$*" >&2; exit 1; }
 
+case "$MODE" in
+    ''|--new) ;;
+    -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) die "неизвестный аргумент: $MODE (используйте --new или --help)" ;;
+esac
+
 [[ -f "$EXAMPLE" ]] || die "нет шаблона $EXAMPLE"
 command -v sops >/dev/null || die "нет sops (установите: setup-control.sh или github.com/getsops/sops)"
 command -v openssl >/dev/null || die "нет openssl"
+# argon2 нужен для argon2id-хешей Authelia (vault_authelia_*): проверяем сразу,
+# чтобы не заставлять вводить остальные пароли до падения на последнем ключе.
+if grep -qE '^vault_authelia_' "$EXAMPLE" && ! command -v argon2 >/dev/null; then
+    die "нет утилиты argon2 (нужна для vault_authelia_*_password_hash): apt-get install -y argon2"
+fi
 [[ -f "$AGE_KEY" ]] || die "нет age-ключа $AGE_KEY (это root SSH-ключ control-node)"
 id -u | grep -qx 0 || echo "ВНИМАНИЕ: скрипт не от root; ключ должен быть читаем текущему пользователю." >&2
 
@@ -43,33 +64,112 @@ if [[ "$MODE" == "--new" ]]; then
     rm -f "$PLAIN"
 fi
 
-if [[ ! -f "$PLAIN" ]]; then
-    log "Заполнение $PLAIN (пароли вводятся скрыто)"
-    umask 077
-    : > "$PLAIN"
+#--------------------------- helpers ----------------------------------------
 
+# Текущее значение ключа из plaintext vault.yml (пусто, если ключа нет).
+current_value() {
+    [[ -f "$PLAIN" ]] || return 0
+    awk -v k="$1" '
+        index($0, k ":") == 1 {
+            v = substr($0, length(k) + 2)
+            sub(/^[ \t]+/, "", v)
+            sub(/[ \t]+$/, "", v)
+            gsub(/^"|"$/, "", v)
+            print v
+            exit
+        }' "$PLAIN"
+}
+
+hash_sha512() {
+    local hash
+    hash="$(printf '%s\n' "$1" | openssl passwd -6 -stdin)"
+    [[ "$hash" == \$6\$* ]] || die "openssl не выдал SHA-512 хеш"
+    printf '%s' "$hash"
+}
+
+# Authelia проверяет argon2id; параметры совпадают с authentication_backend
+# в roles/traefik/config/files/authelia/configuration.yml (m=65536,t=3,p=4).
+hash_argon2id() {
+    local salt hash
+    command -v argon2 >/dev/null || die \
+        "нет утилиты argon2: нужна для argon2id-хеша Authelia (apt-get install -y argon2)"
+    salt="$(openssl rand -hex 16)"
+    hash="$(printf '%s' "$1" | argon2 "$salt" -id -t 3 -m 16 -p 4 -l 32 -e 2>/dev/null)" \
+        || die "argon2 не смог посчитать хеш"
+    [[ "$hash" == \$argon2id\$v=19\$m=65536,t=3,p=4\$* ]] \
+        || die "неожиданный формат argon2id-хеша (ожидался m=65536,t=3,p=4)"
+    printf '%s' "$hash"
+}
+
+# Тип хеша — по имени ключа.
+make_hash() {
+    case "$1" in
+        *authelia*) hash_argon2id "$2" ;;
+        *)          hash_sha512 "$2" ;;
+    esac
+}
+
+# Неинтерактивный запуск (нет /dev/tty) — сразу ошибка, иначе read повиснет.
+[[ -r /dev/tty ]] || die "нужен интерактивный терминал (/dev/tty недоступен)"
+
+#--------------------------- fill vault -------------------------------------
+
+log "Заполнение $PLAIN (пароли вводятся скрыто)"
+
+umask 077
+tmp="$(mktemp "${TMPDIR:-/tmp}/vault.XXXXXX.yml")"
+trap 'rm -f "$tmp"' EXIT
+
+updated=0
+kept=0
+
+while IFS= read -r key; do
+    [[ -n "$key" ]] || continue
+    current="$(current_value "$key")"
+
+    if [[ -n "$current" && "$current" != "CHANGE_ME" ]]; then
+        printf '\n\033[1m%s\033[0m — пароль уже задан.\n' "$key"
+        answer=""
+        read -r -p "  Заменить пароль? [y/N]: " answer </dev/tty || die "ввод прерван"
+        case "${answer,,}" in
+            y|yes|д|да) ;;
+            *)
+                printf '%s: "%s"\n' "$key" "$current" >> "$tmp"
+                kept=$((kept + 1))
+                continue
+                ;;
+        esac
+    fi
+
+    while :; do
+        read -rsp "  Новый пароль для ${key}: " pw </dev/tty || die "ввод прерван"
+        echo
+        if [[ -n "$pw" ]]; then break; fi
+        echo "  Пустой пароль недопустим."
+    done
+
+    printf '%s: "%s"\n' "$key" "$(make_hash "$key" "$pw")" >> "$tmp"
+    unset pw
+    updated=$((updated + 1))
+done < <(grep -oE '^vault_[a-z0-9_]+' "$EXAMPLE")
+
+# Ключи вне шаблона не теряем — переносим со старыми значениями.
+if [[ -f "$PLAIN" ]]; then
     while IFS= read -r key; do
         [[ -n "$key" ]] || continue
-        host="${key#vault_}"; host="${host%_root_password_hash}"
-        while :; do
-            read -rsp "Пароль root для ${host}: " pw </dev/tty || die "ввод прерван"
-            echo
-            [[ -n "$pw" ]] && break
-            echo "Пустой пароль недопустим."
-        done
-        hash="$(printf '%s\n' "$pw" | openssl passwd -6 -stdin)"
-        [[ "$hash" == \$6\$* ]] || die "openssl не выдал SHA-512 хеш"
-        unset pw
-        printf '%s: "%s"\n' "$key" "$hash" >> "$PLAIN"
-        unset hash
-    done < <(grep -oE '^vault_[a-z0-9_]+' "$EXAMPLE")
-
-    chmod 600 "$PLAIN"
-    echo "Записан $PLAIN (plaintext, gitignored)"
-else
-    log "Использую существующий plaintext $PLAIN"
-    chmod 600 "$PLAIN"
+        if grep -qE "^${key}\$" <(grep -oE '^vault_[a-z0-9_]+' "$EXAMPLE"); then
+            continue
+        fi
+        printf '%s: "%s"\n' "$key" "$(current_value "$key")" >> "$tmp"
+    done < <(sed -nE 's/^(vault_[a-z0-9_]+):.*/\1/p' "$PLAIN")
 fi
+
+install -m 600 "$tmp" "$PLAIN"
+echo
+echo "Обновлено паролей: ${updated}, оставлено без изменений: ${kept}."
+echo "Записан $PLAIN (plaintext, gitignored)"
+
+#--------------------------- encrypt ----------------------------------------
 
 log "Шифрование sops (age-получатель: ${AGE_RECIPIENT%% *} ...)"
 
@@ -81,7 +181,7 @@ fi
 # Временный файл обязан иметь .yml: sops определяет формат по расширению,
 # без него он считает входные данные JSON и падает на YAML.
 tmp_enc="$(mktemp "${TMPDIR:-/tmp}/vault.sops.XXXXXX.yml")"
-trap 'rm -f "$tmp_enc"' EXIT
+trap 'rm -f "$tmp" "$tmp_enc"' EXIT
 SOPS_AGE_RECIPIENTS="$AGE_RECIPIENT" \
     sops -e --input-type yaml --output-type yaml "$PLAIN" > "$tmp_enc"
 SOPS_AGE_SSH_PRIVATE_KEY_FILE="$AGE_KEY" \

@@ -13,6 +13,23 @@
     name: docker
     shell: /bin/bash
 
+# Проверяем ДО любых изменений на хосте: без хеша пароля Authelia
+# users_database не отрендерится, а piweb.yml уже будет ссылаться на
+# middleware authelia -> pi.mishgun.com останется недоступным.
+- name: Require authelia password hash in vault
+  ansible.builtin.assert:
+    that:
+      - vault_authelia_pi_password_hash is defined
+      - vault_authelia_pi_password_hash | length > 0
+      - vault_authelia_pi_password_hash != 'CHANGE_ME'
+      - vault_authelia_pi_password_hash.startswith('$argon2')
+    fail_msg: >-
+      Не задан vault_authelia_pi_password_hash (argon2id-хеш пароля Authelia).
+      Сгенерировать: docker run --rm authelia/authelia:4.39 authelia crypto
+      hash generate argon2 --password 'ПАРОЛЬ'; добавить в
+      ansible/group_vars/all/vault.yml и перешифровать в vault.sops.yml.
+    quiet: true
+
 #-----------------------Copy config files----------------------------------
 
 - name: Remove old dynamic routes
@@ -45,6 +62,54 @@
     - /home/docker/acme-dns/data
     - /home/docker/certs/traefik
     - /home/docker/certs/dumped-certs
+
+#-----------------------Authelia (2FA периметра)----------------------------------
+
+- name: Create authelia directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: docker
+    group: docker
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: /home/docker/authelia, mode: '0755' }
+    # секреты (jwt/session/storage) — только владельцу
+    - { path: /home/docker/authelia/secrets, mode: '0700' }
+
+# force: false — файл создаётся один раз; при повторном прогоне значение
+# сохраняется (иначе разломается sqlite-хранилище Authelia).
+- name: Generate authelia secrets
+  ansible.builtin.copy:
+    content: "{{ lookup('password', '/dev/null length=64 chars=ascii_letters,digits') }}\n"
+    dest: "/home/docker/authelia/secrets/{{ item }}"
+    owner: docker
+    group: docker
+    mode: '0600'
+    force: false
+  loop:
+    - session_secret
+    - storage_encryption_key
+    - reset_password_jwt_secret
+
+- name: Copy authelia configuration
+  ansible.builtin.copy:
+    src: authelia/
+    dest: /home/docker/authelia/
+    owner: docker
+    group: docker
+    mode: '0644'
+  register: authelia_config_files
+
+# Пароль пользователя pi живёт только в vault (argon2id-хеш).
+- name: Render authelia users database
+  ansible.builtin.template:
+    src: authelia/users_database.yml.j2
+    dest: /home/docker/authelia/users_database.yml
+    owner: docker
+    group: docker
+    mode: '0600'
+  register: authelia_users_database
 
 - name: Copy acquis.yaml
   copy:
@@ -113,7 +178,11 @@
   become: true
   become_method: su
   become_user: docker
-  when: traefik_config_files.changed or traefik_compose_file.changed
+  when: >-
+    traefik_config_files.changed or
+    traefik_compose_file.changed or
+    authelia_config_files.changed or
+    authelia_users_database.changed
   register: traefik_compose_up
   changed_when: >-
     traefik_compose_up.stderr is defined and

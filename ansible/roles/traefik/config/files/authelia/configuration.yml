@@ -1,0 +1,98 @@
+---
+
+###############################################################
+# Authelia — 2FA для pi.mishgun.com
+#
+# Секреты НЕ хранятся в этом файле: они генерируются ролью на хосте в
+# /home/docker/authelia/secrets (0600, владелец docker) и передаются через
+# переменные *_FILE (AUTHELIA_..._FILE) в docker-compose.yml.
+# Хеш пароля пользователя рендерится в users_database.yml из vault
+# (vault_authelia_pi_password_hash).
+###############################################################
+
+theme: 'dark'
+
+server:
+  address: 'tcp://:9091'
+  headers:
+    # За Traefik: снимаем подделанные клиентом X-Forwarded-* откуда угодно,
+    # кроме docker-сетей (proxy network).
+    trusted_proxies:
+      enable: true
+      networks:
+        - '172.16.0.0/12'
+        - '192.168.0.0/16'
+  endpoints:
+    authz:
+      forward-auth:
+        implementation: 'ForwardAuth'
+
+log:
+  level: 'info'
+  format: 'text'
+
+# Второй фактор: TOTP (Google Authenticator/Aegis/1Password и т.п.).
+# Секреты TOTP создаются при первичной регистрации устройства в портале.
+totp:
+  issuer: 'mishgun.com'
+  period: 30
+  skew: 1
+
+authentication_backend:
+  file:
+    path: '/config/users_database.yml'
+    watch: false
+    password:
+      algorithm: 'argon2'
+      argon2:
+        variant: 'argon2id'
+        iterations: 3
+        memory: 65536
+        parallelism: 4
+        key_length: 32
+        salt_length: 16
+  # Нет SMTP — сброс пароля отключён, пароль меняется на хосте (см. README роли).
+  password_reset:
+    disable: true
+
+access_control:
+  # Всё, что не описано явно, — запрещено.
+  default_policy: 'deny'
+  rules:
+    - domain: 'pi.mishgun.com'
+      policy: 'two_factor'
+      subject:
+        - 'group:admins'
+
+session:
+  name: 'authelia_session'
+  # 'internal' = сессии в локальной sqlite (/config/db.sqlite3), Redis не нужен.
+  storage: 'internal'
+  expiration: '12 hours'
+  inactivity: '1 hour'
+  # remember_me отключён: для админского UI каждые 12 часов нужен полный вход.
+  remember_me: '-1'
+  cookies:
+    - domain: 'mishgun.com'
+      authelia_url: 'https://login.mishgun.com'
+      default_redirection_url: 'https://pi.mishgun.com'
+      same_site: 'lax'
+
+# Анти-брутфорс: 5 неудач за 2 минуты -> бан 15 минут.
+regulation:
+  max_retries: 5
+  find_time: '2 minutes'
+  ban_time: '15 minutes'
+
+storage:
+  local:
+    path: '/config/db.sqlite3'
+
+notifier:
+  filesystem:
+    filename: '/config/notifications.txt'
+
+# identity_validation.reset_password.jwt_secret НЕ задаётся здесь: значение
+# приходит только из env
+# AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE
+# (/config/secrets/reset_password_jwt_secret).

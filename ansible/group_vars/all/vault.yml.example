@@ -26,3 +26,10 @@ vault_nextcloud_root_password_hash: "CHANGE_ME"
 vault_pvpgn_root_password_hash: "CHANGE_ME"
 vault_valheim_root_password_hash: "CHANGE_ME"
 vault_santa_bot_root_password_hash: "CHANGE_ME"
+
+# Authelia (2FA для pi.mishgun.com): argon2id-хеш пароля пользователя pi.
+# Сгенерировать (control-node):
+#   docker run --rm authelia/authelia:4.39 \
+#     authelia crypto hash generate argon2 --password 'ПАРОЛЬ'
+# ВАЖНО: пароль — отдельный, не совпадающий с PI_WEB_PASSWORD.
+vault_authelia_pi_password_hash: "CHANGE_ME"

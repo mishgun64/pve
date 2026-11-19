@@ -1,0 +1,15 @@
+---
+
+# Рендерится ролью traefik/config из vault:
+#   vault_authelia_pi_password_hash — argon2id-хеш пароля пользователя pi.
+# Плейнтекст пароля в репозитории/на хосте не хранится.
+# Генерация хеша (control-node):
+#   docker run --rm authelia/authelia:4.39 \
+#     authelia crypto hash generate argon2 --password 'ПАРОЛЬ'
+users:
+  pi:
+    displayname: 'Pi Web Admin'
+    password: '{{ vault_authelia_pi_password_hash | mandatory }}'
+    email: 'pi@mishgun.com'
+    groups:
+      - 'admins'

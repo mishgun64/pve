@@ -204,7 +204,8 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-co
 
 log "Установка пакетов"
 
-# curl нужен для скачивания sops и ключа Docker
+# curl нужен для скачивания sops и ключа Docker; argon2 — для argon2id-хеша
+# пароля Authelia в init-ansible-vault.sh
 apt-get install -y \
     neovim \
     cron \
@@ -215,6 +216,7 @@ apt-get install -y \
     curl \
     rclone \
     age \
+    argon2 \
     openssh-client \
     lm-sensors
 

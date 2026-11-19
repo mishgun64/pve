@@ -27,6 +27,28 @@ services:
     depends_on:
       - crowdsec
       - acme-dns
+      - authelia
+
+  # Второй фактор (TOTP) на периметре: forwardAuth из dynamic/authelia.yml.
+  # Пароль пользователя pi — argon2id-хеш из vault, рендерится в
+  # authelia/users_database.yml. Секреты генерируются ролью в authelia/secrets.
+  authelia:
+    image: authelia/authelia:4.39
+    container_name: authelia
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
+      AUTHELIA_SESSION_SECRET_FILE: /config/secrets/session_secret
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /config/secrets/storage_encryption_key
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /config/secrets/reset_password_jwt_secret
+    volumes:
+      - ./authelia:/config
+    networks:
+      - proxy
+    security_opt:
+      - no-new-privileges:true
 
   acme-dns:
     image: joohoi/acme-dns:v1.0

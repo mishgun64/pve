@@ -1,0 +1,56 @@
+---
+
+# Authelia — второй фактор (TOTP/WebAuthn) на периметре Traefik.
+# Схема: Traefik forwardAuth -> authelia:9091 -> логин (пароль) + TOTP.
+# Портал: https://login.mishgun.com (сертификат из wildcard *.mishgun.com).
+# Само приложение pi.mishgun.com сохраняет свой пароль (защита от обхода
+# Traefik по LAN и от прямого доступа к 192.168.2.200:30141).
+http:
+  middlewares:
+    authelia:
+      forwardAuth:
+        address: "http://authelia:9091/api/authz/forward-auth"
+        # Доверяем X-Forwarded-* только от Traefik (единственный вход).
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "Remote-User"
+          - "Remote-Groups"
+          - "Remote-Email"
+          - "Remote-Name"
+
+    # Портал логина — без HSTS-агрессии не обойтись, но frame-ancestors
+    # оставляем SAMEORIGIN: Authelia использует iframe для части флоу.
+    authelia-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        contentTypeNosniff: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        referrerPolicy: "no-referrer"
+        permissionsPolicy: "geolocation=(), microphone=(), camera=()"
+
+    # Ограничение темпа на портал: сам брутфорс пароля/OTP гасит regulation
+    # внутри Authelia, здесь — защита от флуда.
+    authelia-ratelimit:
+      rateLimit:
+        average: 20
+        burst: 40
+
+  routers:
+    authelia:
+      rule: "Host(`login.mishgun.com`)"
+      entryPoints:
+        - websecure
+      tls: {}
+      middlewares:
+        - crowdsec@file
+        - authelia-headers
+        - authelia-ratelimit
+      service: authelia
+
+  services:
+    authelia:
+      loadBalancer:
+        servers:
+          - url: "http://authelia:9091"

@@ -68,7 +68,10 @@ session:
   expiration: '12 hours'
   inactivity: '1 hour'
   # remember_me отключён: для админского UI каждые 12 часов нужен полный вход.
-  remember_me: '-1'
+  # ВАЖНО: именно число -1, без кавычек. Строка '-1' в 4.39 не парсится
+  # ("could not decode '-1' to a time.Duration") и Authelia падает с
+  # configuration error -> крэш-луп и 502/504 на login.mishgun.com.
+  remember_me: -1
   cookies:
     - domain: 'mishgun.com'
       authelia_url: 'https://login.mishgun.com'

@@ -191,22 +191,24 @@
      'Created' in traefik_compose_up.stderr)
 
 # Authelia падает на невалидном configuration.yml (лишний/удалённый ключ),
-# а Traefik в этом случае отдаёт на login.mishgun.com голый 504. Проверяем
-# статус и печатаем логи, чтобы причина была видна прямо в выводе роли.
-- name: Check authelia container state
-  ansible.builtin.command: docker inspect --format '{{ '{{' }}.State.Status{{ '}}' }}' authelia
+# а Traefik в этом случае отдаёт на login.mishgun.com голый 502/504. У образа
+# есть HEALTHCHECK (интервал 30s, start-period 1m), поэтому ждём именно
+# healthy: при крэш-лупе контейнер на мгновение бывает running.
+- name: Wait for authelia to become healthy
+  ansible.builtin.command: >-
+    docker inspect --format '{{ '{{' }}.State.Status{{ '}}' }}/{{ '{{' }}.State.Health.Status{{ '}}' }}' authelia
   become: true
   become_method: su
   become_user: docker
   register: authelia_state
   changed_when: false
   failed_when: false
-  retries: 12
+  retries: 24
   delay: 5
-  until: authelia_state.stdout is search('running')
+  until: authelia_state.stdout is match('^running/healthy')
 
-- name: Fail with authelia logs when it is not running
-  when: authelia_state.stdout is not search('running')
+- name: Fail with authelia logs when it is not healthy
+  when: authelia_state.stdout is not match('^running/healthy')
   block:
     - name: Collect authelia logs
       ansible.builtin.command: docker logs authelia --tail 40
@@ -220,8 +222,8 @@
     - name: Report authelia startup failure
       ansible.builtin.fail:
         msg: >-
-          Контейнер authelia не запущен (state: {{ authelia_state.stdout | default('unknown') }}).
-          Traefik на login.mishgun.com отдаёт 504. Логи: {{ authelia_logs.stdout }}
+          Контейнер authelia не healthy (status/health: {{ authelia_state.stdout | default('нет контейнера', true) }}).
+          Traefik на login.mishgun.com отдаёт 502/504. Логи: {{ authelia_logs.stdout }}
           {{ authelia_logs.stderr }}
 
 #-----------------------Autoupdate Crowdsec hub----------------------------------

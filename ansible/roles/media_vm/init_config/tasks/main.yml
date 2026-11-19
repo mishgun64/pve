@@ -1,0 +1,19 @@
+---
+
+# ----------------------- Decrypt init config --------------------------
+
+- name: Decrypt encrypted archives
+  delegate_to: localhost
+  run_once: true
+  ansible.builtin.shell: >
+    sops -d {{ src }} > {{ dest }}
+  args:
+    creates: "{{ dest }}"
+  environment:
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE: "{{ media_vm_sops_age_ssh_private_key_file }}"
+  vars:
+    src: "{{ media_vm_init_config_files_dir }}/{{ item }}.enc"
+    dest: "{{ media_vm_init_config_files_dir }}/{{ item }}"
+  loop: "{{ media_vm_init_config_archives }}"
+  loop_control:
+    label: "{{ item }}"

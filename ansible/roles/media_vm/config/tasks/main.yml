@@ -79,25 +79,32 @@
     state: present
     reload: yes
 
-# ----------------------- Decrypt init config --------------------------
+# ----------------------- Init config (decrypt: роль media_vm/init_config) --------------------------
 
-- name: Decrypt encrypted archives
+# Архивы расшифровываются ролью media_vm/init_config (только в media.yml / пайплайн media/full).
+# При запуске без этой роли (ROLE="media_vm/config" через run_role.yml) шаги копирования/распаковки пропускаются.
+- name: Find decrypted init config archives on control node
+  ansible.builtin.find:
+    paths: "{{ media_vm_init_config_dir }}"
+    patterns: "*_init_config.tar.gz"
+    file_type: file
   delegate_to: localhost
   run_once: true
-  ansible.builtin.shell: >
-    sops -d {{ item.src }} > {{ item.dest }}
-  args:
-    creates: "{{ item.dest }}"
-  environment:
-    SOPS_AGE_SSH_PRIVATE_KEY_FILE: /root/.ssh/id_ed25519
-  loop:
-    - { src: "{{ role_path }}/files/init_config/emby_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/emby_init_config.tar.gz" }
-    - { src: "{{ role_path }}/files/init_config/jellyfin_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/jellyfin_init_config.tar.gz" }
-    - { src: "{{ role_path }}/files/init_config/prowlarr_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/prowlarr_init_config.tar.gz" }
-    - { src: "{{ role_path }}/files/init_config/radarr_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/radarr_init_config.tar.gz" }
-    - { src: "{{ role_path }}/files/init_config/seerr_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/seerr_init_config.tar.gz" }
-    - { src: "{{ role_path }}/files/init_config/sonarr_anime_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/sonarr_anime_init_config.tar.gz" }
-    - { src: "{{ role_path }}/files/init_config/sonarr_series_init_config.tar.gz.enc", dest: "{{ role_path }}/files/init_config/sonarr_series_init_config.tar.gz" }
+  register: media_vm_init_config_found
+
+- name: Set list of decrypted init config archives
+  ansible.builtin.set_fact:
+    media_vm_init_configs: >-
+      {{ media_vm_init_config_found.files | map(attribute='path') | map('basename') | sort | list }}
+
+- name: Warn about missing decrypted init configs
+  ansible.builtin.debug:
+    msg: >-
+      Расшифрованные архивы init_config не найдены в {{ media_vm_init_config_dir }}:
+      шаги копирования и распаковки стартовых конфигов пропущены.
+      Запустите плейбук ansible/media.yml (пайплайн media/full) - роль media_vm/init_config
+      расшифрует архивы.
+  when: media_vm_init_configs | length == 0
 
 - name: Create directories for docker services
   ansible.builtin.file:
@@ -119,33 +126,20 @@
 
 - name: Copy archives
   copy:
-    src: "{{ item }}"
+    src: "{{ media_vm_init_config_dir }}/{{ item }}"
     dest: /home/docker/init_config/
-  loop:
-    - init_config/emby_init_config.tar.gz
-    - init_config/jellyfin_init_config.tar.gz
-    - init_config/prowlarr_init_config.tar.gz
-    - init_config/radarr_init_config.tar.gz
-    - init_config/seerr_init_config.tar.gz
-    - init_config/sonarr_anime_init_config.tar.gz
-    - init_config/sonarr_series_init_config.tar.gz
+    mode: "0644"
+  loop: "{{ media_vm_init_configs }}"
 
 - name: Extract archives
   unarchive:
-    src: "{{ item }}"
+    src: "/home/docker/init_config/{{ item }}"
     dest: /home/docker/
     owner: docker
     group: docker
     mode: "0755"
     remote_src: yes
-  loop:
-    - /home/docker/init_config/emby_init_config.tar.gz
-    - /home/docker/init_config/jellyfin_init_config.tar.gz
-    - /home/docker/init_config/prowlarr_init_config.tar.gz
-    - /home/docker/init_config/radarr_init_config.tar.gz
-    - /home/docker/init_config/seerr_init_config.tar.gz
-    - /home/docker/init_config/sonarr_anime_init_config.tar.gz
-    - /home/docker/init_config/sonarr_series_init_config.tar.gz
+  loop: "{{ media_vm_init_configs }}"
 
 - name: Ensure qbittorrent config dir exists
   file:
@@ -170,6 +164,7 @@
   file:
     path: /home/docker/init_config
     state: absent
+  when: media_vm_init_configs | length > 0
 
 - name: Copy docker-compose file
   ansible.builtin.copy:

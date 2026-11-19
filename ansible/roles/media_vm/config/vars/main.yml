@@ -1,1 +1,9 @@
+---
 init_dir_jenkins: /var/lib/jenkins/jobs/pve/workspace/ansible/roles/media_vm/config_soft/files/init_config
+
+# Каталог на control node, куда роль media_vm/init_config складывает расшифрованные архивы
+# стартовых конфигов (sops). Роль media_vm/init_config запускается только через ansible/media.yml.
+media_vm_init_config_dir: "{{ role_path }}/../init_config/files/init_config"
+
+# media_vm_init_configs (список фактически расшифрованных архивов) задаётся в tasks/main.yml
+# через find: если роль media_vm/init_config не запускалась, копирование и распаковка пропускаются.

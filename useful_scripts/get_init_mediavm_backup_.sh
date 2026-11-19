@@ -107,3 +107,6 @@ for file in "$BASE_DIR"/*.tar.gz; do
 done
 
 echo "Done"
+# Готовые *.tar.gz.enc кладутся в роль расшифровки:
+#   ansible/roles/media_vm/init_config/files/init_config/
+# Расшифровка выполняется ролью media_vm/init_config (плейбук ansible/media.yml, пайплайн media/full).

@@ -49,7 +49,8 @@ Pipeline file: `.woodpecker/pve_firewall.yml`.
 | full | `media/full` | — | — | `Media Full` |
 
 Pipeline files: `.woodpecker/media_vm_config.yml`, `media_vm_backup.yml`, `media_vm_restore.yml`, `media_vm_firewall.yml`, `media_vm_full.yml`.
-`full` запускает `ansible/media.yml` (common/basic, common/docker, media_vm/config, media_vm/firewall, media_vm/restore).
+`full` запускает `ansible/media.yml` (common/basic, common/docker, media_vm/init_config, media_vm/config, media_vm/firewall, media_vm/restore).
+Роль `media_vm/init_config` (расшифровка sops-архивов стартовых конфигов) запускается только из `ansible/media.yml`, отдельного пайплайна у неё нет. В пайплайне `media/config` (`run_role.yml`) шаги копирования/распаковки init-конфигов пропускаются, если расшифрованных архивов нет.
 Плановый бэкап: cron `Media-backup`.
 
 ## nextcloud

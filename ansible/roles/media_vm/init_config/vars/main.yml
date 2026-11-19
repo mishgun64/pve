@@ -1,0 +1,18 @@
+---
+# Роль media_vm/init_config: расшифровка зашифрованных sops архивов стартовых конфигов.
+# Запускается только через ansible/media.yml (пайплайн media/full).
+# Плейнтекст *.tar.gz создаётся рядом с *.enc и не коммитится в репозиторий.
+
+media_vm_init_config_files_dir: "{{ role_path }}/files/init_config"
+
+# SSH-ключ (age-получатель sops) на control node
+media_vm_sops_age_ssh_private_key_file: /root/.ssh/id_ed25519
+
+media_vm_init_config_archives:
+  - emby_init_config.tar.gz
+  - jellyfin_init_config.tar.gz
+  - prowlarr_init_config.tar.gz
+  - radarr_init_config.tar.gz
+  - seerr_init_config.tar.gz
+  - sonarr_anime_init_config.tar.gz
+  - sonarr_series_init_config.tar.gz

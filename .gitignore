@@ -1,5 +1,7 @@
 /ansible/roles/pve/firewall/files/cluster.fw
 /ansible/roles/media_vm/firewall/files/124.fw
+# расшифрованные sops-архивы стартовых конфигов (роль media_vm/init_config)
+/ansible/roles/media_vm/init_config/files/init_config/*.tar.gz
 /ansible/roles/wireguard/firewall/files/126.fw
 /ansible/roles/traefik/firewall/files/143.fw
 /ansible/roles/traefik/config/files/enroll_secret

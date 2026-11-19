@@ -8,6 +8,7 @@
       - common/basic
       - common/docker
 #      - common/monitoring
+      - media_vm/init_config
       - media_vm/config
       - media_vm/firewall
       - media_vm/restore

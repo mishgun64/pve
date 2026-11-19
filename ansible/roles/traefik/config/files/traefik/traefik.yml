@@ -13,6 +13,8 @@ entryPoints:
   web:
     address: ":80"
     http:
+      # Аудит 2026-11-19: гасим заголовки-алиасы (X_Auth_User и т.п.) — защита PHP/CGI-бэкендов от подмены.
+      aliasHeadersStrategy: delete
       redirections:
         entryPoint:
           to: websecure
@@ -20,6 +22,8 @@ entryPoints:
 
   websecure:
     address: ":443"
+    http:
+      aliasHeadersStrategy: delete
 #
 #  xmpp:
 #    address: ":5222"

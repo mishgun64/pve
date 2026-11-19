@@ -33,11 +33,31 @@ http:
       rateLimit:
         average: 10
         burst: 20
+    # Аудит 2026-11-19: жёсткий лимит на эндпоинт логина (брутфорс пароля).
+    piweb-login-ratelimit:
+      rateLimit:
+        average: 1
+        burst: 5
     piweb-inflight:
       inFlightReq:
         amount: 30
 
   routers:
+    # Аудит 2026-11-19: отдельный роутер для логина с жёстким rate-limit.
+    piweb-login:
+      rule: "Host(`pi.mishgun.com`) && Path(`/api/login`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      middlewares:
+        - piweb-strip-preview
+        - crowdsec@file
+        - piweb-headers
+        - piweb-login-ratelimit
+        - piweb-inflight
+      service: piweb
     piweb:
       rule: "Host(`pi.mishgun.com`)"
       entryPoints:

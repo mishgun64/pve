@@ -54,6 +54,20 @@
     group: docker
     mode: '0644'
 
+# Аудит 2026-11-19: ротация логов traefik (access.log рос без ротации до 439 МБ).
+- name: Ensure logrotate installed
+  ansible.builtin.apt:
+    name: logrotate
+    state: present
+
+- name: Install logrotate config for traefik logs
+  copy:
+    src: logrotate-traefik.conf
+    dest: /etc/logrotate.d/traefik
+    owner: root
+    group: root
+    mode: '0644'
+
 - name: Copy acme-dns config
   copy:
     src: acme-dns/config.cfg

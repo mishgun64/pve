@@ -28,6 +28,7 @@
     owner: docker
     group: docker
     mode: '0755'
+  register: traefik_config_files
 
 - name: Create required directories
   ansible.builtin.file:
@@ -76,6 +77,7 @@
     owner: docker
     group: docker
     mode: '0644'
+  register: traefik_compose_file
 
 #-----------------------Add mount point----------------------------------
 
@@ -83,6 +85,27 @@
   ansible.builtin.command: >
     pct set 143 -mp0 /srv/certs/,mp=/home/docker/certs
   delegate_to: pve
+
+#-----------------------Apply container changes----------------------------------
+
+# Пересоздаём контейнеры, чтобы они подхватили новые конфиги и не держали
+# в памяти прежние роуты/сертификаты (file-provider watch обновляет правила,
+# но не окружение/mount'ы контейнера). Выполняется только при изменении
+# конфигов, чтобы не рвать соединения на пустом прогоне.
+- name: Recreate docker compose stack
+  ansible.builtin.command: docker compose up -d --force-recreate --remove-orphans
+  args:
+    chdir: /home/docker
+  become: true
+  become_method: su
+  become_user: docker
+  when: traefik_config_files.changed or traefik_compose_file.changed
+  register: traefik_compose_up
+  changed_when: >-
+    traefik_compose_up.stderr is defined and
+    ('Started' in traefik_compose_up.stderr or
+     'Recreated' in traefik_compose_up.stderr or
+     'Created' in traefik_compose_up.stderr)
 
 #-----------------------Autoupdate Crowdsec hub----------------------------------
 

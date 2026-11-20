@@ -1,0 +1,95 @@
+---
+
+#--------------------------nftables guard (п.10.2 плана)--------------------------
+# Инкрементально: только таблица inet monitoring_guard, БЕЗ flush ruleset,
+# чтобы не снести цепочки DOCKER/DOCKER-USER (см. setup-control.sh, piweb_guard).
+
+- name: Assert monitoring admin sources are defined
+  ansible.builtin.assert:
+    that:
+      - monitoring_admin_sources | length > 0
+    fail_msg: "monitoring_admin_sources пуст — Grafana/Prometheus останутся без ограничений портов."
+    quiet: true
+
+- name: Ensure nftables is installed
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure nftables fragments directory exists
+  ansible.builtin.file:
+    path: /etc/nftables.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Render monitoring nftables fragment
+  ansible.builtin.template:
+    src: monitoring.nft.j2
+    dest: /etc/nftables.d/monitoring.nft
+    owner: root
+    group: root
+    mode: '0644'
+  register: monitoring_nft_template
+
+- name: Check whether monitoring_guard table is loaded
+  ansible.builtin.command:
+    cmd: nft list table inet monitoring_guard
+  register: monitoring_nft_loaded
+  changed_when: false
+  failed_when: false
+
+- name: Validate monitoring nftables fragment (nft -c)
+  ansible.builtin.shell: |
+    set -e
+    tmp="$(mktemp /tmp/nft-monitoring.XXXXXX)"
+    trap 'rm -f "$tmp"' EXIT
+    # Проверяем фрагмент изолированно: полный ruleset уже может содержать
+    # monitoring_guard, и nft -c упал бы на дубликате таблицы.
+    { printf 'flush ruleset\n'; cat /etc/nftables.d/monitoring.nft; } > "$tmp"
+    nft -c -f "$tmp"
+  changed_when: false
+  when: monitoring_nft_template is changed or monitoring_nft_loaded.rc != 0
+
+- name: Ensure /etc/nftables.conf includes fragments directory
+  ansible.builtin.lineinfile:
+    path: /etc/nftables.conf
+    line: 'include "/etc/nftables.d/*.nft"'
+    insertafter: EOF
+    create: true
+    owner: root
+    group: root
+    mode: '0644'
+
+# Только enable: start/restart nftables.service выполнит flush ruleset из
+# /etc/nftables.conf и снесёт цепочки Docker. Применяем фрагмент вручную ниже.
+- name: Enable nftables service (do not start/restart)
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+
+- name: Apply monitoring_guard table
+  ansible.builtin.shell: |
+    set -e
+    nft delete table inet monitoring_guard 2>/dev/null || true
+    nft -f /etc/nftables.d/monitoring.nft
+    nft list table inet monitoring_guard >/dev/null
+  when: monitoring_nft_template is changed or monitoring_nft_loaded.rc != 0
+
+- name: Verify monitoring_guard table is loaded
+  ansible.builtin.command:
+    cmd: nft list table inet monitoring_guard
+  register: monitoring_nft_verify
+  changed_when: false
+  failed_when: false
+
+- name: Fail when monitoring_guard table is not loaded
+  ansible.builtin.fail:
+    msg: >-
+      Таблица inet monitoring_guard не загружена — порты 3000/9090/9093
+      остаются без ограничения по источникам. Проверить:
+      nft -c -f /etc/nftables.d/monitoring.nft
+  when: monitoring_nft_verify.rc != 0

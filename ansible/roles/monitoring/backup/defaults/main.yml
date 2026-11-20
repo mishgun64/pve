@@ -1,0 +1,19 @@
+---
+# Роль monitoring/backup: архив стека /opt/monitoring (без TSDB Prometheus) ->
+# sops/age -> /srv/backups/monitoring -> Google Drive (rclone).
+# Выполняется на самом control_node (target_hosts=monitoring_server).
+# См. MONITORING-PLAN.md, п.5.4.
+
+monitoring_dir: /opt/monitoring
+monitoring_backup_dir: /srv/backups/monitoring
+# Сколько поколений держать локально И на Google Drive (см. п.12: ротация по
+# поколениям, как cleanup_backups.sh; имя файла совместимо с ним).
+monitoring_backup_keep: 5
+# TSDB Prometheus по умолчанию НЕ архивируем: объём большой, данные
+# восстанавливаются рескреппингом. Включить флагом, если нужны raw-метрики.
+monitoring_backup_include_tsdb: false
+
+monitoring_backup_upload: true
+monitoring_rclone_remote: "gdrive:"
+monitoring_rclone_dir: "monitoring"
+monitoring_rclone_config: /root/.config/rclone/rclone.conf

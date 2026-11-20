@@ -1,0 +1,38 @@
+# Правила по Docker-контейнерам (cAdvisor). Managed by Ansible.
+#
+# ВАЖНО: cAdvisor продолжает отдавать container_last_seen для остановленных
+# контейнеров, поэтому ContainerDown срабатывает и на осознанно остановленный
+# контейнер (docker compose down на время работ). Это ожидаемое поведение:
+# любой остановленный контейнер при restart: unless-stopped — либо авария,
+# либо плановые работы. При плановых работах алерт удобнее замьютить в
+# Alertmanager. Если мешают одноразовые контейнеры (build/CI) — добавить их
+# имена в исключение ниже (name!~"...").
+groups:
+  - name: containers
+    rules:
+      - alert: ContainerDown
+        expr: >-
+          (time() - max by (instance, name) (
+            container_last_seen{job="cadvisor", name!="", container!=""}
+          )) > 600
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Контейнер {{ $labels.name }} не работает на {{ $labels.instance }}"
+          description: >-
+            Контейнер {{ $labels.name }} не отдаёт метрики (не запущен) более
+            10 минут. Проверить: docker ps -a / docker logs.
+
+      # Crash loop: контейнер перезапускался 3+ раз за 30 минут.
+      - alert: ContainerRestarted
+        expr: >-
+          changes(container_start_time_seconds{job="cadvisor", name!="", container!=""}[30m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Контейнер {{ $labels.name }} перезапускается на {{ $labels.instance }}"
+          description: >-
+            Более двух перезапусков за 30 минут. Похоже на crash loop —
+            смотреть docker logs у контейнера.

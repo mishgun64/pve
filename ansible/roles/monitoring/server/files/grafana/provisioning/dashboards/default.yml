@@ -1,0 +1,15 @@
+# Managed by Ansible (role monitoring/server).
+# Дашборды читаются из bind-mount /opt/monitoring/grafana/dashboards (ro).
+apiVersion: 1
+
+providers:
+  - name: monitoring
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

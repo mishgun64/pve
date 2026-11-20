@@ -1,0 +1,28 @@
+# Managed by Ansible (role monitoring/server). Модули проб blackbox_exporter.
+modules:
+  # Публичные HTTPS-сервисы: только валидный TLS и 2xx/3xx после редиректов.
+  http_2xx:
+    prober: http
+    timeout: 10s
+    http:
+      valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+      valid_status_codes: []          # по умолчанию 2xx
+      method: GET
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+      fail_if_not_ssl: true
+
+  # Внутренние TCP-сервисы (например, PVPGN 6112/tcp).
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+
+  # «Хост жив» для LAN-адресов. UDP-сервисы (Valheim, WireGuard) так не
+  # проверить — см. комментарий в defaults/main.yml (п.7.2 плана).
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: ip4

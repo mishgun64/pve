@@ -1,0 +1,31 @@
+# Managed by Ansible (role monitoring/server).
+# Токен бота и chat_id приходят из files/secrets.enc.yml (sops/age) и в
+# открытом виде в git не попадают.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: telegram
+  group_by: ["alertname", "instance"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token: "{{ monitoring_alertmanager_telegram_bot_token }}"
+        # chat_id — число (личка) или отрицательное (группа), поэтому без кавычек.
+        chat_id: {{ monitoring_alertmanager_telegram_chat_id }}
+        parse_mode: HTML
+        send_resolved: true
+        api_url: "https://api.telegram.org"
+
+# Пока хост лежит (InstanceDown), не спамим его же HighCPU/HighMemory/DiskFull.
+inhibit_rules:
+  - source_matchers:
+      - 'alertname="InstanceDown"'
+    target_matchers:
+      - 'severity=~"warning|critical"'
+    equal: ["instance"]

@@ -1,0 +1,58 @@
+# Правила по «железу» (node_exporter). Managed by Ansible.
+groups:
+  - name: nodes
+    rules:
+      # Любой таргет (node_exporter, cAdvisor, pve, blackbox) не отвечает.
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} недоступен (job {{ $labels.job }})"
+          description: >-
+            Prometheus не может собрать метрики с {{ $labels.instance }}
+            (job={{ $labels.job }}) дольше минуты. Проверить хост, экспортер и
+            firewall (9100/8081 от 192.168.2.200).
+
+      - alert: HighCPU
+        expr: >-
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU > 90% на {{ $labels.instance }}"
+          description: "Средняя загрузка CPU держится выше 90% более 10 минут."
+
+      - alert: HighMemory
+        expr: >-
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "RAM > 90% на {{ $labels.instance }}"
+          description: >-
+            Доступно менее 10% оперативной памяти более 10 минут. Проверить
+            процессы/контейнеры (cAdvisor) и не пора ли добавить память.
+
+      - alert: DiskFull
+        expr: >-
+          max by (instance, mountpoint) (
+            node_filesystem_avail_bytes{
+              fstype!~"tmpfs|ramfs|overlay|squashfs|fuse.*|nsfs|proc|sysfs",
+              mountpoint!~"/var/lib/docker/.+|/run/.+|/sys/.+|/var/lib/containers/.+|/snap/.+"
+            }
+            /
+            node_filesystem_size_bytes{
+              fstype!~"tmpfs|ramfs|overlay|squashfs|fuse.*|nsfs|proc|sysfs",
+              mountpoint!~"/var/lib/docker/.+|/run/.+|/sys/.+|/var/lib/containers/.+|/snap/.+"
+            }
+          ) * 100 < 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Диск {{ $labels.mountpoint }} заполнен > 90% на {{ $labels.instance }}"
+          description: "Свободно менее 10% файловой системы более 15 минут."

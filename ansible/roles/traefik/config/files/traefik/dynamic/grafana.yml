@@ -1,0 +1,23 @@
+---
+
+# Grafana (control_node, 192.168.2.200:3000) — наружу через TLS + CrowdSec.
+# Prometheus (9090) и Alertmanager (9093) наружу НЕ выставляем: только LAN
+# (nftables monitoring_guard на control, см. роль monitoring/server).
+# Аутентификация — собственная учётка Grafana (admin + пароль из секрета),
+# Authelia здесь не используется (п.10.3 MONITORING-PLAN.md).
+http:
+  routers:
+    grafana:
+      rule: "Host(`grafana.mishgun.com`)"
+      entryPoints:
+        - websecure
+      tls: {}
+      middlewares:
+        - crowdsec@file
+      service: grafana
+
+  services:
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.2.200:3000"

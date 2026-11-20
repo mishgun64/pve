@@ -1,0 +1,29 @@
+when:
+  - event: manual
+    evaluate: 'PIPELINE == "monitoring/full"'
+
+steps:
+  deploy:
+    image: alpine/ansible:latest
+
+    environment:
+      SSH_KEY:
+        from_secret: ssh_key
+
+    commands:
+      - |
+        apk add --no-cache sops
+        sops --version
+
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+
+        export ANSIBLE_CONFIG=ansible/ansible.cfg
+        export SOPS_AGE_SSH_PRIVATE_KEY_FILE="$HOME/.ssh/id_ed25519"
+
+        # Агенты (monitoring_agents) -> сервер (monitoring_server).
+        # Правки firewall .fw.enc выполняются отдельно (см. п.10 плана).
+        ansible-playbook \
+          -i ansible/hosts_prod \
+          ansible/monitoring.yml

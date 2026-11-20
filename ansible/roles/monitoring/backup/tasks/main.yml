@@ -1,0 +1,284 @@
+---
+
+#--------------------------Preflight--------------------------
+
+- name: Require root
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['user_id'] == 'root'
+    fail_msg: "Роль monitoring/backup запускается от root."
+    quiet: true
+
+- name: Check monitoring stack deployment
+  ansible.builtin.stat:
+    path: "{{ monitoring_dir }}/docker-compose.yml"
+  register: monitoring_backup_compose_file
+
+- name: Fail when the monitoring stack is not deployed
+  ansible.builtin.fail:
+    msg: >-
+      {{ monitoring_dir }}/docker-compose.yml не найден: сначала развернуть
+      стек (pipeline monitoring/server), потом бэкапить.
+  when: not monitoring_backup_compose_file.stat.exists
+
+- name: Require rclone upload prerequisites
+  when: monitoring_backup_upload | bool
+  block:
+    - name: Check rclone binary
+      ansible.builtin.command:
+        cmd: rclone version
+      register: monitoring_backup_rclone_bin
+      changed_when: false
+      failed_when: false
+
+    - name: Fail when rclone is missing
+      ansible.builtin.fail:
+        msg: >-
+          rclone не установлен на control_node. Установить и настроить remote
+          gdrive: (см. useful_scripts/control/setup-control.sh).
+      when: monitoring_backup_rclone_bin.rc != 0
+
+    - name: Check rclone config
+      ansible.builtin.stat:
+        path: "{{ monitoring_rclone_config }}"
+      register: monitoring_backup_rclone_config
+
+    - name: Fail when rclone config is missing
+      ansible.builtin.fail:
+        msg: >-
+          Нет {{ monitoring_rclone_config }}: remote gdrive: не настроен.
+          Настроить: sudo rclone config (или setup-control.sh).
+      when: not monitoring_backup_rclone_config.stat.exists
+
+    # Проверяем доступ ДО tar/sops: иначе прогон падает на последнем шаге.
+    - name: Verify Google Drive remote is reachable
+      ansible.builtin.command:
+        cmd: >-
+          rclone lsd {{ monitoring_rclone_remote }}
+          --config {{ monitoring_rclone_config }}
+          --retries 1 --low-level-retries 1 --contimeout 10s
+      register: monitoring_backup_rclone_lsd
+      changed_when: false
+      retries: 2
+      delay: 10
+
+#--------------------------Prepare backup dir--------------------------
+
+# Время берём на самом control (в его таймзоне): имя файла должно совпадать
+# с форматом cleanup_backups.sh и порядком ротации.
+- name: Generate backup timestamp
+  ansible.builtin.command:
+    cmd: date +%d_%m_%Y_%H_%M
+  register: monitoring_backup_date
+  changed_when: false
+
+- name: Set backup timestamp
+  ansible.builtin.set_fact:
+    monitoring_backup_ts: "{{ monitoring_backup_date.stdout | trim }}"
+
+- name: Set backup file names
+  ansible.builtin.set_fact:
+    monitoring_backup_archive: "{{ monitoring_backup_dir }}/monitoring_{{ monitoring_backup_ts }}.tar.gz"
+    monitoring_backup_encrypted: "{{ monitoring_backup_dir }}/monitoring_{{ monitoring_backup_ts }}.tar.gz.enc"
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ monitoring_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+# Получатель sops (age) — публичный ключ jenkins@control, тот же, что в ролях.
+- name: Deploy .sops.yaml for backup encryption
+  ansible.builtin.copy:
+    src: .sops.yaml
+    dest: "{{ monitoring_backup_dir }}/.sops.yaml"
+    owner: root
+    group: root
+    mode: '0644'
+
+#--------------------------Archive + encrypt--------------------------
+
+# Grafana останавливаем на время архивации: sqlite grafana.db нельзя копировать
+# на ходу. Prometheus/Alertmanager не трогаем (WAL/силенсы переживают копию).
+- name: Create encrypted monitoring backup
+  block:
+    - name: Stop grafana for a consistent grafana.db
+      ansible.builtin.command:
+        cmd: docker compose stop grafana
+        chdir: "{{ monitoring_dir }}"
+      register: monitoring_backup_grafana_stop
+      changed_when: monitoring_backup_grafana_stop.rc == 0
+      failed_when: false
+
+    - name: Archive monitoring stack (without Prometheus TSDB)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tar -czf "{{ monitoring_backup_archive }}" \
+          -C {{ monitoring_dir | dirname }} \
+          --exclude='{{ monitoring_dir | basename }}/data/prometheus' \
+          {{ monitoring_dir | basename }}
+      changed_when: true
+      when: not (monitoring_backup_include_tsdb | bool)
+
+    - name: Archive monitoring stack (with Prometheus TSDB)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tar -czf "{{ monitoring_backup_archive }}" \
+          -C {{ monitoring_dir | dirname }} \
+          {{ monitoring_dir | basename }}
+      changed_when: true
+      when: monitoring_backup_include_tsdb | bool
+
+    - name: Encrypt backup with sops/age
+      ansible.builtin.command:
+        argv:
+          - sops
+          - -e
+          - --input-type
+          - binary
+          - --output-type
+          - binary
+          - --output
+          - "{{ monitoring_backup_encrypted }}"
+          - "{{ monitoring_backup_archive }}"
+        # .sops.yaml ищется рядом с входным файлом — он лежит в backup dir.
+        chdir: "{{ monitoring_backup_dir }}"
+
+    - name: Write sha256 checksum of the encrypted backup
+      ansible.builtin.shell: |
+        set -euo pipefail
+        cd "{{ monitoring_backup_dir }}"
+        sha256sum "{{ monitoring_backup_encrypted | basename }}" \
+          > "{{ monitoring_backup_encrypted | basename }}.sha256"
+      changed_when: true
+
+  always:
+    - name: Start grafana back
+      ansible.builtin.command:
+        cmd: docker compose start grafana
+        chdir: "{{ monitoring_dir }}"
+      changed_when: false
+      failed_when: false
+
+    # Плейнтекст архива содержит .env/alertmanager.yml/pve.yml с токенами:
+    # он не должен остаться на диске ни при успехе, ни при ошибке sops.
+    - name: Remove plaintext archive (secrets must not stay unencrypted)
+      ansible.builtin.file:
+        path: "{{ monitoring_backup_archive }}"
+        state: absent
+
+- name: Check encrypted backup exists
+  ansible.builtin.stat:
+    path: "{{ monitoring_backup_encrypted }}"
+  register: monitoring_backup_encrypted_stat
+
+- name: Fail when encrypted backup was not created
+  ansible.builtin.fail:
+    msg: >-
+      Шифрованный архив не создан ({{ monitoring_backup_encrypted }}).
+      Смотреть вывод tar/sops выше.
+  when: not monitoring_backup_encrypted_stat.stat.exists
+
+#--------------------------Upload to Google Drive--------------------------
+
+- name: Upload encrypted backup to Google Drive
+  when: monitoring_backup_upload | bool
+  block:
+    - name: Ensure remote monitoring directory exists
+      ansible.builtin.command:
+        cmd: >-
+          rclone mkdir {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}
+          --config {{ monitoring_rclone_config }}
+          --retries 3 --low-level-retries 10 --contimeout 30s
+      changed_when: false
+
+    - name: Upload encrypted archive
+      ansible.builtin.command:
+        cmd: >-
+          rclone copyto {{ monitoring_backup_encrypted }}
+          {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}/{{ monitoring_backup_encrypted | basename }}
+          --config {{ monitoring_rclone_config }}
+          --retries 3 --low-level-retries 10 --contimeout 30s --timeout 300s
+
+    - name: Upload checksum
+      ansible.builtin.command:
+        cmd: >-
+          rclone copyto {{ monitoring_backup_encrypted }}.sha256
+          {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}/{{ monitoring_backup_encrypted | basename }}.sha256
+          --config {{ monitoring_rclone_config }}
+          --retries 3 --low-level-retries 10 --contimeout 30s --timeout 300s
+      register: monitoring_backup_sha_upload
+      # Архив уже загружен — потеря checksum не повод считать бэкап провальным.
+      failed_when: false
+
+    - name: Warn when checksum upload failed
+      ansible.builtin.debug:
+        msg: "WARNING: не удалось загрузить .sha256 на Google Drive (архив загружен)."
+      when: monitoring_backup_sha_upload.rc != 0
+
+    - name: Read uploaded object metadata
+      ansible.builtin.command:
+        cmd: >-
+          rclone lsjson --stat
+          {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}/{{ monitoring_backup_encrypted | basename }}
+          --config {{ monitoring_rclone_config }}
+          --retries 1 --low-level-retries 1 --contimeout 10s
+      register: monitoring_backup_remote_stat
+      changed_when: false
+
+    - name: Verify uploaded size matches local archive
+      ansible.builtin.assert:
+        that:
+          - (monitoring_backup_remote_stat.stdout | from_json)['Size'] | int == monitoring_backup_encrypted_stat.stat.size | int
+        fail_msg: >-
+          Размер объекта на Drive не совпал с локальным
+          ({{ (monitoring_backup_remote_stat.stdout | from_json)['Size'] | default('?') }}
+          != {{ monitoring_backup_encrypted_stat.stat.size }}).
+          Локальная копия цела: {{ monitoring_backup_encrypted }}
+        quiet: true
+
+    - name: Rotate backups on Google Drive (keep last {{ monitoring_backup_keep }})
+      ansible.builtin.shell: |
+        set -euo pipefail
+        remote="{{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}"
+        cfg="{{ monitoring_rclone_config }}"
+        keep={{ monitoring_backup_keep | int }}
+        rclone lsf "$remote" --files-only --include 'monitoring_*.tar.gz.enc' --config "$cfg" \
+          | awk -F'[_.]' 'NF>=6 {print $4$3$2$5$6" "$0}' \
+          | sort -r \
+          | tail -n +$((keep + 1)) \
+          | cut -d' ' -f2- \
+          | while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              echo "delete: $f"
+              rclone deletefile "$remote/$f" --config "$cfg" || true
+              rclone deletefile "$remote/$f.sha256" --config "$cfg" || true
+            done
+      changed_when: false
+
+#--------------------------Local rotation--------------------------
+
+- name: Rotate local backups (keep last {{ monitoring_backup_keep }})
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd "{{ monitoring_backup_dir }}"
+    keep={{ monitoring_backup_keep | int }}
+    ls -1t monitoring_*.tar.gz.enc 2>/dev/null \
+      | tail -n +$((keep + 1)) \
+      | while IFS= read -r f; do
+          echo "delete: $f"
+          rm -f -- "$f" "${f}.sha256"
+        done
+  changed_when: false
+
+#--------------------------Summary--------------------------
+
+- name: Backup summary
+  ansible.builtin.debug:
+    msg:
+      - "Архив: {{ monitoring_backup_encrypted }} ({{ (monitoring_backup_encrypted_stat.stat.size / 1024 / 1024) | round(2) }} MiB)"
+      - "Локально хранится последних: {{ monitoring_backup_keep }}"
+      - "Google Drive: {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}/ (последних {{ monitoring_backup_keep }})"
+      - "TSDB Prometheus в архиве: {{ 'да' if monitoring_backup_include_tsdb | bool else 'нет' }}"

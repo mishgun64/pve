@@ -1,0 +1,11 @@
+# Managed by Ansible (role monitoring/server).
+# Read-only доступ к PVE API: пользователь monitoring@pve с ролью PVEAuditor
+# на "/" и API-токен monitoring@pve!<token_name> (см. п.9.1 плана).
+# root@pam!tf (terraform) здесь НЕ используется — у него полные права.
+default:
+  user: "{{ monitoring_pve_api_user }}"
+  token_name: "{{ monitoring_pve_token_name }}"
+  token_value: "{{ monitoring_pve_token_value }}"
+  # PVE обычно с самоподписанным сертификатом (LAN). Если поставлен валидный
+  # Let's Encrypt — переключить на true.
+  verify_ssl: false

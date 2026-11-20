@@ -1,0 +1,50 @@
+when:
+  - event: manual
+    evaluate: 'PIPELINE == "monitoring/backup"'
+
+  # Плановая задача в настройках репозитория (repo settings -> Crons).
+  # Имя должно совпадать с именем cron-задачи, иначе пайплайн пропускается.
+  - event: cron
+    cron: "Monitoring-backup"
+
+steps:
+  deploy:
+    image: alpine/ansible:latest
+
+    environment:
+      SSH_KEY:
+        from_secret: ssh_key
+
+    commands:
+      - |
+        if [ "$CI_PIPELINE_EVENT" = "manual" ]; then
+          if [ -z "$ROLE" ]; then
+            echo "ERROR: ROLE parameter is required"
+            exit 1
+          fi
+
+          if [ -z "$TARGET" ]; then
+            echo "ERROR: TARGET parameter is required"
+            exit 1
+          fi
+        else
+          ROLE="monitoring/backup"
+          TARGET="monitoring_server"
+        fi
+
+        echo "ROLE=$ROLE"
+        echo "TARGET=$TARGET"
+
+        mkdir -p ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+
+        export ANSIBLE_CONFIG=ansible/ansible.cfg
+
+        # Архив/шифрование/загрузка выполняются на самом control (там есть
+        # sops, age-ключ и rclone.conf). В CI sops не нужен.
+        ansible-playbook \
+          -i ansible/hosts_prod \
+          ansible/run_role.yml \
+          -e "role_name=$${ROLE}" \
+          -e "target_hosts=$${TARGET}"

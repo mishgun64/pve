@@ -36,8 +36,24 @@ all:
         santa_bot_lxc:
           ansible_host: 192.168.2.11
 
-    # Мониторинг
-    monitoring_hosts:
+    # Мониторинг: агенты (node_exporter) на всех хостах, КРОМЕ pve_iso_server
+    # (решение п.12 плана: PXE/ISO-сервер в мониторинг не входит).
+    monitoring_agents:
+      children:
+        docker_hosts:
       hosts:
-        prometheus_lxc:
-          ansible_host: 192.168.2.10
+        pve:
+        control_node:
+
+    # cAdvisor ставится только там, где есть Docker (docker_hosts + control).
+    monitoring_cadvisor:
+      children:
+        docker_hosts:
+      hosts:
+        control_node:
+
+    # Сервер мониторинга: Prometheus/Alertmanager/Grafana/blackbox/pve_exporter
+    # в Docker на control_node (192.168.2.200).
+    monitoring_server:
+      hosts:
+        control_node:

@@ -1,0 +1,169 @@
+---
+
+#--------------------------node_exporter (метрики железа)--------------------------
+
+- name: Require Debian-family host
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'Debian'
+    fail_msg: >-
+      monitoring/agent поддерживает только Debian-семейство (PVE, Debian LXC/VM).
+      Обнаружено: {{ ansible_facts['distribution'] | default('unknown') }}.
+    quiet: true
+
+- name: Install node_exporter (prometheus-node-exporter)
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# Дебиановский пакет читает доп. флаги из ARGS в /etc/default/prometheus-node-exporter.
+- name: Configure node_exporter args
+  ansible.builtin.template:
+    src: prometheus-node-exporter.default.j2
+    dest: /etc/default/prometheus-node-exporter
+    owner: root
+    group: root
+    mode: '0644'
+  register: node_exporter_default
+
+- name: Restart node_exporter after args change
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    state: restarted
+  when: node_exporter_default is changed
+
+- name: Ensure node_exporter is started and enabled
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    state: started
+    enabled: true
+
+- name: Wait for node_exporter port
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: "{{ node_exporter_port }}"
+    timeout: 60
+
+- name: Check node_exporter /metrics endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ node_exporter_port }}/metrics"
+    status_code: 200
+    timeout: 20
+  register: node_exporter_metrics
+  retries: 6
+  delay: 5
+  until: node_exporter_metrics.status == 200
+  changed_when: false
+
+#--------------------------cAdvisor (Docker-контейнеры)--------------------------
+
+- name: cAdvisor (Docker hosts only)
+  when:
+    - cadvisor_enabled
+    - inventory_hostname in (groups['monitoring_cadvisor'] | default([]))
+  block:
+    - name: Check that docker is installed
+      ansible.builtin.command:
+        cmd: docker --version
+      register: cadvisor_docker_bin
+      changed_when: false
+      failed_when: false
+
+    - name: Fail when docker is missing on a cAdvisor host
+      ansible.builtin.fail:
+        msg: >-
+          {{ inventory_hostname }} входит в группу monitoring_cadvisor, но docker
+          не найден в PATH. Установить Docker (роль common/docker) или исключить
+          хост из группы.
+      when: cadvisor_docker_bin.rc != 0
+
+    - name: Inspect existing cAdvisor container
+      ansible.builtin.command:
+        cmd: "docker inspect {{ cadvisor_container_name }}"
+      register: cadvisor_inspect
+      changed_when: false
+      failed_when: false
+
+    - name: Read cAdvisor container state
+      ansible.builtin.set_fact:
+        cadvisor_exists: "{{ cadvisor_inspect.rc == 0 }}"
+        cadvisor_running: >-
+          {{ (cadvisor_inspect.stdout | from_json | first).State.Running
+             if cadvisor_inspect.rc == 0 else false }}
+        cadvisor_current_image: >-
+          {{ (cadvisor_inspect.stdout | from_json | first).Config.Image
+             if cadvisor_inspect.rc == 0 else '' }}
+        cadvisor_current_ports: >-
+          {{ ((cadvisor_inspect.stdout | from_json | first).HostConfig.PortBindings | default({}, true)).keys() | list
+             if cadvisor_inspect.rc == 0 else [] }}
+
+    - name: Decide whether cAdvisor container must be recreated
+      ansible.builtin.set_fact:
+        cadvisor_recreate: >-
+          {{ (cadvisor_exists | bool) and (
+               cadvisor_current_image != cadvisor_image or
+               (cadvisor_port ~ '/tcp') not in cadvisor_current_ports
+             ) }}
+
+    - name: Remove cAdvisor container with obsolete image/params
+      ansible.builtin.command:
+        cmd: "docker rm -f {{ cadvisor_container_name }}"
+      when: cadvisor_recreate | bool
+
+    - name: Run cAdvisor container
+      ansible.builtin.command:
+        cmd: >-
+          docker run -d --name {{ cadvisor_container_name }}
+          --restart unless-stopped
+          -p {{ cadvisor_port }}:8080
+          -v /:/rootfs:ro
+          -v /var/run:/var/run:ro
+          -v /sys:/sys:ro
+          -v /var/lib/docker/:/var/lib/docker:ro
+          --privileged
+          {{ cadvisor_image }}
+      when: (not (cadvisor_exists | bool)) or (cadvisor_recreate | bool)
+      register: cadvisor_run
+
+    - name: Start existing stopped cAdvisor container
+      ansible.builtin.command:
+        cmd: "docker start {{ cadvisor_container_name }}"
+      when:
+        - cadvisor_exists | bool
+        - not (cadvisor_recreate | bool)
+        - not (cadvisor_running | bool)
+
+    - name: Wait for cAdvisor port
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ cadvisor_port }}"
+        timeout: 120
+
+    - name: Check cAdvisor /metrics endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ cadvisor_port }}/metrics"
+        status_code: 200
+        timeout: 60
+      register: cadvisor_metrics
+      retries: 6
+      delay: 10
+      until: cadvisor_metrics.status == 200
+      changed_when: false
+
+    - name: Report cAdvisor status
+      ansible.builtin.debug:
+        msg:
+          - "cAdvisor: {{ cadvisor_image }} на порту {{ cadvisor_port }}"
+          - "Метрики отдаются (HTTP {{ cadvisor_metrics.status }})"
+
+#--------------------------Summary--------------------------
+
+- name: Report monitoring agent status
+  ansible.builtin.debug:
+    msg:
+      - "node_exporter: :{{ node_exporter_port }} ({{ node_exporter_args | default('') or 'без доп. флагов' }})"
+      - >-
+        cAdvisor: {{ 'включён' if (cadvisor_enabled and inventory_hostname in (groups['monitoring_cadvisor'] | default([])))
+                      else 'не требуется для этого хоста' }}

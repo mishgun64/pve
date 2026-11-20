@@ -1,0 +1,17 @@
+---
+# Роль monitoring/restore: восстановление стека /opt/monitoring из
+# шифрованного архива (локально в /srv/backups/monitoring или на Google Drive).
+# Выполняется на control_node от root. См. MONITORING-PLAN.md, п.5.4.
+
+monitoring_dir: /opt/monitoring
+# Адрес публикации портов из docker-compose.yml (LAN-IP control_node).
+monitoring_restore_bind_address: "{{ ansible_host | default('127.0.0.1') }}"
+monitoring_backup_dir: /srv/backups/monitoring
+monitoring_rclone_remote: "gdrive:"
+monitoring_rclone_dir: "monitoring"
+monitoring_rclone_config: /root/.config/rclone/rclone.conf
+# Пусто — берём самый новый локальный архив, иначе последний с Google Drive.
+monitoring_restore_archive: ""
+# Приватный ключ, соответствующий age-получателю бэкапа (jenkins@control =
+# root@control). sops не ищет ~/.ssh сам — путь передаётся явно.
+monitoring_restore_sops_key: /root/.ssh/id_ed25519

@@ -1,0 +1,276 @@
+---
+
+#--------------------------Preflight--------------------------
+
+- name: Require root
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['user_id'] == 'root'
+    fail_msg: "Роль monitoring/restore запускается от root."
+    quiet: true
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ monitoring_backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+#--------------------------Find backup--------------------------
+
+- name: Look for a local encrypted backup
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ls -1t {{ monitoring_backup_dir }}/monitoring_*.tar.gz.enc 2>/dev/null | head -n 1 || true
+  register: monitoring_restore_local_backup
+  changed_when: false
+
+- name: Use explicitly requested archive
+  ansible.builtin.set_fact:
+    monitoring_restore_file: "{{ monitoring_restore_archive }}"
+  when: monitoring_restore_archive | length > 0
+
+- name: Use latest local archive
+  ansible.builtin.set_fact:
+    monitoring_restore_file: "{{ monitoring_restore_local_backup.stdout | trim }}"
+  when:
+    - monitoring_restore_archive | length == 0
+    - monitoring_restore_local_backup.stdout | trim | length > 0
+
+# Локальных архивов нет (чистая машина) — тянем последний с Google Drive.
+- name: Fetch latest backup from Google Drive
+  when:
+    - monitoring_restore_archive | length == 0
+    - monitoring_restore_local_backup.stdout | trim | length == 0
+  block:
+    - name: Find newest backup on Google Drive
+      ansible.builtin.shell: |
+        set -euo pipefail
+        rclone lsf "{{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}" \
+          --files-only --include 'monitoring_*.tar.gz.enc' \
+          --config {{ monitoring_rclone_config }} \
+          --retries 2 --low-level-retries 5 --contimeout 15s \
+          | awk -F'[_.]' 'NF>=6 {print $4$3$2$5$6" "$0}' \
+          | sort -r | head -n 1 | cut -d' ' -f2- || true
+      register: monitoring_restore_remote_name
+      changed_when: false
+
+    - name: Fail when Google Drive has no backups
+      ansible.builtin.fail:
+        msg: >-
+          Нет ни локального архива в {{ monitoring_backup_dir }}, ни объектов
+          monitoring_*.tar.gz.enc на {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}.
+          Указать файл явно: -e monitoring_restore_archive=/path/to/monitoring_....tar.gz.enc
+      when: monitoring_restore_remote_name.stdout | trim | length == 0
+
+    - name: Download newest backup from Google Drive
+      ansible.builtin.command:
+        cmd: >-
+          rclone copyto
+          {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}/{{ monitoring_restore_remote_name.stdout | trim }}
+          {{ monitoring_backup_dir }}/{{ monitoring_restore_remote_name.stdout | trim }}
+          --config {{ monitoring_rclone_config }}
+          --retries 3 --low-level-retries 10 --contimeout 30s --timeout 300s
+
+    - name: Try to download its checksum
+      ansible.builtin.command:
+        cmd: >-
+          rclone copyto
+          {{ monitoring_rclone_remote }}{{ monitoring_rclone_dir }}/{{ monitoring_restore_remote_name.stdout | trim }}.sha256
+          {{ monitoring_backup_dir }}/{{ monitoring_restore_remote_name.stdout | trim }}.sha256
+          --config {{ monitoring_rclone_config }}
+          --retries 1 --low-level-retries 3 --contimeout 15s
+      failed_when: false
+
+    - name: Set restore file to the downloaded archive
+      ansible.builtin.set_fact:
+        monitoring_restore_file: "{{ monitoring_backup_dir }}/{{ monitoring_restore_remote_name.stdout | trim }}"
+
+- name: Check restore archive exists
+  ansible.builtin.stat:
+    path: "{{ monitoring_restore_file }}"
+  register: monitoring_restore_file_stat
+  when: monitoring_restore_file is defined
+
+- name: Fail when no restore archive was selected
+  ansible.builtin.fail:
+    msg: >-
+      Не удалось выбрать архив для восстановления. Указать явно:
+      -e monitoring_restore_archive=/path/to/monitoring_....tar.gz.enc
+  when: monitoring_restore_file is not defined
+
+- name: Fail when restore archive is missing
+  ansible.builtin.fail:
+    msg: "Архив не найден: '{{ monitoring_restore_file }}'."
+  when:
+    - monitoring_restore_file is defined
+    - not monitoring_restore_file_stat.stat.exists
+
+#--------------------------Stop current stack--------------------------
+
+- name: Check whether the stack is deployed
+  ansible.builtin.stat:
+    path: "{{ monitoring_dir }}/docker-compose.yml"
+  register: monitoring_restore_compose_file
+
+- name: Stop monitoring stack
+  ansible.builtin.command:
+    cmd: docker compose down --remove-orphans
+    chdir: "{{ monitoring_dir }}"
+  when: monitoring_restore_compose_file.stat.exists
+
+#--------------------------Verify checksum--------------------------
+
+- name: Check for checksum file
+  ansible.builtin.stat:
+    path: "{{ monitoring_restore_file }}.sha256"
+  register: monitoring_restore_checksum
+
+- name: Verify archive checksum
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd "{{ monitoring_restore_file | dirname }}"
+    sha256sum -c "{{ monitoring_restore_file | basename }}.sha256"
+  changed_when: false
+  when: monitoring_restore_checksum.stat.exists
+
+- name: Report checksum verification skipped
+  ansible.builtin.debug:
+    msg: "WARNING: файл .sha256 не найден — целостность архива не проверена."
+  when: not monitoring_restore_checksum.stat.exists
+
+#--------------------------Decrypt--------------------------
+
+- name: Check decryption key
+  ansible.builtin.stat:
+    path: "{{ monitoring_restore_sops_key }}"
+  register: monitoring_restore_sops_key_stat
+
+- name: Fail when decryption key is missing
+  ansible.builtin.fail:
+    msg: >-
+      Нет приватного ключа {{ monitoring_restore_sops_key }} для расшифровки
+      архива. Указать путь: -e monitoring_restore_sops_key=/path/to/id_ed25519
+  when: not monitoring_restore_sops_key_stat.stat.exists
+
+- name: Decrypt backup
+  ansible.builtin.command:
+    argv:
+      - sops
+      - -d
+      - --input-type
+      - binary
+      - --output-type
+      - binary
+      - --output
+      - /tmp/monitoring_restore.tar.gz
+      - "{{ monitoring_restore_file }}"
+  environment:
+    SOPS_AGE_SSH_PRIVATE_KEY_FILE: "{{ monitoring_restore_sops_key }}"
+
+- name: Ensure decrypted archive exists
+  ansible.builtin.stat:
+    path: /tmp/monitoring_restore.tar.gz
+  register: monitoring_restore_plain
+  failed_when: false
+
+- name: Fail when decryption produced no archive
+  ansible.builtin.fail:
+    msg: >-
+      sops не смог расшифровать {{ monitoring_restore_file }}. Нужен приватный
+      ключ, соответствующий age-получателю архива (jenkins@control):
+      SOPS_AGE_SSH_PRIVATE_KEY_FILE=/root/.ssh/id_ed25519 sops -d ...
+  when: not monitoring_restore_plain.stat.exists
+
+#--------------------------Check archive contents (path traversal)--------------------------
+
+- name: Validate archive layout
+  ansible.builtin.shell: |
+    set -euo pipefail
+    listing="$(tar -tzf /tmp/monitoring_restore.tar.gz)"
+    if printf '%s\n' "$listing" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+      echo "ERROR: архив содержит абсолютные пути или path traversal" >&2
+      exit 1
+    fi
+    printf '%s\n' "$listing" | grep -qx 'monitoring/docker-compose.yml'
+  changed_when: false
+
+#--------------------------Extract--------------------------
+
+# Распаковываем от root с сохранением uid/gid: data/prometheus и
+# data/alertmanager должны остаться 65534, data/grafana — 472.
+- name: Extract monitoring stack
+  ansible.builtin.command:
+    cmd: tar -xzf /tmp/monitoring_restore.tar.gz -C {{ monitoring_dir | dirname }}
+
+- name: Ensure Prometheus/Alertmanager data ownership
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: '65534'
+    group: '65534'
+    recurse: true
+  loop:
+    - "{{ monitoring_dir }}/data/prometheus"
+    - "{{ monitoring_dir }}/data/alertmanager"
+
+- name: Ensure Grafana data ownership
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/data/grafana"
+    state: directory
+    owner: '472'
+    group: '472'
+    recurse: true
+
+#--------------------------Start stack--------------------------
+
+- name: Validate docker-compose file
+  ansible.builtin.command:
+    cmd: docker compose config --quiet
+    chdir: "{{ monitoring_dir }}"
+  changed_when: false
+
+- name: Start monitoring stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ monitoring_dir }}"
+
+- name: Wait for monitoring ports
+  ansible.builtin.wait_for:
+    host: "{{ monitoring_restore_bind_address }}"
+    port: "{{ item }}"
+    timeout: 180
+  loop:
+    - 9090
+    - 9093
+    - 3000
+
+- name: Check restored stack health
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    status_code: 200
+    timeout: 20
+  register: monitoring_restore_health
+  retries: 18
+  delay: 5
+  until: monitoring_restore_health.status == 200
+  changed_when: false
+  loop:
+    - "http://{{ monitoring_restore_bind_address }}:9090/-/healthy"
+    - "http://{{ monitoring_restore_bind_address }}:9093/-/healthy"
+    - "http://{{ monitoring_restore_bind_address }}:3000/api/health"
+
+#--------------------------Cleanup--------------------------
+
+- name: Remove decrypted archive
+  ansible.builtin.file:
+    path: /tmp/monitoring_restore.tar.gz
+    state: absent
+
+- name: Restore summary
+  ansible.builtin.debug:
+    msg:
+      - "Восстановлено из: {{ monitoring_restore_file }}"
+      - "Стек: {{ monitoring_dir }} (docker compose up -d)"
+      - "Grafana/Prometheus/Alertmanager подняты, health-check пройден."

@@ -1,0 +1,2 @@
+# Managed by Ansible (role monitoring/agent). Не редактировать вручную.
+ARGS="--web.listen-address=:{{ node_exporter_port }}{{ (' ' ~ node_exporter_args) if node_exporter_args | default('') | length > 0 else '' }}"

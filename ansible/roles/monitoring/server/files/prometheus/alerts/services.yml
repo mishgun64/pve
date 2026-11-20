@@ -1,0 +1,57 @@
+# Правила доступности сервисов (blackbox_exporter). Managed by Ansible.
+groups:
+  - name: services
+    rules:
+      # Публичные HTTPS-сервисы. 5 минут — чтобы перевыпуск сертификата или
+      # перезапуск Traefik не будили.
+      - alert: ServiceDown
+        expr: probe_success{job="blackbox_http"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Сервис {{ $labels.instance }} недоступен"
+          description: >-
+            HTTP(S)-проба {{ $labels.instance }} не проходит дольше 5 минут
+            (статус/TLS/таймаут).
+
+      # Внутренние TCP-сервисы (PVPGN и т.п.).
+      - alert: ServiceDownInternal
+        expr: probe_success{job="blackbox_tcp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TCP-сервис {{ $labels.instance }} не отвечает"
+          description: "TCP-проба {{ $labels.instance }} не проходит дольше 2 минут."
+
+      # ICMP: хост не пингуется. Дополняет node_exporter (если упал весь хост,
+      # придут оба алерта — это нормально).
+      - alert: ICMPUnreachable
+        expr: probe_success{job="blackbox_icmp"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Хост {{ $labels.instance }} не пингуется"
+          description: "ICMP-проба {{ $labels.instance }} не проходит дольше 10 минут."
+
+      - alert: TLSCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 7 * 86400
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Сертификат {{ $labels.instance }} истекает < 7 дней"
+          description: >-
+            До истечения TLS-сертификата меньше недели. Проверить выпуск
+            сертификата Traefik/Let's Encrypt.
+
+      - alert: TLSCertExpiringWarning
+        expr: probe_ssl_earliest_cert_expiry - time() < 30 * 86400
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Сертификат {{ $labels.instance }} истекает < 30 дней"
+          description: "До истечения TLS-сертификата меньше месяца."

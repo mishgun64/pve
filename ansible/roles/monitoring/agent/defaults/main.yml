@@ -1,0 +1,25 @@
+---
+# Роль-агент мониторинга: node_exporter (метрики железа) + cAdvisor
+# (метрики и состояние Docker-контейнеров).
+#
+# Запускается на группе monitoring_agents (docker_hosts + pve + control_node,
+# БЕЗ pve_iso_server). cAdvisor ставится только на хосты из группы
+# monitoring_cadvisor (docker_hosts + control_node).
+#
+# Правки firewall (входящие 9100/8081 от сервера мониторинга 192.168.2.200)
+# выполняются отдельно, см. п.10 MONITORING-PLAN.md.
+
+# Порт node_exporter (Debian-пакет prometheus-node-exporter слушает :9100)
+node_exporter_port: 9100
+# Доп. флаги node_exporter (строка ARGS в /etc/default/prometheus-node-exporter).
+# В LXC часть hw-коллекторов недоступна — при ошибках отключать точечно, напр.
+# "--no-collector.hwmon --no-collector.thermal_zone".
+node_exporter_args: ""
+
+cadvisor_enabled: true
+cadvisor_port: 8081
+cadvisor_container_name: cadvisor
+# Версия пиннится. gcr.io/cadvisor/cadvisor — официальный registry образа.
+# Если gcr.io недоступен с хоста, переопределить на зеркало, например:
+#   -e cadvisor_image=<registry>/cadvisor/cadvisor:v0.55.1
+cadvisor_image: "gcr.io/cadvisor/cadvisor:v0.55.1"

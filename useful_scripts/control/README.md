@@ -29,8 +29,37 @@ curl -fsSL https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/c
 | `Nextcloud-backup` | `.woodpecker/nextcloud_backup.yml` | `nextcloud/backup` → `nextcloud_vm` |
 | `Traefik-backup` | `.woodpecker/traefik_backup.yml` | `traefik/backup` → `traefik_lxc` |
 | `Valheim-backup` | `.woodpecker/valheim_backup.yml` | `valheim/backup` → `valheim_lxc` |
+| `Monitoring-backup` | `.woodpecker/monitoring_backup.yml` | `monitoring/backup` → `monitoring_server` (control) |
 
 В каждом из этих файлов два независимых условия `when`: `event: manual` + `evaluate: PIPELINE == "..."` (ручной запуск через `wp_cli`) и `event: cron` + `cron: "<имя задачи>"` (расписание). Нельзя объединять их в один блок: `evaluate` опирается на переменную `PIPELINE`, которой при cron-событии нет, и тогда пайплайн молча пропускается.
+
+## Мониторинг: read-only PVE-токен и секреты
+
+Два скрипта для первичной настройки стека мониторинга (см.
+`ansible/roles/monitoring/README.md`). Оба запускаются от root на control_node,
+не печатают секреты в терминал и не передают их в argv:
+
+```bash
+# 1) Пользователь monitoring@pve, API-токен monitoring@pve!prometheus (privsep=1),
+#    роль PVEAuditor на "/" для токена. Работает по ssh с control на PVE (192.168.2.2),
+#    секрет пишет в /root/monitoring-pve-token.secret (0600).
+sudo useful_scripts/control/setup-pve-monitoring-token.sh
+#    --check — только проверить наличие; --rotate — перевыпустить токен;
+#    --local — выполнить pveum на самом PVE.
+
+# 2) Заполнить sops-секреты (Telegram bot_token/chat_id, PVE-токен, пароль Grafana).
+sudo useful_scripts/control/setup-monitoring-secrets.sh \
+     --pve-token-file /root/monitoring-pve-token.secret
+shred -u /root/monitoring-pve-token.secret
+
+sudo useful_scripts/control/setup-monitoring-secrets.sh --check
+sudo useful_scripts/control/setup-monitoring-secrets.sh --show-grafana-password
+```
+
+Скрипт секретов работает с `ansible/roles/monitoring/server/files/secrets.enc.yml`
+(sops/age, получатель — ключ `jenkins@control`). Нужен приватный ключ:
+`export SOPS_AGE_SSH_PRIVATE_KEY_FILE=/root/.ssh/id_ed25519` (подставляется
+автоматически, если файл существует).
 
 ## rclone (Google Drive)
 

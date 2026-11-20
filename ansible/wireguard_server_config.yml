@@ -7,6 +7,5 @@
   roles:
       - common/basic
       - common/docker
-      - common/monitoring
       - wireguard
       - wireguard/firewall

@@ -1,0 +1,39 @@
+# Правила по LXC/VM на Proxmox (prometheus-pve-exporter 3.x). Managed by Ansible.
+#
+# Метрика pve_up{id="lxc/124"|"qemu/100"|"node/pve"|"storage/..."} = 1 если
+# гость запущен / нода online / storage доступен. Метрики pve_guest_running
+# в 3.x нет (переименована в pve_up) — сверено с README exporter 3.12.
+groups:
+  - name: pve
+    rules:
+      - alert: PVEGuestDown
+        expr: pve_up{id=~"lxc/.+|qemu/.+"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Гость {{ $labels.id }} на PVE не запущен"
+          description: >-
+            LXC/VM {{ $labels.id }} выключен более 5 минут. Если это плановое
+            выключение — замьютить алерт; иначе проверить pct status / qm status
+            и системный журнал ноды.
+
+      - alert: PVENodeDown
+        expr: pve_up{id=~"node/.+"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Нода PVE {{ $labels.id }} недоступна"
+          description: "pve_exporter не видит ноду {{ $labels.id }}."
+
+      - alert: PVEStorageDown
+        expr: pve_up{id=~"storage/.+"} == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Хранилище {{ $labels.id }} недоступно"
+          description: >-
+            Storage {{ $labels.id }} не отвечает более 10 минут (NFS/диск?).
+            Проверить pvesm status.

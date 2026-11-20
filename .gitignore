@@ -19,6 +19,12 @@
 /ansible/roles/santa_bot/config/files/secrets.yml
 /ansible/roles/santa_bot/config/files/secrets.json
 
+# Мониторинг: плейнтекст секретов/рендер-файлы, если появятся локально
+/ansible/roles/monitoring/server/files/secrets.yml
+/ansible/roles/monitoring/server/files/secrets.json
+/ansible/roles/monitoring/server/files/.env
+/ansible/roles/monitoring/server/files/pve.yml
+
 # IDE project files accidentally created inside .woodpecker
 /.woodpecker/*.xml
 /.woodpecker/*.iml

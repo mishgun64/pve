@@ -1,0 +1,85 @@
+# Managed by Ansible (role monitoring/server).
+# Таргеты собираются из inventory-групп monitoring_agents/monitoring_cadvisor
+# (ansible/hosts_prod), поэтому новые хосты появляются здесь автоматически.
+
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  evaluation_interval: {{ prometheus_scrape_interval }}
+  external_labels:
+    monitor: control-node
+
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "alertmanager:9093"
+
+scrape_configs:
+  # Сам Prometheus (правила/скрейпы/TSDB) — для дашборда и алертов на себя.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: node_exporter
+    scrape_interval: {{ prometheus_node_scrape_interval }}
+    static_configs:
+{% for h in groups['monitoring_agents'] | sort %}
+{% if h in (groups['monitoring_server'] | default([])) %}
+      # self ({{ h }}): из контейнера localhost — это сам Prometheus.
+      - targets: ["host.docker.internal:9100"]
+        labels:
+          instance: "{{ h }}"
+{% else %}
+      - targets: ["{{ hostvars[h]['ansible_host'] | default(h) }}:9100"]
+        labels:
+          instance: "{{ h }}"
+{% endif %}
+{% endfor %}
+
+  - job_name: cadvisor
+    scrape_interval: {{ prometheus_cadvisor_scrape_interval }}
+    static_configs:
+{% for h in groups['monitoring_cadvisor'] | sort %}
+{% if h in (groups['monitoring_server'] | default([])) %}
+      - targets: ["host.docker.internal:8081"]
+        labels:
+          instance: "{{ h }}"
+{% else %}
+      - targets: ["{{ hostvars[h]['ansible_host'] | default(h) }}:8081"]
+        labels:
+          instance: "{{ h }}"
+{% endif %}
+{% endfor %}
+
+  # Состояние LXC/VM/нод PVE через read-only API-токен (PVEAuditor).
+  - job_name: pve
+    scrape_interval: 60s
+    metrics_path: /pve
+    params:
+      target: ["{{ pve_api_host }}"]
+      cluster: ["1"]
+      node: ["1"]
+    static_configs:
+      - targets: ["pve_exporter:{{ pve_exporter_port }}"]
+
+{% for job in blackbox_jobs %}
+  - job_name: {{ job.name }}
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: ["{{ job.module }}"]
+    static_configs:
+{% for t in job.targets %}
+      - targets: ["{{ t }}"]
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "blackbox:{{ blackbox_port }}"
+{% endfor %}

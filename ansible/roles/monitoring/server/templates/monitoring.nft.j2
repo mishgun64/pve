@@ -1,0 +1,50 @@
+#!/usr/sbin/nft -f
+# Managed by Ansible (role monitoring/server). П.10.2 MONITORING-PLAN.md.
+#
+# Применяется инкрементально (nft -f /etc/nftables.d/monitoring.nft),
+# БЕЗ flush ruleset: цепочки DOCKER/DOCKER-USER и таблицы piweb_guard/
+# control_guard не трогаем. Приоритет -14: после control_guard (-15).
+#
+# 3000  Grafana        — Traefik (публичный https://grafana.mishgun.com) + LAN-админы
+# 9090  Prometheus     — LAN-админы
+# 9093  Alertmanager   — LAN-админы
+# 9100/8081 агенты control — только из docker-сетей (Prometheus в контейнере
+#                           ходит через host.docker.internal, а не loopback)
+table inet monitoring_guard {
+    set admin_src {
+        type ipv4_addr
+        flags interval
+        elements = {
+{% for s in monitoring_admin_sources %}
+            {{ s }}{{ "," if not loop.last }}
+{% endfor %}
+        }
+    }
+
+    chain input {
+        type filter hook input priority -14; policy accept;
+
+        iif "lo" accept
+        ct state established,related accept
+
+        # Grafana: traefik (внутренний и outer-адрес) + админы, остальным закрыто.
+        tcp dport {{ grafana_port }} ip saddr @admin_src accept
+{% for src in monitoring_grafana_proxy_sources %}
+        tcp dport {{ grafana_port }} ip saddr {{ src }} accept
+{% endfor %}
+        tcp dport {{ grafana_port }} drop
+
+        # Prometheus / Alertmanager: только LAN-админы (наружу не выставляем).
+        tcp dport {{ prometheus_port }} ip saddr @admin_src accept
+        tcp dport {{ prometheus_port }} drop
+        tcp dport {{ alertmanager_port }} ip saddr @admin_src accept
+        tcp dport {{ alertmanager_port }} drop
+
+        # Агенты на самом control: только из docker-сетей.
+        tcp dport { {{ monitoring_node_exporter_port }}, {{ monitoring_cadvisor_port }} } ip saddr {{ monitoring_docker_sources }} accept
+        tcp dport { {{ monitoring_node_exporter_port }}, {{ monitoring_cadvisor_port }} } drop
+
+        # IPv6: порты стека наружу не публикуем вообще (LAN только IPv4).
+        meta nfproto ipv6 tcp dport { {{ grafana_port }}, {{ prometheus_port }}, {{ alertmanager_port }}, {{ monitoring_node_exporter_port }}, {{ monitoring_cadvisor_port }} } drop
+    }
+}

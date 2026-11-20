@@ -1,0 +1,25 @@
+---
+
+# Полный стек мониторинга (см. MONITORING-PLAN.md и
+# ansible/roles/monitoring/README.md).
+#
+# Порядок важен: сначала агенты (node_exporter/cAdvisor), затем сервер —
+# иначе Prometheus на первом старте увидит часть таргетов DOWN.
+#
+# Правки firewall на PVE (входящие 9100/8081 от 192.168.2.200) выполняются
+# отдельно: зашифрованные .fw.enc лежат в ролях сервисов, см. п.10 плана и
+# useful_scripts/control/add-monitoring-fw-rules.sh.
+
+- name: Monitoring agents (node_exporter + cAdvisor)
+  hosts: monitoring_agents
+  remote_user: root
+  gather_facts: true
+  roles:
+    - monitoring/agent
+
+- name: Monitoring server (Prometheus/Alertmanager/Grafana/blackbox/pve_exporter)
+  hosts: monitoring_server
+  remote_user: root
+  gather_facts: true
+  roles:
+    - monitoring/server

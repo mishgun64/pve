@@ -1,0 +1,377 @@
+---
+
+#--------------------------Preflight--------------------------
+
+- name: Require root
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['user_id'] == 'root'
+    fail_msg: "Роль monitoring/server запускается от root (docker compose, nftables)."
+    quiet: true
+
+- name: Require Debian-family host
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'Debian'
+    fail_msg: "Поддерживается только Debian (control_node)."
+    quiet: true
+
+- name: Check docker CLI
+  ansible.builtin.command:
+    cmd: docker --version
+  register: monitoring_docker_bin
+  changed_when: false
+  failed_when: false
+
+- name: Fail when docker is missing
+  ansible.builtin.fail:
+    msg: >-
+      Docker не найден на {{ inventory_hostname }}. Сервер мониторинга
+      разворачивается только на control_node (setup-control.sh).
+  when: monitoring_docker_bin.rc != 0
+
+- name: Check docker compose plugin
+  ansible.builtin.command:
+    cmd: docker compose version
+  register: monitoring_compose_version
+  changed_when: false
+
+#--------------------------Directories--------------------------
+
+- name: Create monitoring directory tree
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ monitoring_dir }}", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/prometheus", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/prometheus/alerts", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/alertmanager", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/blackbox", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/pve", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/grafana", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/grafana/provisioning", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/grafana/provisioning/datasources", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/grafana/provisioning/dashboards", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/grafana/dashboards", mode: '0755' }
+    - { path: "{{ monitoring_dir }}/data", mode: '0755' }
+    # Prometheus/Alertmanager в официальных образах работают от nobody (65534).
+    - { path: "{{ monitoring_dir }}/data/prometheus", owner: '65534', group: '65534', mode: '0755' }
+    - { path: "{{ monitoring_dir }}/data/alertmanager", owner: '65534', group: '65534', mode: '0755' }
+    # Grafana в официальном образе — uid/gid 472.
+    - { path: "{{ monitoring_dir }}/data/grafana", owner: '472', group: '472', mode: '0755' }
+
+#--------------------------Static configs--------------------------
+
+- name: Copy blackbox_exporter config
+  ansible.builtin.copy:
+    src: blackbox/
+    dest: "{{ monitoring_dir }}/blackbox/"
+    owner: root
+    group: root
+    mode: '0644'
+  register: monitoring_blackbox_config
+
+- name: Copy Prometheus alert rules
+  ansible.builtin.copy:
+    src: prometheus/alerts/
+    dest: "{{ monitoring_dir }}/prometheus/alerts/"
+    owner: root
+    group: root
+    mode: '0644'
+  register: monitoring_alerts
+
+# Удалённые из репозитория правила не должны оставаться на хосте и грузиться
+# Prometheus (copy не удаляет файлы, которых больше нет в роли).
+- name: Find alert rules on host
+  ansible.builtin.find:
+    paths: "{{ monitoring_dir }}/prometheus/alerts"
+    patterns: "*.yml"
+    file_type: file
+  register: monitoring_host_alerts
+
+- name: Remove alert rules deleted from the role
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/prometheus/alerts/{{ item }}"
+    state: absent
+  loop: >-
+    {{ monitoring_host_alerts.files | map(attribute='path') | map('basename') | list
+       | difference(lookup('fileglob', role_path ~ '/files/prometheus/alerts/*.yml', wantlist=True)
+                    | map('basename') | list) }}
+  when: monitoring_host_alerts.matched | int > 0
+  register: monitoring_alerts_pruned
+
+- name: Copy Grafana provisioning
+  ansible.builtin.copy:
+    src: grafana/provisioning/
+    dest: "{{ monitoring_dir }}/grafana/provisioning/"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy Grafana dashboards
+  ansible.builtin.copy:
+    src: grafana/dashboards/
+    dest: "{{ monitoring_dir }}/grafana/dashboards/"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Find Grafana dashboards on host
+  ansible.builtin.find:
+    paths: "{{ monitoring_dir }}/grafana/dashboards"
+    patterns: "*.json"
+    file_type: file
+  register: monitoring_host_dashboards
+
+- name: Remove Grafana dashboards deleted from the role
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/dashboards/{{ item }}"
+    state: absent
+  loop: >-
+    {{ monitoring_host_dashboards.files | map(attribute='path') | map('basename') | list
+       | difference(lookup('fileglob', role_path ~ '/files/grafana/dashboards/*.json', wantlist=True)
+                    | map('basename') | list) }}
+  when: monitoring_host_dashboards.matched | int > 0
+
+#--------------------------Secrets--------------------------
+
+- name: Load secrets from sops
+  ansible.builtin.import_tasks: secrets.yml
+
+#--------------------------Rendered configs--------------------------
+
+- name: Render Prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_dir }}/prometheus/prometheus.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: monitoring_prometheus_config
+
+- name: Render Alertmanager config
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ monitoring_dir }}/alertmanager/alertmanager.yml"
+    owner: root
+    # Alertmanager в контейнере работает от nobody: файл читается группой 65534.
+    group: '65534'
+    mode: '0640'
+  register: monitoring_alertmanager_config
+
+- name: Render pve_exporter config
+  ansible.builtin.template:
+    src: pve.yml.j2
+    dest: "{{ monitoring_dir }}/pve/pve.yml"
+    owner: root
+    group: '65534'
+    mode: '0640'
+  register: monitoring_pve_config
+
+- name: Render Grafana environment file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ monitoring_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: monitoring_env_file
+
+- name: Render docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: monitoring_compose_file
+
+#--------------------------Config validation--------------------------
+
+# promtool/amtool берём из тех же образов, что и compose — проверка до старта,
+# чтобы кривой конфиг не превратился в crash loop и потерю старых данных.
+- name: Validate Prometheus config with promtool
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --entrypoint
+      - promtool
+      - -v
+      - "{{ monitoring_dir }}/prometheus:/etc/prometheus:ro"
+      - "{{ prometheus_image }}"
+      - check
+      - config
+      - /etc/prometheus/prometheus.yml
+  changed_when: false
+  register: monitoring_promtool_check
+
+- name: Validate Alertmanager config with amtool
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --entrypoint
+      - amtool
+      - -v
+      - "{{ monitoring_dir }}/alertmanager:/etc/alertmanager:ro"
+      - "{{ alertmanager_image }}"
+      - check-config
+      - /etc/alertmanager/alertmanager.yml
+  changed_when: false
+  register: monitoring_amtool_check
+
+- name: Validate docker-compose file
+  ansible.builtin.command:
+    cmd: docker compose config --quiet
+    chdir: "{{ monitoring_dir }}"
+  changed_when: false
+
+#--------------------------Firewall (nftables)--------------------------
+
+- name: Configure nftables guard for monitoring ports
+  ansible.builtin.import_tasks: firewall.yml
+  when: monitoring_manage_firewall | bool
+
+#--------------------------Start stack--------------------------
+
+- name: Start monitoring stack
+  ansible.builtin.command:
+    cmd: docker compose up -d --remove-orphans
+    chdir: "{{ monitoring_dir }}"
+  register: monitoring_compose_up
+  changed_when: >-
+    monitoring_compose_up.stderr is defined and
+    ('Started' in monitoring_compose_up.stderr or
+     'Created' in monitoring_compose_up.stderr or
+     'Recreated' in monitoring_compose_up.stderr)
+
+# blackbox_exporter/pve_exporter читают config только на старте.
+- name: Recreate blackbox when its config changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate --no-deps blackbox
+    chdir: "{{ monitoring_dir }}"
+  when: monitoring_blackbox_config is changed
+
+- name: Recreate pve_exporter when its config changed
+  ansible.builtin.command:
+    cmd: docker compose up -d --force-recreate --no-deps pve_exporter
+    chdir: "{{ monitoring_dir }}"
+  when: monitoring_pve_config is changed
+
+- name: Wait for monitoring ports
+  ansible.builtin.wait_for:
+    host: "{{ monitoring_bind_address }}"
+    port: "{{ item }}"
+    timeout: 180
+  loop:
+    - "{{ prometheus_port }}"
+    - "{{ alertmanager_port }}"
+    - "{{ grafana_port }}"
+
+- name: Check Prometheus health
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_bind_address }}:{{ prometheus_port }}/-/healthy"
+    status_code: 200
+    timeout: 20
+  register: monitoring_prometheus_health
+  retries: 12
+  delay: 5
+  until: monitoring_prometheus_health.status == 200
+  changed_when: false
+
+- name: Check Alertmanager health
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_bind_address }}:{{ alertmanager_port }}/-/healthy"
+    status_code: 200
+    timeout: 20
+  register: monitoring_alertmanager_health
+  retries: 12
+  delay: 5
+  until: monitoring_alertmanager_health.status == 200
+  changed_when: false
+
+- name: Check Grafana health
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_bind_address }}:{{ grafana_port }}/api/health"
+    status_code: 200
+    timeout: 20
+  register: monitoring_grafana_health
+  retries: 18
+  delay: 5
+  until: monitoring_grafana_health.status == 200
+  changed_when: false
+
+#--------------------------Post-checks--------------------------
+
+- name: List running compose services
+  ansible.builtin.command:
+    cmd: docker compose ps --status running --services
+    chdir: "{{ monitoring_dir }}"
+  register: monitoring_compose_running
+  changed_when: false
+
+- name: Assert all monitoring containers are running
+  ansible.builtin.assert:
+    that:
+      - "'prometheus' in monitoring_compose_running.stdout_lines"
+      - "'alertmanager' in monitoring_compose_running.stdout_lines"
+      - "'grafana' in monitoring_compose_running.stdout_lines"
+      - "'blackbox' in monitoring_compose_running.stdout_lines"
+      - "'pve_exporter' in monitoring_compose_running.stdout_lines"
+    fail_msg: >-
+      Не все контейнеры стека запущены ({{ monitoring_compose_running.stdout_lines }}).
+      Смотреть: cd {{ monitoring_dir }} && docker compose logs --tail=100
+    quiet: true
+
+# Prometheus/Alertmanager читают конфиги без рестарта (--web.enable-lifecycle).
+- name: Reload Prometheus after config/rule changes
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_bind_address }}:{{ prometheus_port }}/-/reload"
+    method: POST
+    status_code: 200
+    timeout: 20
+  when: >-
+    monitoring_prometheus_config is changed or
+    monitoring_alerts is changed or
+    monitoring_alerts_pruned is changed
+
+- name: Reload Alertmanager after config change
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_bind_address }}:{{ alertmanager_port }}/-/reload"
+    method: POST
+    status_code: 200
+    timeout: 20
+  when: monitoring_alertmanager_config is changed
+
+- name: Query Prometheus active targets
+  ansible.builtin.uri:
+    url: "http://{{ monitoring_bind_address }}:{{ prometheus_port }}/api/v1/targets?state=active"
+    status_code: 200
+    timeout: 20
+  register: monitoring_targets
+  changed_when: false
+
+- name: Report DOWN targets (агенты могут быть ещё не развёрнуты)
+  ansible.builtin.debug:
+    msg: >-
+      DOWN targets:
+      {{ monitoring_targets.json.data.activeTargets
+         | rejectattr('health', 'equalto', 'up')
+         | map(attribute='labels') | map(attribute='instance') | list }}
+
+- name: Monitoring stack status
+  ansible.builtin.debug:
+    msg:
+      - "Prometheus:   http://{{ monitoring_bind_address }}:{{ prometheus_port }} (LAN only)"
+      - "Alertmanager: http://{{ monitoring_bind_address }}:{{ alertmanager_port }} (LAN only)"
+      - "Grafana:      http://{{ monitoring_bind_address }}:{{ grafana_port }} / {{ grafana_root_url }}"
+      - "Секреты:      {{ monitoring_dir }}/.env (0600), alertmanager/pve (0640)"
+      - "Retention Prometheus: {{ prometheus_retention }}"

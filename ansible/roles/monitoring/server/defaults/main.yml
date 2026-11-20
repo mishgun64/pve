@@ -1,0 +1,123 @@
+---
+# Роль monitoring/server: Prometheus + Alertmanager + Grafana + blackbox_exporter
+# + pve_exporter в Docker на control_node (см. MONITORING-PLAN.md, п.5.2).
+
+monitoring_dir: /opt/monitoring
+monitoring_timezone: Europe/Moscow
+
+#------------------------------------Порты (host)------------------------------------
+prometheus_port: 9090
+alertmanager_port: 9093
+grafana_port: 3000
+# Адрес, на котором публикуются порты стека. Только LAN-IP control_node:
+# 0.0.0.0 означал бы «на всех интерфейсах» (WAN/VPN), а nftables input не
+# фильтрует DNAT-трафик Docker. Grafana принимает трафик Traefik
+# (192.168.2.3) на этот же адрес.
+monitoring_bind_address: "{{ ansible_host }}"
+
+# Порты blackbox/pve_exporter нужны только внутри compose-сети `monitoring`
+# (наружу не публикуются, firewall их не открывает).
+blackbox_port: 9115
+pve_exporter_port: 9221
+
+# Порты агентов на самом control (Prometheus ходит к ним через
+# host.docker.internal); нужны для правил nftables.
+monitoring_node_exporter_port: 9100
+monitoring_cadvisor_port: 8081
+
+#------------------------------------Prometheus------------------------------------
+prometheus_retention: 15d
+prometheus_scrape_interval: 15s
+# Метрики агентов собираем реже, чем evaluate правила: TSDB на control не резиновая.
+prometheus_node_scrape_interval: 30s
+prometheus_cadvisor_scrape_interval: 30s
+
+#------------------------------------Версии образов (пиннинг)------------------------------------
+# Обновление — осознанно: поменять тег здесь, прогнать pipeline monitoring/server.
+prometheus_image: prom/prometheus:v3.16.0
+alertmanager_image: prom/alertmanager:v0.35.0
+grafana_image: grafana/grafana:13.3.1
+blackbox_image: prom/blackbox-exporter:v0.29.1
+# Официальный registry: prompve (Docker Hub). prometheus-pve-exporter 3.x
+# отдаёт pve_up{id="lxc/124"} / pve_guest_info — см. prometheus/alerts/pve.yml.
+pve_exporter_image: prompve/prometheus-pve-exporter:3.12.0
+
+#------------------------------------Grafana------------------------------------
+grafana_root_url: "https://grafana.mishgun.com"
+grafana_domain: "grafana.mishgun.com"
+grafana_admin_user: admin
+
+#------------------------------------PVE API (pve_exporter)------------------------------------
+# Токен read-only (role PVEAuditor) задаётся в files/secrets.enc.yml.
+pve_api_host: "192.168.2.2"
+
+#------------------------------------blackbox targets------------------------------------
+# Публичные HTTPS-сервисы (traefik). Внутренние TCP-порты бэкендов не дублируем:
+# на control они закрыты nftables, шум от проб только мешает (см. п.7.2 плана).
+blackbox_http_targets:
+  - "https://pi.mishgun.com"
+  - "https://ci.mishgun.com"
+  - "https://cloud.mishgun.com"
+  - "https://emby.mishgun.com"
+  - "https://jellyfin.mishgun.com"
+  - "https://login.mishgun.com"
+  - "https://grafana.mishgun.com"
+
+# TCP-пробы того, что не выходит наружу через traefik.
+blackbox_tcp_targets:
+  - "192.168.2.8:6112"   # PVPGN (Battle.net)
+
+# ICMP: шлюз + все LAN-хосты. Valheim/WireGuard — UDP, обычными TCP/ICMP
+# пробами их доступность не проверить: контролируем «хост жив» + контейнер
+# running (cAdvisor). Это ограничение зафиксировано в п.7.2 плана.
+blackbox_icmp_targets:
+  - "192.168.2.1"    # шлюз
+  - "192.168.2.2"    # pve
+  - "192.168.2.3"    # traefik_lxc
+  - "192.168.2.4"    # media_vm
+  - "192.168.2.5"    # nextcloud_vm
+  - "192.168.2.6"    # wg_lxc
+  - "192.168.2.8"    # pvpgn_lxc
+  - "192.168.2.9"    # valheim_lxc
+  - "192.168.2.11"   # santa_bot_lxc
+  - "192.168.2.200"  # control_node
+
+blackbox_jobs:
+  - name: blackbox_http
+    module: http_2xx
+    targets: "{{ blackbox_http_targets }}"
+  - name: blackbox_tcp
+    module: tcp_connect
+    targets: "{{ blackbox_tcp_targets }}"
+  - name: blackbox_icmp
+    module: icmp
+    targets: "{{ blackbox_icmp_targets }}"
+
+#------------------------------------Firewall (nftables на control)------------------------------------
+monitoring_manage_firewall: true
+# LAN-админы: доступ к Grafana/Prometheus/Alertmanager напрямую по IP:порт.
+# Те же подсети, что в CONTROL_GUARD_SSH_SOURCES (setup-control.sh) — при
+# изменении синхронизировать.
+monitoring_admin_sources:
+  - "192.168.1.0/24"
+  - "192.168.2.0/24"
+# Хосты Traefik, которым разрешён порт Grafana (публичный
+# https://grafana.mishgun.com). Traefik LXC (143) dual-homed:
+#   192.168.2.3 — внутренний интерфейс (vmbr0),
+#   192.168.4.3 — "outer" интерфейс (vmbr1), с него тоже может приходить запрос.
+monitoring_grafana_proxy_sources:
+  - "192.168.2.3"
+  - "192.168.4.3"
+# Docker-сети: Prometheus в контейнере ходит к node_exporter/cAdvisor самого
+# control через host.docker.internal (адрес моста), а не через loopback.
+monitoring_docker_sources: "172.16.0.0/12"
+
+#------------------------------------Секреты------------------------------------
+# Значения приходят из files/secrets.enc.yml (sops/age) в tasks/secrets.yml.
+# Пустые значения-заглушки: роль падает, если секреты не заполнены.
+monitoring_grafana_admin_password: ""
+monitoring_alertmanager_telegram_bot_token: ""
+monitoring_alertmanager_telegram_chat_id: 0
+monitoring_pve_api_user: "monitoring@pve"
+monitoring_pve_token_name: "prometheus"
+monitoring_pve_token_value: ""

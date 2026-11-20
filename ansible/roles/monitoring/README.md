@@ -144,7 +144,9 @@ sudo useful_scripts/control/add-monitoring-fw-rules.sh --apply  # перешиф
 ### control: nftables (роль `monitoring/server`)
 
 Фрагмент `/etc/nftables.d/monitoring.nft`, таблица `inet monitoring_guard`
-(приоритет -14, применяется инкрементально `nft -f`, БЕЗ `flush ruleset`):
+(приоритет -14, применяется инкрементально `nft -f`, БЕЗ `flush ruleset`).
+Тот же фрагмент (те же порты/источники) ставит `setup-control.sh` при
+bootstrap/пересборке control — при изменении правил синхронизировать оба места:
 
 | Порт | Кто ходит |
 |---|---|
@@ -228,6 +230,11 @@ gcr.io/cadvisor/cadvisor:v0.55.1
 `monitoring/restore` берёт самый новый локальный архив, иначе последний с
 Google Drive (или `-e monitoring_restore_archive=/path/file.enc`), проверяет
 sha256, защищается от path traversal, распаковывает в `/opt`, поднимает стек.
+
+При пересборке control_node `useful_scripts/control/setup-control.sh` тоже
+восстанавливает стек из последнего `gdrive:monitoring` (если `/opt/monitoring`
+отсутствует) и применяет nftables-гард `monitoring_guard`; роль остаётся
+источником истины по конфигам/compose.
 Расшифровка идёт на control приватным ключом `monitoring_restore_sops_key`
 (по умолчанию `/root/.ssh/id_ed25519` — тот же ключ, что age-получатель
 `jenkins@control`).

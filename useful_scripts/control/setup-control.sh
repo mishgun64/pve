@@ -47,6 +47,24 @@ PIWEB_ALLOWED_SRC=""
 CONTROL_GUARD_SSH_SOURCES="192.168.1.0/24,192.168.2.0/24"
 # Единственный клиент порта 8000 (Woodpecker UI/API) — хост Traefik (п.3).
 CONTROL_GUARD_WP_SRC="192.168.2.3"
+
+# --- Мониторинг (серверная часть на control, /opt/monitoring) --------------
+# Рабочая конфигурация стека — роль ansible/roles/monitoring/server (пайплайн
+# monitoring/server). setup-control.sh делает bootstrap/DR:
+#   * nftables-гард портов Grafana/Prometheus/Alertmanager;
+#   * восстановление /opt/monitoring из последнего бэкапа gdrive:monitoring.
+# При изменении портов/источников синхронизировать с
+# ansible/roles/monitoring/server/defaults/main.yml.
+MONITORING_DIR="/opt/monitoring"
+MONITORING_RCLONE_DIR="monitoring"
+MONITORING_PORT_GRAFANA=3000
+MONITORING_PORT_PROMETHEUS=9090
+MONITORING_PORT_ALERTMANAGER=9093
+MONITORING_AGENT_PORTS="9100,8081"
+# LAN-админы для 9090/9093/3000 — те же, что для SSH (control_guard).
+MONITORING_ADMIN_SRC="${MONITORING_ADMIN_SRC:-$CONTROL_GUARD_SSH_SOURCES}"
+# Traefik LXC (143) dual-homed: внутренний 192.168.2.3 и outer 192.168.4.3.
+MONITORING_GRAFANA_PROXY_SRC="${MONITORING_GRAFANA_PROXY_SRC:-192.168.2.3,192.168.4.3}"
 SERVER_VOL="${PROJECT_NAME}_woodpecker-server-data"
 AGENT_VOL="${PROJECT_NAME}_woodpecker-agent-config"
 RAW_BASE="https://raw.githubusercontent.com/mishgun64/pve/main/useful_scripts/control"
@@ -1128,6 +1146,89 @@ EOF
     unset PI_WEB_PASSWORD
 fi
 
+# ------------------------------------------------------- monitoring guard ---
+# Порты серверной части мониторинга. Таблицу создаёт и роль monitoring/server
+# (idempotent); здесь — чтобы после пересборки control порты не оставались
+# открытыми до первого прогона пайплайна. Блок намеренно вне установки Pi Web.
+log "Ограничение доступа к портам мониторинга (nftables monitoring_guard)"
+
+apt-get install -y nftables
+install -d -m 0755 /etc/nftables.d
+
+{
+    echo '#!/usr/sbin/nft -f'
+    echo '# Сгенерировано setup-control.sh: порты мониторинга на control_node.'
+    echo 'table inet monitoring_guard {'
+    echo '    set admin_src {'
+    echo '        type ipv4_addr'
+    echo '        flags interval'
+    echo "        elements = { $MONITORING_ADMIN_SRC }"
+    echo '    }'
+    echo ''
+    echo '    chain input {'
+    echo '        type filter hook input priority -14; policy accept;'
+    echo ''
+    echo '        iif "lo" accept'
+    echo '        ct state established,related accept'
+    echo ''
+    echo '        # Grafana: Traefik (внутренний + outer) и LAN-админы.'
+    echo "        tcp dport $MONITORING_PORT_GRAFANA ip saddr @admin_src accept"
+    for mon_proxy in $(tr ',' ' ' <<< "$MONITORING_GRAFANA_PROXY_SRC"); do
+        echo "        tcp dport $MONITORING_PORT_GRAFANA ip saddr $mon_proxy accept"
+    done
+    echo "        tcp dport $MONITORING_PORT_GRAFANA drop"
+    echo ''
+    echo '        # Prometheus / Alertmanager: только LAN-админы.'
+    echo "        tcp dport $MONITORING_PORT_PROMETHEUS ip saddr @admin_src accept"
+    echo "        tcp dport $MONITORING_PORT_PROMETHEUS drop"
+    echo "        tcp dport $MONITORING_PORT_ALERTMANAGER ip saddr @admin_src accept"
+    echo "        tcp dport $MONITORING_PORT_ALERTMANAGER drop"
+    echo ''
+    echo '        # node_exporter/cAdvisor самого control: только docker-сети.'
+    echo "        tcp dport { $MONITORING_AGENT_PORTS } ip saddr 172.16.0.0/12 accept"
+    echo "        tcp dport { $MONITORING_AGENT_PORTS } drop"
+    echo ''
+    echo "        meta nfproto ipv6 tcp dport { $MONITORING_PORT_GRAFANA, $MONITORING_PORT_PROMETHEUS, $MONITORING_PORT_ALERTMANAGER, $MONITORING_AGENT_PORTS } drop"
+    echo '    }'
+    echo '}'
+} > /etc/nftables.d/monitoring.nft
+
+chmod 0644 /etc/nftables.d/monitoring.nft
+
+NFT_MON_CHECK="$(mktemp /tmp/nft-mon-check.XXXXXX)"
+{ printf 'flush ruleset\n'; cat /etc/nftables.d/monitoring.nft; } > "$NFT_MON_CHECK"
+
+if ! nft -c -f "$NFT_MON_CHECK"; then
+    rm -f "$NFT_MON_CHECK"
+    echo "ОШИБКА: /etc/nftables.d/monitoring.nft не прошёл nft -c" >&2
+    exit 1
+fi
+rm -f "$NFT_MON_CHECK"
+
+# Каталог фрагментов мог не подключиться, если установка Pi Web пропущена.
+if ! grep -qF 'include "/etc/nftables.d/*.nft"' /etc/nftables.conf 2>/dev/null; then
+    [[ -f /etc/nftables.conf ]] || printf '#!/usr/sbin/nft -f\nflush ruleset\n' > /etc/nftables.conf
+    printf '\ninclude "/etc/nftables.d/*.nft"\n' >> /etc/nftables.conf
+fi
+
+systemctl enable nftables >/dev/null 2>&1 || true
+
+# Инкрементально: только своя таблица (DOCKER-* не трогаем).
+nft delete table inet monitoring_guard 2>/dev/null || true
+
+if ! nft -f /etc/nftables.d/monitoring.nft; then
+    echo "ОШИБКА: не удалось загрузить monitoring_guard" >&2
+    exit 1
+fi
+
+if nft list table inet monitoring_guard >/dev/null 2>&1; then
+    echo "Мониторинг: $MONITORING_PORT_GRAFANA — Traefik ($MONITORING_GRAFANA_PROXY_SRC) + $MONITORING_ADMIN_SRC"
+    echo "             $MONITORING_PORT_PROMETHEUS/$MONITORING_PORT_ALERTMANAGER — только $MONITORING_ADMIN_SRC"
+    echo "             $MONITORING_AGENT_PORTS — только docker-сети 172.16.0.0/12"
+else
+    echo "ОШИБКА: таблица monitoring_guard не загружена" >&2
+fi
+
 # ---------------------------------------------------- LLMNR/mDNS off ---
 # Аудит 2026-11-19: LLMNR (5355/tcp+udp на всех интерфейсах) серверу не нужен —
 # лишняя поверхность атаки и вектор spoofing в LAN. mDNS тоже выключаем.
@@ -1929,6 +2030,103 @@ EOF
     fi
 fi
 
+# ------------------------------------------------------------ monitoring ---
+# Серверная часть мониторинга (Prometheus/Alertmanager/Grafana/blackbox/
+# pve_exporter) живёт на control в /opt/monitoring и раскатывается ролью
+# monitoring/server. Здесь — восстановление из последнего бэкапа
+# gdrive:monitoring (роль monitoring/backup), чтобы пересобранный control
+# сразу получил рабочий стек. Если бэкапа нет — стек развернётся пайплайном
+# monitoring/server (или monitoring/restore) в Woodpecker.
+log "Стек мониторинга (control, $MONITORING_DIR)"
+
+if [[ -f "$MONITORING_DIR/docker-compose.yml" ]]; then
+    echo "Уже установлен — поднимаю сервисы (docker compose up -d)."
+
+    (cd "$MONITORING_DIR" && docker compose up -d) ||
+        echo "ВНИМАНИЕ: docker compose up -d в $MONITORING_DIR вернул ошибку" >&2
+else
+    MON_REMOTE_PATH="${RCLONE_REMOTE}${MONITORING_RCLONE_DIR}"
+    MON_ERR="$(mktemp /tmp/rclone-mon.XXXXXX)"
+    MON_LSF_STATUS=0
+
+    MON_LIST="$(rclone lsf --files-only \
+        --include 'monitoring_*.tar.gz.enc' \
+        --config "$RCLONE_CONFIG_FILE" \
+        "${RCLONE_TIMEOUT_ARGS[@]}" \
+        "${MON_REMOTE_PATH}/" 2>"$MON_ERR")" || MON_LSF_STATUS=$?
+
+    if [[ "$MON_LSF_STATUS" -ne 0 && "$MON_LSF_STATUS" -ne 3 ]]; then
+        echo "ВНИМАНИЕ: не удалось прочитать ${MON_REMOTE_PATH}/: $(cat "$MON_ERR")" >&2
+        echo "Стек мониторинга не восстановлен — развернуть пайплайном monitoring/server." >&2
+    elif [[ "$MON_LSF_STATUS" -eq 3 || -z "$MON_LIST" ]]; then
+        echo "Бэкапа на Drive нет — стек развернётся пайплайном monitoring/server."
+    else
+        # Имя: monitoring_ДД_ММ_ГГГГ_ЧЧ_ММ.tar.gz.enc — сортируем по дате.
+        MON_NAME="$(awk -F'[_.]' 'NF>=6 {print $4$3$2$5$6" "$0}' <<< "$MON_LIST" \
+            | sort -r | head -n 1 | cut -d' ' -f2-)"
+
+        log "Восстановление мониторинга из ${MON_REMOTE_PATH}/${MON_NAME}"
+
+        MON_TMP_DIR="$(mktemp -d /tmp/monitoring-restore.XXXXXX)"
+        chmod 700 "$MON_TMP_DIR"
+
+        if ! rclone copyto \
+            "${MON_REMOTE_PATH}/${MON_NAME}" \
+            "$MON_TMP_DIR/${MON_NAME}" \
+            --config "$RCLONE_CONFIG_FILE" \
+            "${RCLONE_TRANSFER_ARGS[@]}"; then
+            echo "ОШИБКА: не удалось скачать бэкап мониторинга" >&2
+        elif ! SOPS_AGE_SSH_PRIVATE_KEY_FILE="$SSH_KEY_FILE" sops -d \
+            --input-type binary --output-type binary \
+            --output "$MON_TMP_DIR/monitoring.tar.gz" \
+            "$MON_TMP_DIR/${MON_NAME}"; then
+            echo "ОШИБКА: не удалось расшифровать бэкап мониторинга (ключ root не подходит?)" >&2
+        elif ! MON_LISTING="$(tar -tzf "$MON_TMP_DIR/monitoring.tar.gz" 2>/dev/null)"; then
+            echo "ОШИБКА: бэкап не читается как tar.gz" >&2
+        elif grep -Eq '(^/|(^|/)\.\.(/|$))' <<< "$MON_LISTING"; then
+            echo "ОШИБКА: в архиве небезопасные пути, распаковка отменена" >&2
+        elif ! grep -qx 'monitoring/docker-compose.yml' <<< "$MON_LISTING"; then
+            echo "ОШИБКА: в архиве нет monitoring/docker-compose.yml" >&2
+        elif ! {
+            mkdir -p "$MON_TMP_DIR/root" &&
+                tar -xzf "$MON_TMP_DIR/monitoring.tar.gz" -C "$MON_TMP_DIR/root" &&
+                # Каталог мог остаться без compose (например, после ручного
+                # удаления): не затираем data/ (TSDB), кладём файлы поверх.
+                if [[ -d "$MONITORING_DIR" ]]; then
+                    cp -a "$MON_TMP_DIR/root/monitoring/." "$MONITORING_DIR/"
+                else
+                    mv "$MON_TMP_DIR/root/monitoring" "$MONITORING_DIR"
+                fi
+        }; then
+            echo "ОШИБКА: не удалось распаковать бэкап мониторинга в $MONITORING_DIR" >&2
+        else
+            # Владельцы bind-mount data: Prometheus/Alertmanager — 65534,
+            # Grafana — 472 (как в роли monitoring/server).
+            for mon_data in "$MONITORING_DIR/data/prometheus" "$MONITORING_DIR/data/alertmanager"; do
+                if [[ -d "$mon_data" ]]; then
+                    chown -R 65534:65534 "$mon_data" ||
+                        echo "ВНИМАНИЕ: не удалось сменить владельца $mon_data" >&2
+                fi
+            done
+            if [[ -d "$MONITORING_DIR/data/grafana" ]]; then
+                chown -R 472:472 "$MONITORING_DIR/data/grafana" ||
+                    echo "ВНИМАНИЕ: не удалось сменить владельца data/grafana" >&2
+            fi
+
+            if (cd "$MONITORING_DIR" && docker compose config -q && docker compose up -d); then
+                echo "Стек мониторинга восстановлен из ${MON_NAME}"
+            else
+                echo "ОШИБКА: docker compose up -d в $MONITORING_DIR" >&2
+                echo "Проверить: cd $MONITORING_DIR && docker compose logs --tail=50" >&2
+            fi
+        fi
+
+        rm -rf "$MON_TMP_DIR"
+    fi
+
+    rm -f "$MON_ERR"
+fi
+
 # ---------------------------------------------------- backup-woodpecker.sh ---
 log "Установка backup-woodpecker.sh"
 
@@ -2042,3 +2240,17 @@ echo ""
 echo "Woodpecker:"
 cd "$WP_DIR"
 docker compose ps
+
+echo ""
+echo "Мониторинг:"
+if [[ -f "$MONITORING_DIR/docker-compose.yml" ]]; then
+    (cd "$MONITORING_DIR" && docker compose ps) || true
+    echo "  Grafana:      https://grafana.mishgun.com  (LAN: http://${PI_WEB_LAN_IP:-<LAN-IP>}:$MONITORING_PORT_GRAFANA)"
+    echo "  Prometheus:   http://${PI_WEB_LAN_IP:-<LAN-IP>}:$MONITORING_PORT_PROMETHEUS  (LAN only)"
+    echo "  Alertmanager: http://${PI_WEB_LAN_IP:-<LAN-IP>}:$MONITORING_PORT_ALERTMANAGER  (LAN only)"
+    echo "  конфиги:      $MONITORING_DIR (Ansible: monitoring/server)"
+    echo "  обновление:   пайплайн monitoring/server в Woodpecker"
+else
+    echo "  не установлен — развернуть пайплайном monitoring/server в Woodpecker"
+    echo "  (или monitoring/restore, если бэкап есть на Google Drive)"
+fi

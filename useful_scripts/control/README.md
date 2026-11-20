@@ -61,6 +61,24 @@ sudo useful_scripts/control/setup-monitoring-secrets.sh --show-grafana-password
 `export SOPS_AGE_SSH_PRIVATE_KEY_FILE=/root/.ssh/id_ed25519` (подставляется
 автоматически, если файл существует).
 
+### Пересборка control и мониторинг
+
+Серверная часть мониторинга (`/opt/monitoring`) ставится не этим скриптом, а
+ролью `ansible/roles/monitoring/server` (пайплайн `monitoring/server`) — единый
+источник истины по compose/конфигам. `setup-control.sh` делает bootstrap/DR:
+
+- ставит nftables-гард `monitoring_guard`: 3000 — Traefik
+  (`192.168.2.3`, `192.168.4.3`) и LAN-админы, 9090/9093 — только LAN-админы,
+  9100/8081 — только docker-сети; IPv6 для этих портов закрыт;
+- если `/opt/monitoring` отсутствует, а на `gdrive:monitoring` есть бэкап —
+  скачивает последний `monitoring_ДД_ММ_ГГГГ_ЧЧ_ММ.tar.gz.enc`, расшифровывает
+  ключом root, проверяет архив и поднимает стек (`docker compose up -d`);
+- если бэкапа нет — стек развернётся пайплайном `monitoring/server`
+  (или `monitoring/restore`).
+
+При изменении портов/источников синхронизировать `MONITORING_*` в
+`setup-control.sh` и `ansible/roles/monitoring/server/defaults/main.yml`.
+
 ## rclone (Google Drive)
 
 Бэкапы уходят на Google Drive через rclone, поэтому рабочий конфиг rclone обязателен.

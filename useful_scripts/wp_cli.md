@@ -38,6 +38,33 @@ Pipeline files: `.woodpecker/common_basic.yml`, `common_docker.yml`.
 Pipeline file: `.woodpecker/pve_firewall.yml`.
 Запускается по push в `ansible/roles/pve/firewall/**`.
 
+## monitoring
+
+Серверная часть мониторинга (Prometheus, Alertmanager, Grafana, blackbox_exporter,
+pve_exporter) разворачивается на `control_node` в `/opt/monitoring`; агенты
+(`node_exporter` + cAdvisor) — на группах `monitoring_agents` / `monitoring_cadvisor`.
+
+| Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |
+|---|---|---|---|---|
+| agent | `monitoring/agent` | `monitoring/agent` | `monitoring_agents` | `Monitoring Agent` |
+| server | `monitoring/server` | `monitoring/server` | `monitoring_server` | `Monitoring Server` |
+| backup | `monitoring/backup` | `monitoring/backup` | `monitoring_server` | `Monitoring Backup` |
+| restore | `monitoring/restore` | `monitoring/restore` | `monitoring_server` | `Monitoring Restore` |
+| full | `monitoring/full` | — | — | `Monitoring Full` |
+
+Pipeline files: `.woodpecker/monitoring_agent.yml`, `monitoring_server.yml`,
+`monitoring_backup.yml`, `monitoring_restore.yml`, `monitoring_full.yml`.
+`full` запускает `ansible/monitoring.yml` (сначала `monitoring/agent`, затем
+`monitoring/server`). `server` расшифровывает `secrets.enc.yml` на раннере
+(нужен `sops` + `SOPS_AGE_SSH_PRIVATE_KEY_FILE`); `backup`/`restore` выполняются
+на самом control (rclone `gdrive:monitoring` + sops + ключ root) и в CI sops не
+требуют. Плановый бэкап: cron `Monitoring-backup`.
+
+Секреты (Telegram bot_token/chat_id, PVE-токен, пароль Grafana) — в
+sops-файле роли; первичная настройка — скриптами
+`useful_scripts/control/setup-pve-monitoring-token.sh` и
+`setup-monitoring-secrets.sh`. Подробности: `ansible/roles/monitoring/README.md`.
+
 ## media
 
 | Pipeline | PIPELINE | ROLE | TARGET | MESSAGE |

@@ -78,10 +78,15 @@ ROWS=(
     "santa_bot|Santa Bot|Restore|santa_bot/restore|santa_bot/restore|santa_bot_lxc"
     "santa_bot|Santa Bot|Firewall|santa_bot/firewall|santa_bot/firewall|pve"
     "santa_bot|Santa Bot|Full|santa_bot/full||"
+    "monitoring|Monitoring|Agent|monitoring/agent|monitoring/agent|monitoring_agents"
+    "monitoring|Monitoring|Server|monitoring/server|monitoring/server|monitoring_server"
+    "monitoring|Monitoring|Backup|monitoring/backup|monitoring/backup|monitoring_server"
+    "monitoring|Monitoring|Restore|monitoring/restore|monitoring/restore|monitoring_server"
+    "monitoring|Monitoring|Full|monitoring/full||"
 )
 
 # Порядок сервисов как в ps1
-SERVICE_ORDER=(common pve media nextcloud pvpgn traefik valheim wireguard santa_bot)
+SERVICE_ORDER=(common pve media nextcloud pvpgn traefik valheim wireguard santa_bot monitoring)
 
 # ============================================================
 # ЦВЕТА / UI
